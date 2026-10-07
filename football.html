@@ -112,6 +112,9 @@ td.note{white-space:normal;min-width:200px;color:var(--gold);font-size:14px}
 </style>
 </head>
 <body>
+<div class="gs-home-row" id="gs-home"><a class="gs-home" href="index.html">&#9664; ALL CHAMINADE GAMES</a></div>
+<style>.gs-home-row{max-width:980px;margin:0 auto 12px}.gs-home{display:inline-block;font-family:"Press Start 2P",ui-monospace,"Courier New",monospace;font-size:10px;line-height:1;padding:10px 12px;background:#6a0b1e;border:2px solid #e0aa2e;color:#fff8e8;text-decoration:none}.gs-home:hover{background:#86122b}.gs-home:focus-visible{outline:3px dashed #ffc72c;outline-offset:6px}</style>
+<script>addEventListener("DOMContentLoaded",()=>{const r=document.getElementById("gs-home"),g=document.getElementById("game");if(!r||!g)return;const s=()=>{r.hidden=!g.hidden};new MutationObserver(s).observe(g,{attributes:true,attributeFilter:["hidden"]});s()});</script>
 
 
 <div id="menu" class="wrap"></div>
