@@ -1024,35 +1024,41 @@ function startShot(c){
   if(GR-c.x<0.6){setMsg("NO ANGLE FROM BEHIND THE GOAL",1.1);return}
   const D=Math.hypot(GR-c.x,GY-c.y),gk=goalie("O"),sav=R(gk.p,"sav"),press=pressured(c),outside=c.x<RR;
   const k={c,stage:0,pos:0,dir:1,power:0,D,press,sav,outside,t:0,ru:0,rv:0.45,tu:0,tv:0.45,
-    gu:clamp(gk.y-GY,-0.5,0.5),gside:Math.random()<.5?-1:1,sv:0.86,
-    sway:(0.03+Math.max(0,D-5)/85)*(1.4-R(c.p,"sht")/110)*(press?1.6:1)+(outside?0.2:0)};   // how much your aim wobbles: more the farther out you are
+    gu:clamp(gk.y-GY,-0.5,0.5),g0:clamp(gk.y-GY,-0.4,0.4),gside:Math.random()<.5?-1:1,sv:0.86,
+    sway:(0.03+Math.max(0,D-5)/65)*(1.4-R(c.p,"sht")/110)*(press?1.6:1)+(outside?0.2:0)};   // how much your aim wobbles: more the farther out you are
   const ang=clamp(Math.atan2(c.y-GY,GR-c.x),-1.25,1.25);NV={sq:Math.max(0.22,Math.pow(Math.cos(ang),1.6)),tilt:Math.sin(ang)*0.34,side:Math.sign(ang),off:-Math.sign(ang)*Math.min(300,Math.abs(Math.sin(ang))*360)};k.sq=NV.sq;
   k.su=k.gu+k.gside*0.40;k.pSpeed=1.7;
   G.sm=k;G.phase="shot";input.down=false;input.aiming=false;renderBar(true);SFX.tick();
 }
 const swayAt=k=>({u:k.sway*(Math.sin(k.t*3.3)+0.6*Math.sin(k.t*7.1+1)),v:k.sway*0.8*(Math.sin(k.t*2.7+2)+0.5*Math.sin(k.t*6.3))});
 /* What the goalie covers: his body and stick, plus how far he can react. A soft shot from far out gives him time. */
-function gkReach(k){return(0.075+(k.sav-70)/200+clamp(k.D-8,0,12)*0.03+(k.outside?0.1:0)-(k.D<7?0.05:0))*(1.45-k.power*0.7)}
+function gkReach(k){return(0.075+(k.sav-70)/200+clamp(k.D-7,0,16)*0.02+(k.outside?0.1:0)-(k.D<7?0.05:0))*(1.45-k.power*0.7)}
 function gkCovers(k,u,v){const cs=1/(0.5+0.5*(k.sq||1)),m=gkReach(k)*cs,bw=0.30*cs;
   if(Math.abs(u-k.gu)<=bw+m&&v<=0.85+m)return true;                                    // body, pads and helmet
   return Math.hypot((u-k.su)/cs,(v-k.sv)*1.1)<=0.20+m/cs;       // stick head, wherever he's moved it       // stick head up on his stick side
 }
 function updateShotMeter(dt){const k=G.sm;if(!k)return;k.t+=dt;
-  if(k.stage===0){k.pos+=k.dir*k.pSpeed*dt;if(k.pos>1){k.pos=1;k.dir=-1}if(k.pos<0){k.pos=0;k.dir=1}return}
+  if(k.stage===0){k.pos+=k.dir*k.pSpeed*dt;if(k.pos>1){k.pos=1;k.dir=-1}if(k.pos<0){k.pos=0;k.dir=1}
+    // while you wind up he stays live: shuffling across the crease and bouncing his stick
+    const gs=1.2+(k.sav-70)/60,tg=k.g0+0.32*Math.sin(k.t*2.3)+0.1*Math.sin(k.t*5.3);k.gu+=clamp(tg-k.gu,-gs*dt,gs*dt);
+    const tsu=k.gu+k.gside*(0.4+0.06*Math.sin(k.t*6.1)),tsv=0.84+0.07*Math.sin(k.t*4.7);k.su+=clamp(tsu-k.su,-2.5*dt,2.5*dt);k.sv+=clamp(tsv-k.sv,-2.5*dt,2.5*dt);
+    return}
   if(k.stage===1){
     if(input.down){const n=toNet(input.cx,input.cy);k.tu=n.u;k.tv=n.v}
     const kx=(input.keys.ArrowRight||input.keys.KeyD?1:0)-(input.keys.ArrowLeft||input.keys.KeyA?1:0),ky=(input.keys.ArrowUp||input.keys.KeyW?1:0)-(input.keys.ArrowDown||input.keys.KeyS?1:0);
     k.tu=clamp(k.tu+kx*1.6*dt,-1.5,1.5);k.tv=clamp(k.tv+ky*1.4*dt,0,1.45);
     const f=Math.min(1,dt*14);k.ru+=(k.tu-k.ru)*f;k.rv+=(k.tv-k.rv)*f;
     // the goalie reads your eyes: he slides toward wherever you're aiming
-    const gs=1.7+(k.sav-70)/50;k.gu+=clamp(clamp(k.ru,-0.8,0.8)-k.gu,-gs*dt,gs*dt);
+    const far=clamp(k.D-8,0,14),gs=1.7+(k.sav-70)/50+far*0.05;k.gu+=clamp(clamp(k.ru,-0.8,0.8)+0.06*Math.sin(k.t*3.1)-k.gu,-gs*dt,gs*dt);
     // ...and he moves his stick head to where you're aiming, as far as his arms reach
-    const ss=2.6+(k.sav-70)/40,tsu=k.gu+clamp(k.ru-k.gu,-0.62,0.62),tsv=clamp(k.rv,0.15,0.92);
+    const ss=2.6+(k.sav-70)/40+far*0.065,tsu=k.gu+clamp(k.ru-k.gu,-0.62,0.62),tsv=clamp(k.rv,0.15,0.92);
     k.su+=clamp(tsu-k.su,-ss*dt,ss*dt);k.sv+=clamp(tsv-k.sv,-ss*dt,ss*dt);
     k.t1=(k.t1||0)+dt;if(k.t1>2.8)fireShot();   // don't stare him down forever
     return}
   // stage 2: the ball flies into the cage
   k.t2+=dt;const r=k.res;if(r.saved){const tu=clamp(r.u,k.gu-0.5,k.gu+0.5);k.gu+=(tu-k.gu)*Math.min(1,dt*10);k.su+=(r.u-k.su)*Math.min(1,dt*12);k.sv+=(clamp(r.v,0.1,1)-k.sv)*Math.min(1,dt*12)}
+  else{const d=r.u-k.gu,tu=k.gu+Math.sign(d)*Math.max(0,Math.abs(d)-0.42);k.gu+=clamp(tu-k.gu,-3*dt,3*dt);   // beaten, but he still dives for it
+    const sd=r.u-k.su,stu=k.su+Math.sign(sd)*Math.max(0,Math.abs(sd)-0.3);k.su+=clamp(stu-k.su,-4*dt,4*dt);k.sv+=clamp(clamp(r.v,0.1,1)-k.sv,-3*dt,3*dt)}
   if(k.t2>0.6){G.sm=null;G.phase="live";shoot(k.c,GY+r.u,{power:k.power,saved:r.saved,over:r.v>1});renderBar(true)}
 }
 function fireShot(){const k=G&&G.sm;if(!k||k.stage!==1)return;
@@ -1060,10 +1066,13 @@ function fireShot(){const k=G&&G.sm;if(!k||k.stage!==1)return;
   const u=k.ru+w.u+rnd(-e,e),v=Math.max(0.03,k.rv+w.v+rnd(-e,e));
   const inCage=Math.abs(u)<=1&&v<=1;
   // he reacts as you release: a lunge of the body and a jab of the stick toward the ball (less time to react to a hard shot)
-  const L=0.18*(1.2-k.power*0.5);k.gu+=clamp(u-k.gu,-L,L);k.su+=clamp(u-k.su,-L*1.3,L*1.3);k.sv+=clamp(v-k.sv,-L*1.3,L*1.3);
+  // ...and the farther out you are, the longer the ball is in the air, so he gets there even if you switch corners late
+  const far=clamp(k.D-8,0,14),fly=k.D/(17+k.power*15+R(k.c.p,"sht")/10);
+  const L0=0.18*(1.2-k.power*0.5),Lf=Math.max(0,fly-0.12)*(1.6+(k.sav-70)/25),L=L0+Lf,Ls=L0*1.3+Lf;
+  k.gu+=clamp(u-k.gu,-L,L);k.su+=clamp(u-k.su,-Ls,Ls);k.sv+=clamp(v-k.sv,-Ls,Ls);
   let saved=inCage&&gkCovers(k,u,v);
   if(inCage&&!saved&&k.power<0.35&&Math.random()<0.65)saved=true;   // a weak shot gets eaten anyway
-  if(saved&&k.power>0.94&&!k.outside&&Math.random()<0.06)saved=false;  // a cannon can beat him through the body
+  if(saved&&k.power>0.94&&k.D<12&&Math.random()<0.06)saved=false;  // a cannon can beat him through the body
   if(inCage&&!saved&&k.outside&&Math.random()<0.8)saved=true;      // from outside the line he sees it the whole way
   k.res={u,v,saved};k.stage=2;k.t2=0;SFX.shot();renderBar(true);
 }
@@ -1439,7 +1448,7 @@ function renderBar(force){
   else if(m==="def"){bar.innerHTML=`${AB("a-check","Check","SPACE","hot")}${AB("a-hit","Hit","R","hot")}${AB("a-sprint","Sprint","HOLD SHIFT","gold")}${AB("a-switch","Switch","E")}${SUBS}<div class="info">Check to knock the ball out of his stick. Hit (or swipe the field) to lay him out with your shoulder. Land it and he goes down, miss and you do. Poles check and hit harder.</div>`;
     on("a-check",actCheck);on("a-hit",actHit);on("a-switch",actSwitch);sprintBtn()}
   else if(m==="loose"){bar.innerHTML=`${AB("a-hit","Hit","R")}${AB("a-sprint","Sprint","HOLD SHIFT","gold")}${AB("a-switch","Switch","E")}${SUBS}<div class="info"><b>Ground ball!</b> Run over it to scoop it up. You can hit anyone within 5 yards of a loose ball.</div>`;on("a-hit",actHit);on("a-switch",actSwitch);sprintBtn()}
-  else if(m.startsWith("shot")){const st=G.sm?G.sm.stage:0;bar.innerHTML=st>1?`<div class="info">&nbsp;</div>`:`${AB("a-shot",st===0?"Power":"Shoot","SPACE","gold")}<div class="info">${st===0?"Tap when the power bar is full. More power means less time for the goalie.":"Drag on the net to aim (arrow keys work too) and let go to shoot. The goalie slides toward where you're looking, and your aim wobbles more from far out or with a defender on you."}</div>`;
+  else if(m.startsWith("shot")){const st=G.sm?G.sm.stage:0;bar.innerHTML=st>1?`<div class="info">&nbsp;</div>`:`${AB("a-shot",st===0?"Power":"Shoot","SPACE","gold")}<div class="info">${st===0?"Tap when the power bar is full. More power means less time for the goalie.":"Drag on the net to aim (arrow keys work too) and let go to shoot. The goalie slides toward where you're looking, and your aim wobbles more from far out or with a defender on you. From far out he has time to get to it, so get closer."}</div>`;
     const b=$("#a-shot");if(b)b.onpointerdown=ev=>{ev.preventDefault();shotTap()}}
   else if(m.startsWith("dodge")){const v=G.dv;
     bar.innerHTML=!v||v.stage?`<div class="info">&nbsp;</div>`:`${AB("d-left","◀ Left","A",v.side<0?"gold":"")}${AB("d-right","Right ▶","D",v.side>0?"gold":"")}${DODGES.map(x=>AB("d-"+x.k,x.name.toLowerCase().replace(/^./,s=>s.toUpperCase()),x.key,"hot")).join("")}<div class="info">Read his tell, pick a side, then pick your move. Stick up: swim. Hands out: roll. Sitting back: switch hands. Go away from his lean.</div>`;
@@ -1587,7 +1596,7 @@ function renderHowto(){
     <li><b>Faceoff.</b> Every quarter and every goal starts at the X. Wait for DOWN, then SET, then tap (or press Space) the instant the WHISTLE shows. Beat their FOGO to the clamp and the ball is yours. Go early and it's a violation. A dead heat squirts out as a ground ball.</li>
     <li><b>Run.</b> Like Retro Bowl, your ball carrier runs on his own: up the field, then around the top of the attack. Hold your finger on the field to steer him toward it. Keys: arrows or WASD. The Flyers attack the cage on the right.</li>
     <li><b>Throw.</b> Put your finger on your player, drag back, and let go. Aim near a teammate and the pass locks on to him (gold arrow). The pass meter shows how hard you're pulling: let go in the green band for a pinpoint pass. A quick flick is a fast, flat bullet. A slow pull floats a lob over sticks. You can also tap a teammate, or press Space for the most open man.</li>
-    <li><b>Shoot.</b> Tap the cage (or press F, or the Shoot button) to wind up. First tap when the power bar is full. Then the view switches to first person, looking at the cage: drag anywhere on the net to aim and let go to shoot (arrow keys and Space work too). The goalie slides toward wherever you're aiming, so pick a corner late. Your aim wobbles more from far out or with a defender on you, and a soft shot gives him time to react. You can't score from behind the goal.</li>
+    <li><b>Shoot.</b> Tap the cage (or press F, or the Shoot button) to wind up. First tap when the power bar is full. Then the view switches to first person, looking at the cage: drag anywhere on the net to aim and let go to shoot (arrow keys and Space work too). The goalie slides toward wherever you're aiming, so pick a corner late. From far out the ball is in the air long enough for him to get there, so the best shots come from close in. Your aim wobbles more from far out or with a defender on you, and a soft shot gives him time to react. You can't score from behind the goal.</li>
     <li><b>Dodge moves.</b> With a defender on you, tap Dodge (or swipe, or press E) and the view switches to first person, face to face with him. Read his tell: stick up means he wants to check, so swim dodge over it. Hands out means he wants to push, so roll dodge off him. Sitting back means he's waiting, so switch hands and change direction. Pick Left or Right (arrows or A/D), going away from the way he leans, then pick your move (or press 1, 2, 3) before the timer runs out. Beat him and he's left behind. Guess wrong and he can strip you.</li>
     <li><b>Shooting range.</b> From outside the white restraining line a shot almost never goes in. The closer you get to the cage, the easier it is to score.</li>
     <li><b>Sprint.</b> With nobody on you, a dodge is a quick burst. A sharp split dodge can leave your defender a step behind. Hold the Sprint button (or Shift) for a speed boost. It drains the green BOOST meter and refills when you let go.</li>
