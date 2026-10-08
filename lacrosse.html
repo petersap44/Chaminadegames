@@ -1021,17 +1021,17 @@ function startShot(c){
   if(GR-c.x<0.6){setMsg("NO ANGLE FROM BEHIND THE GOAL",1.1);return}
   const D=Math.hypot(GR-c.x,GY-c.y),gk=goalie("O"),sav=R(gk.p,"sav"),press=pressured(c),outside=c.x<RR;
   const k={c,stage:0,pos:0,dir:1,power:0,D,press,sav,outside,t:0,ru:0,rv:0.45,tu:0,tv:0.45,
-    gu:clamp(gk.y-GY,-0.5,0.5),gside:Math.random()<.5?-1:1,
+    gu:clamp(gk.y-GY,-0.5,0.5),gside:Math.random()<.5?-1:1,sv:0.86,
     sway:(0.03+Math.max(0,D-5)/85)*(1.4-R(c.p,"sht")/110)*(press?1.6:1)+(outside?0.2:0)};   // how much your aim wobbles: more the farther out you are
-  k.pSpeed=1.7;
+  k.su=k.gu+k.gside*0.40;k.pSpeed=1.7;
   G.sm=k;G.phase="shot";input.down=false;input.aiming=false;renderBar(true);SFX.tick();
 }
 const swayAt=k=>({u:k.sway*(Math.sin(k.t*3.3)+0.6*Math.sin(k.t*7.1+1)),v:k.sway*0.8*(Math.sin(k.t*2.7+2)+0.5*Math.sin(k.t*6.3))});
 /* What the goalie covers: his body and stick, plus how far he can react. A soft shot from far out gives him time. */
-function gkReach(k){return(0.065+(k.sav-70)/200+clamp(k.D-8,0,12)*0.03+(k.outside?0.1:0)-(k.D<7?0.05:0))*(1.45-k.power*0.7)}
+function gkReach(k){return(0.075+(k.sav-70)/200+clamp(k.D-8,0,12)*0.03+(k.outside?0.1:0)-(k.D<7?0.05:0))*(1.45-k.power*0.7)}
 function gkCovers(k,u,v){const m=gkReach(k),bw=0.30;
   if(Math.abs(u-k.gu)<=bw+m&&v<=0.85+m)return true;                                    // body, pads and helmet
-  const su=k.gu+k.gside*0.40,sv=0.86;return Math.hypot(u-su,(v-sv)*1.1)<=0.19+m;       // stick head up on his stick side
+  return Math.hypot(u-k.su,(v-k.sv)*1.1)<=0.20+m;       // stick head, wherever he's moved it       // stick head up on his stick side
 }
 function updateShotMeter(dt){const k=G.sm;if(!k)return;k.t+=dt;
   if(k.stage===0){k.pos+=k.dir*k.pSpeed*dt;if(k.pos>1){k.pos=1;k.dir=-1}if(k.pos<0){k.pos=0;k.dir=1}return}
@@ -1041,11 +1041,14 @@ function updateShotMeter(dt){const k=G.sm;if(!k)return;k.t+=dt;
     k.tu=clamp(k.tu+kx*1.6*dt,-1.5,1.5);k.tv=clamp(k.tv+ky*1.4*dt,0,1.45);
     const f=Math.min(1,dt*14);k.ru+=(k.tu-k.ru)*f;k.rv+=(k.tv-k.rv)*f;
     // the goalie reads your eyes: he slides toward wherever you're aiming
-    const gs=1.0+(k.sav-70)/70;k.gu+=clamp(clamp(k.ru,-0.76,0.76)-k.gu,-gs*dt,gs*dt);
+    const gs=1.25+(k.sav-70)/60;k.gu+=clamp(clamp(k.ru,-0.8,0.8)-k.gu,-gs*dt,gs*dt);
+    // ...and he moves his stick head to where you're aiming, as far as his arms reach
+    const ss=1.8+(k.sav-70)/40,tsu=k.gu+clamp(k.ru-k.gu,-0.62,0.62),tsv=clamp(k.rv,0.15,0.92);
+    k.su+=clamp(tsu-k.su,-ss*dt,ss*dt);k.sv+=clamp(tsv-k.sv,-ss*dt,ss*dt);
     k.t1=(k.t1||0)+dt;if(k.t1>2.8)fireShot();   // don't stare him down forever
     return}
   // stage 2: the ball flies into the cage
-  k.t2+=dt;const r=k.res;if(r.saved){const tu=clamp(r.u,k.gu-0.5,k.gu+0.5);k.gu+=(tu-k.gu)*Math.min(1,dt*10)}
+  k.t2+=dt;const r=k.res;if(r.saved){const tu=clamp(r.u,k.gu-0.5,k.gu+0.5);k.gu+=(tu-k.gu)*Math.min(1,dt*10);k.su+=(r.u-k.su)*Math.min(1,dt*12);k.sv+=(clamp(r.v,0.1,1)-k.sv)*Math.min(1,dt*12)}
   if(k.t2>0.6){G.sm=null;G.phase="live";shoot(k.c,GY+r.u,{power:k.power,saved:r.saved,over:r.v>1});renderBar(true)}
 }
 function fireShot(){const k=G&&G.sm;if(!k||k.stage!==1)return;
@@ -1083,8 +1086,8 @@ function drawShotView(){const k=G.sm,W=VW*SCALE,H=VH*SCALE,g=sc,O=lookFor("O");
   txt(String(goalie("O").p.num),gx,y1-130,14,O.num,"center");
   px(-24,196,48,46,O.helmet);px(-18,186,36,30,O.cage);px(-14,182,28,22,"#e1b38c");                       // helmet, cage, face
   for(let i=-14;i<=14;i+=7)px(i,186,2,30,O.cage);
-  const sx=netX(k.gu+k.gside*0.40),sy=netY(0.86);
-  g.fillStyle="#d8d8d8";g.fillRect(Math.min(gx,sx),y1-110,Math.abs(sx-gx),6);g.fillRect(sx-3,sy,6,y1-110-sy);   // stick shaft
+  const sx=netX(k.su),sy=netY(k.sv),hx=gx+(sx>=gx?46:-46),hy=y1-110;
+  g.strokeStyle="#d8d8d8";g.lineWidth=6;g.lineCap="butt";g.beginPath();g.moveTo(hx,hy);g.lineTo(sx,sy+14);g.stroke();   // stick shaft from his glove
   g.fillStyle="#f6f6f0";g.fillRect(sx-24,sy-30,48,44);g.fillStyle="rgba(40,40,40,.55)";g.fillRect(sx-18,sy-24,36,32); // big goalie head
   g.fillStyle=O.glove;g.fillRect(gx-56,y1-120,20,22);g.fillRect(gx+36,y1-120,20,22);
   // posts and crossbar
