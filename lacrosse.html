@@ -1013,7 +1013,7 @@ function shoot(c,aimY,meter){ // meter: {power,saved} from the user's power/plac
 }
 /* ---------- shooting: power meter, then a first-person view of the cage where you aim anywhere ----------
    Net coordinates: u runs -1 (far post, left of the screen) to 1 (near post), v runs 0 (ground) to 1 (crossbar). */
-const NETW=270,NETH=230,NETB=338; // the cage on screen in the first-person view
+const NETW=240,NETH=210,NETB=338; // the cage on screen in the first-person view
 const netX=u=>VW*SCALE/2+u*NETW/2,netY=v=>NETB-v*NETH;
 const toNet=(x,y)=>({u:clamp((x-VW*SCALE/2)/(NETW/2),-1.5,1.5),v:clamp((NETB-y)/NETH,0,1.45)});
 function startShot(c){
@@ -1028,10 +1028,10 @@ function startShot(c){
 }
 const swayAt=k=>({u:k.sway*(Math.sin(k.t*3.3)+0.6*Math.sin(k.t*7.1+1)),v:k.sway*0.8*(Math.sin(k.t*2.7+2)+0.5*Math.sin(k.t*6.3))});
 /* What the goalie covers: his body and stick, plus how far he can react. A soft shot from far out gives him time. */
-function gkReach(k){return(0.05+(k.sav-70)/200+clamp(k.D-8,0,12)*0.03+(k.outside?0.1:0)-(k.D<7?0.05:0))*(1.45-k.power*0.7)}
-function gkCovers(k,u,v){const m=gkReach(k),bw=0.27;
-  if(Math.abs(u-k.gu)<=bw+m&&v<=0.8+m)return true;                                    // body, pads and helmet
-  const su=k.gu+k.gside*0.36,sv=0.86;return Math.hypot(u-su,(v-sv)*1.1)<=0.17+m;       // stick head up on his stick side
+function gkReach(k){return(0.065+(k.sav-70)/200+clamp(k.D-8,0,12)*0.03+(k.outside?0.1:0)-(k.D<7?0.05:0))*(1.45-k.power*0.7)}
+function gkCovers(k,u,v){const m=gkReach(k),bw=0.30;
+  if(Math.abs(u-k.gu)<=bw+m&&v<=0.85+m)return true;                                    // body, pads and helmet
+  const su=k.gu+k.gside*0.40,sv=0.86;return Math.hypot(u-su,(v-sv)*1.1)<=0.19+m;       // stick head up on his stick side
 }
 function updateShotMeter(dt){const k=G.sm;if(!k)return;k.t+=dt;
   if(k.stage===0){k.pos+=k.dir*k.pSpeed*dt;if(k.pos>1){k.pos=1;k.dir=-1}if(k.pos<0){k.pos=0;k.dir=1}return}
@@ -1041,7 +1041,7 @@ function updateShotMeter(dt){const k=G.sm;if(!k)return;k.t+=dt;
     k.tu=clamp(k.tu+kx*1.6*dt,-1.5,1.5);k.tv=clamp(k.tv+ky*1.4*dt,0,1.45);
     const f=Math.min(1,dt*14);k.ru+=(k.tu-k.ru)*f;k.rv+=(k.tv-k.rv)*f;
     // the goalie reads your eyes: he slides toward wherever you're aiming
-    const gs=0.75+(k.sav-70)/80;k.gu+=clamp(clamp(k.ru,-0.7,0.7)-k.gu,-gs*dt,gs*dt);
+    const gs=1.0+(k.sav-70)/70;k.gu+=clamp(clamp(k.ru,-0.76,0.76)-k.gu,-gs*dt,gs*dt);
     k.t1=(k.t1||0)+dt;if(k.t1>2.8)fireShot();   // don't stare him down forever
     return}
   // stage 2: the ball flies into the cage
@@ -1083,7 +1083,7 @@ function drawShotView(){const k=G.sm,W=VW*SCALE,H=VH*SCALE,g=sc,O=lookFor("O");
   txt(String(goalie("O").p.num),gx,y1-130,14,O.num,"center");
   px(-24,196,48,46,O.helmet);px(-18,186,36,30,O.cage);px(-14,182,28,22,"#e1b38c");                       // helmet, cage, face
   for(let i=-14;i<=14;i+=7)px(i,186,2,30,O.cage);
-  const sx=netX(k.gu+k.gside*0.36),sy=netY(0.86);
+  const sx=netX(k.gu+k.gside*0.40),sy=netY(0.86);
   g.fillStyle="#d8d8d8";g.fillRect(Math.min(gx,sx),y1-110,Math.abs(sx-gx),6);g.fillRect(sx-3,sy,6,y1-110-sy);   // stick shaft
   g.fillStyle="#f6f6f0";g.fillRect(sx-24,sy-30,48,44);g.fillStyle="rgba(40,40,40,.55)";g.fillRect(sx-18,sy-24,36,32); // big goalie head
   g.fillStyle=O.glove;g.fillRect(gx-56,y1-120,20,22);g.fillRect(gx+36,y1-120,20,22);
