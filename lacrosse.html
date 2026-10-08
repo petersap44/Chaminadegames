@@ -754,7 +754,7 @@ function updateAir(dt){
   // defenders can knock down or pick off a pass (or block a shot) that comes near their stick
   for(const e of G.ents){
     if(e.team===b.team||b.tested.has(e)||e.role==="G")continue;
-    if(dist(e,b)<0.85&&b.h<2.3){b.tested.add(e);
+    if(dist(e,b)<(e.p.pole?1.15:0.85)&&b.h<2.3){b.tested.add(e);
       const p=b.shot?(u<0.5?0.18:0):(e.team==="O"?DIF("intc")*(b.easy===2?0.35:b.easy?0.6:1):0.3);
       if(Math.random()<p){
         if(!b.shot&&Math.random()<0.4){give(e);setMsg("PICKED OFF"+(e.team==="C"?": "+e.p.last.toUpperCase():""),1.2);if(e.team==="C"){ps(e.p).ct++;SFX.catch()}else SFX.bad();G.st[e.team].to++;return}
@@ -842,7 +842,7 @@ function nextPeriod(){
 function tryCheck(d,c){
   if(!c||d.team===c.team||c.role==="G")return false;
   d.ccd=0.9;
-  if(dist(d,c)>2){d.stun=0.25;return false}
+  if(dist(d,c)>(d.p.pole?2.6:2)){d.stun=0.25;return false}
   let p=0.2+(R(d.p,"pow")-R(c.p,"stk"))/240+(d.p.pole?0.08:0)-(c.dodge>0?0.15:0);
   if(c.team==="C")p+=DIF("chk");
   if(d.team==="C"&&DL_()===0)p+=0.08;
@@ -1221,6 +1221,14 @@ function drawPlayer(e){
   if(!c){c=document.createElement("canvas");c.width=SPR_W*SCALE;c.height=SPR_H*SCALE;const g=c.getContext("2d");g.setTransform(SCALE,0,0,SCALE,0,0);
     paintPlayer(g,SPR_OX,SPR_OY,f,pose,SKIN[skin],gk,pole,ball,look);SPR[key]=c}
   wc.drawImage(c,x-SPR_OX,y-SPR_OY,SPR_W,SPR_H);
+  if(ball){ // make the ball carrier obvious: pulsing ring, glowing ball, arrow (red when the other team has it)
+    const g=wc,t=performance.now()/1000,opp=e.team!=="C",col=opp?"#ff3b30":"#ffd640",pu=0.5+0.5*Math.sin(t*8);
+    g.strokeStyle=col;g.globalAlpha=0.55+0.45*pu;g.lineWidth=1.5;g.beginPath();g.ellipse(x+0.5,y+1,8+pu*2.5,3+pu,0,0,Math.PI*2);g.stroke();g.globalAlpha=1;
+    const bx=x+f*(3+(gk?4:pole?7:2)),by=y-9-(gk?11:pole?15:5);
+    g.fillStyle=opp?"rgba(255,59,48,.45)":"rgba(255,214,64,.4)";g.beginPath();g.arc(bx+0.5,by,3.2+pu,0,Math.PI*2);g.fill();
+    g.fillStyle="#fffbe8";g.beginPath();g.arc(bx+0.5,by,1.7,0,Math.PI*2);g.fill();
+    if(opp){const ay=Math.min(y-21,by-4)-3-pu*2;g.fillStyle=col;g.strokeStyle="#000";g.lineWidth=0.75;g.beginPath();g.moveTo(x-3.5,ay-4);g.lineTo(x+4.5,ay-4);g.lineTo(x+0.5,ay+1);g.closePath();g.fill();g.stroke()}
+  }
   if(e===G.ctrl){const g=wc;g.strokeStyle="#ffd640";g.lineWidth=1;g.beginPath();g.ellipse(x+0.5,y+1,e.down>0?7:6,2.5,0,0,Math.PI*2);g.stroke()}
 }
 function paintPlayer(g,x,y,f,pose,skin,gk,pole,ball,look){
@@ -1239,8 +1247,8 @@ function paintPlayer(g,x,y,f,pose,skin,gk,pole,ball,look){
   px(1,-14,1,1,skin);
   // stick: glove at the hand, shaft up and forward, head on top
   const hx=f>0?x+3:x-3,hy=y-9;
-  const len=pole?11:8,sx=hx+f*(pole?4:3),sy=hy-len;
-  line(g,hx-f*2,hy+2,sx,sy,gk?"#d8d8d8":pole?"#c9c9c9":"#e4e4e4");
+  const len=gk?11:pole?15:5,sx=hx+f*(gk?4:pole?7:2),sy=hy-len; // long poles on D/LSM, short sticks on offense
+  line(g,hx-f*(pole&&!gk?4:2),hy+(pole&&!gk?3:2),sx,sy,gk?"#d8d8d8":pole?"#9aa0a8":"#e4e4e4");
   g.fillStyle=look.glove;g.fillRect(hx-1,hy-1,2,2);
   const hw=gk?5:3,hh=gk?5:3;g.fillStyle="#f6f6f0";g.fillRect(sx-Math.floor(hw/2),sy-hh+1,hw,hh);
   g.fillStyle="rgba(40,40,40,.6)";g.fillRect(sx-Math.floor(hw/2)+1,sy-hh+2,hw-2,hh-2);
@@ -1302,7 +1310,9 @@ function drawHUD(){
   sc.fillStyle="#000";sc.fillRect(285,9,128,40);
   txt(G.ot?"OT"+(G.otN>1?G.otN:""):"Q"+G.q,296,23,12,"#ffffff");txt(fmtClock(G.clock),404,23,12,G.clock<20&&G.phase==="live"?"#ff6b6b":"#ffffff","right");
   // name over the player you control
-  if(G.ctrl&&(G.phase==="live")){const e=G.ctrl,x=wx(e.x)*SCALE,y=wy(e.y)*SCALE-(e.p.pole?66:60);if(x>0&&x<W)txt(e.p.last.toUpperCase(),x,y,8,"#ffd640","center")}
+  if(G.ctrl&&(G.phase==="live")){const e=G.ctrl,x=wx(e.x)*SCALE,y=wy(e.y)*SCALE-(e.p.pole?72:60);if(x>0&&x<W)txt(e.p.last.toUpperCase(),x,y,8,"#ffd640","center")}
+  // who has the ball when you're on defense
+  if(G.phase==="live"&&G.ball.st==="held"&&G.ball.owner&&G.ball.owner.team!=="C"){const e=G.ball.owner,x=wx(e.x)*SCALE,y=wy(e.y)*SCALE+22;if(x>0&&x<W)txt("BALL: "+e.p.last.toUpperCase(),x,y,8,"#ff4b40","center")}
   // player card
   const who=G.phase==="fo"?ent("C","M",0):G.ctrl;
   if(who&&who.p&&G.phase!=="final"){sc.fillStyle="#000";sc.fillRect(W-232,H-58,224,50);sc.drawImage(portraitCanvas(who.p),W-228,H-54,42,42);
