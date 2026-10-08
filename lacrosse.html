@@ -569,6 +569,7 @@ function update(dt){
   else if(G.phase==="fo")updateFO(dt);
   else if(G.phase==="live")updateLive(dt);
   else if(G.phase==="shot"){updateShotMeter(dt);settle(dt)}
+  else if(G.phase==="dodge"){updateDodge(dt);settle(dt)}
   else if(G.phase==="goal"||G.phase==="dead"){G.resT-=dt;settle(dt);if(G.resT<=0)G.after()}
   else settle(dt);
   const fx=G.ball.st==="held"?G.ball.owner.x+dirOf(G.ball.owner.team)*8:G.ball.x;
@@ -788,8 +789,9 @@ function resolveShot(){
     else{setMsg("WIDE",1);looseFrom(gx,b.ty,dir*b.spd*.55,(b.ty-b.y0)/b.T*.4)}
     G.shotOut={t:3};return}
   const gkS=R(gk.p,"sav")+(gk.team==="C"?(save.up.gk||0)*3:0);
-  let p=0.5+(gkS-75)/120-Math.abs(gk.y-b.ty)*0.4+(b.D-11)*0.022-(b.sht-75)/220+(b.press?0.08:0)+(T==="O"?DIF("gkVsOpp"):DIF("oppGk"));
+  let p=0.5+(gkS-75)/120-Math.abs(gk.y-b.ty)*0.4+(b.D-11)*0.03-(b.D<7?0.08:0)-(b.sht-75)/220+(b.press?0.08:0)+(T==="O"?DIF("gkVsOpp"):DIF("oppGk"));
   p=clamp(p,0.05,0.9);
+  if(T==="C"?b.x0<RR:b.x0>RL)p=Math.max(p,0.96);   // outside the restraining line: almost never
   if(b.forced!==undefined?b.forced:Math.random()<p){
     G.st[other(T)].sv++;if(gk.team==="C")ps(gk.p).sv++;SFX.save();
     if(Math.random()<0.3){looseFrom(gx+dir*-1.4,b.ty,-dir*rnd(3,6),rnd(-4,4));setBig("SAVE! REBOUND",1.1)}
@@ -881,6 +883,89 @@ function dodge(c,dx,dy){
   if(d&&dist(d,c)<1.8&&Math.random()<0.45+(R(c.p,"spd")-R(d.p,"spd"))/150){d.stun=0.6;if(c.team==="C")setMsg("SPLIT DODGE!",0.9)}
   tone(520,.08,"triangle",.05);
 }
+/* ---------- dodge view: first person, read your defender, pick the move and the side ----------
+   His tell: stick up means he's about to check (swim over it), hands out means he's going to push (roll off it),
+   sitting back means he's waiting on you (switch hands and change direction). Go away from the way he leans. */
+const DODGES=[{k:"roll",name:"ROLL DODGE",key:"1",beats:"push",loses:"sit"},{k:"swim",name:"SWIM DODGE",key:"2",beats:"check",loses:"push"},{k:"switch",name:"SWITCH HANDS",key:"3",beats:"sit",loses:"check"}];
+const TELLS={check:"STICK UP: HE WANTS TO CHECK",push:"HANDS OUT: HE WANTS TO PUSH",sit:"SITTING BACK: HE'S WAITING"};
+function startDodge(c,side,dx,dy){
+  const d=nearest(G.ents.filter(e=>e.team!==c.team&&e.role!=="G"&&!(e.down>0)),c);
+  if(!d||dist(d,c)>3.6){if(dx!=null)dodge(c,dx,dy);else dodge(c);return}   // nobody on you: just a quick dodge
+  G.dv={c,d,act:["check","push","sit"][irnd(0,2)],lean:Math.random()<.5?-1:1,side:side||1,t:0,lim:[3.4,2.7,2.1][DL_()],stage:0};
+  G.phase="dodge";input.down=false;input.aiming=false;renderBar(true);SFX.tick();
+}
+function dodgeSide(s){const v=G.dv;if(v&&v.stage===0&&v.side!==s){v.side=s;SFX.tick();renderBar(true)}}
+function doDodge(key){const v=G.dv;if(!v||v.stage!==0)return;
+  const c=v.c,d=v.d,m=DODGES.find(x=>x.k===key)||null;
+  let p=!m?0.06:m.beats===v.act?0.8:m.loses===v.act?0.15:0.45;
+  if(m){p+=(v.side===-v.lean?0.08:-0.15)+(R(c.p,"spd")+R(c.p,"stk")-R(d.p,"spd")-R(d.p,"pow"))/300+(enOf(c.p)-enOf(d.p))*0.15+[.08,0,-.06][DL_()]}
+  v.ok=Math.random()<clamp(p,0.03,0.95);v.move=m;v.stage=1;v.t2=0;
+  if(m&&m.k==="switch")c.hand=-(c.hand||1);
+  if(v.ok)tone(520,.08,"triangle",.05);else SFX.check();renderBar(true);
+}
+function updateDodge(dt){const v=G.dv;if(!v)return;
+  if(v.stage===0){v.t+=dt;if(v.t>v.lim)doDodge(null);return}
+  v.t2+=dt;if(v.t2>0.75)finishDodge()}
+function finishDodge(){
+  const v=G.dv;G.dv=null;G.phase="live";const c=v.c,d=v.d;
+  if(carrier()!==c){renderBar(true);return}
+  const fx=dirOf(c.team)*0.7,n=Math.hypot(fx,v.side);c.ddx=fx/n;c.ddy=v.side/n;c.dcd=1.3;
+  if(v.ok){c.dodge=0.55;c.vx=c.ddx*ySpd(c)*1.6;c.vy=c.ddy*ySpd(c)*1.6;d.stun=1.1;d.vx=-c.ddx*3;d.vy=-c.ddy*3;
+    setBig(v.move.name+"!",1.1)}
+  else if(!v.move||Math.random()<0.55){looseFrom(c.x,c.y,rnd(-4,4),rnd(-4,4));G.lastTouch=c.team;c.stun=0.5;G.st[d.team].to++;
+    setBig(v.move?"STRIPPED!":"TOO SLOW! STRIPPED",1.1);SFX.bad()}
+  else{c.dodge=0;c.vx=c.vy=0;c.stun=0.6;setMsg("STONEWALLED",1)}
+  renderBar(true);
+}
+/* Dodge view layout on the 768x432 screen */
+const DV_BOX=i=>({x:30+i*240,y:VH*SCALE-66,w:228,h:52}),DV_ARROW=s=>({x:s<0?18:VW*SCALE-118,y:150,w:100,h:110});
+const inBox=(p,b)=>p.x>=b.x&&p.x<=b.x+b.w&&p.y>=b.y&&p.y<=b.y+b.h;
+function dodgeTap(pt){const v=G.dv;if(!v||v.stage!==0)return;
+  for(const s of [-1,1])if(inBox(pt,DV_ARROW(s))){dodgeSide(s);return}
+  DODGES.forEach((m,i)=>{if(inBox(pt,DV_BOX(i)))doDodge(m.k)});
+}
+function drawDodgeView(){const v=G.dv,W=VW*SCALE,H=VH*SCALE,g=sc,L=lookFor(v.d.team),d=v.d;
+  g.setTransform(1,0,0,1,0,0);
+  // stands, turf, and the cage way behind him
+  g.fillStyle="#3a1018";g.fillRect(0,0,W,140);for(let y=8;y<140;y+=10){g.fillStyle="#4c1622";g.fillRect(0,y,W,4)}
+  for(let i=0;i<240;i++){const x=(i*97)%W,y=10+((i*53)%120);g.fillStyle=["#f3eedf","#e8b63e","#a3203a","#cfcfcf","#3b6fb6"][i%5];g.fillRect(x,y,4,5)}
+  g.fillStyle="#3f8a36";g.fillRect(0,140,W,H-140);for(let y=140;y<H;y+=22){g.fillStyle="#46963c";g.fillRect(0,y,W,11)}
+  g.fillStyle="#ff6a1a";g.fillRect(W/2-34,118,4,30);g.fillRect(W/2+30,118,4,30);g.fillRect(W/2-34,116,68,4);
+  g.fillStyle="rgba(255,255,255,.18)";g.fillRect(W/2-30,120,60,28);
+  // the defender: leaning one way, showing his tell
+  const r=v.stage===1?Math.min(1,v.t2/0.45):0,slide=v.stage===1&&v.ok?-v.side*r*260:0,grow=v.stage===1&&!v.ok?1+r*0.25:1;
+  const cx=W/2+v.lean*34+slide,low=v.act==="sit"?22:v.act==="push"?10:0,base=372;
+  g.save();g.translate(cx,base);g.scale(grow,grow);g.globalAlpha=v.stage===1&&v.ok?1-r*0.6:1;
+  const px=(x,y,w,h,c)=>{g.fillStyle=c;g.fillRect(x,-y,w,h)};
+  px(-40,92-low,30,92-low,L.shorts);px(10,92-low,30,92-low,L.shorts);px(-42,10,34,10,"#151515");px(8,10,34,10,"#151515");
+  px(-50,212-low,100,122,L.jersey);px(-36,200-low,72,70,shade(L.jersey,-.15));
+  px(-30,262-low,60,54,L.helmet);px(-22,250-low,44,34,L.cage);px(-17,246-low,34,24,"#e1b38c");for(let i=-17;i<=17;i+=8)px(i,250-low,2,34,L.cage);
+    // stick and gloves show the tell
+  g.fillStyle="#d8d8d8";
+  if(v.act==="check"){g.save();g.translate(44,-200+low);g.rotate(-0.9);g.fillRect(0,-4,d.p.pole?150:96,7);g.fillStyle="#f6f6f0";g.fillRect(d.p.pole?150:96,-14,26,26);g.restore();
+    px(36,206-low,24,22,L.glove);px(-60,160-low,22,22,L.glove)}
+  else if(v.act==="push"){g.fillRect(-90,-150+low,180,7);px(-96,160-low,24,24,L.glove);px(72,160-low,24,24,L.glove);g.fillStyle="#f6f6f0";g.fillRect(-120,-160+low,28,26)}
+  else{g.save();g.translate(30,-130+low);g.rotate(0.55);g.fillRect(0,-4,d.p.pole?140:90,7);g.fillStyle="#f6f6f0";g.fillRect(d.p.pole?140:90,-14,26,26);g.restore();
+    px(22,140-low,24,22,L.glove);px(-56,150-low,22,22,L.glove)}
+  g.restore();g.globalAlpha=1;
+  if(!(v.stage===1&&v.ok))txt(String(d.p.num),cx,base-(172-low)*grow,16,L.num,"center");
+  // your gloves and stick, first person
+  const hand=v.c.hand||1,ME=lookFor(v.c.team);
+  g.save();g.translate(W/2+hand*250,H+6);g.rotate(hand*0.3);g.fillStyle="#d8d8d8";g.fillRect(-4,-150,8,150);g.fillStyle="#f6f6f0";g.fillRect(-18,-190,36,44);g.fillStyle="rgba(40,40,40,.5)";g.fillRect(-13,-185,26,34);
+  g.fillStyle="#fffbe8";g.fillRect(-6,-162,12,12);g.fillStyle=ME.glove;g.fillRect(-16,-96,32,28);g.restore();
+  // header, tell, timer
+  g.fillStyle="rgba(0,0,0,.8)";g.fillRect(0,0,W,58);
+  txt("BEAT #"+d.p.num+" "+d.p.last.toUpperCase().slice(0,12),16,10,12,"#ffd640");
+  txt("LEANING "+(v.lean<0?"LEFT":"RIGHT"),W-16,10,9,"#a6a8c2","right");
+  if(v.stage===0){txt(TELLS[v.act],W/2,36,10,"#ffffff","center");
+    const left=Math.max(0,1-v.t/v.lim);g.fillStyle="#000";g.fillRect(W/2-150,64,300,12);g.fillStyle=left>0.3?"#ffd640":"#ff6b6b";g.fillRect(W/2-148,66,296*left,8);
+    for(const s of [-1,1]){const b=DV_ARROW(s),on=v.side===s;g.fillStyle=on?"#ffd640":"rgba(0,0,0,.6)";g.fillRect(b.x,b.y,b.w,b.h);
+      g.fillStyle=on?"#5a0d1c":"#ffffff";const ax=b.x+b.w/2,ay=b.y+44;for(let i=0;i<22;i++)g.fillRect(ax+s*(i-11)-1,ay-(22-i),3,(22-i)*2);
+      txt(s<0?"LEFT":"RIGHT",ax,b.y+b.h-24,9,on?"#5a0d1c":"#ffffff","center")}
+    DODGES.forEach((m,i)=>{const b=DV_BOX(i);g.fillStyle="rgba(0,0,0,.82)";g.fillRect(b.x,b.y,b.w,b.h);g.fillStyle="#e0aa2e";g.fillRect(b.x,b.y,b.w,3);g.fillRect(b.x,b.y+b.h-3,b.w,3);g.fillRect(b.x,b.y,3,b.h);g.fillRect(b.x+b.w-3,b.y,3,b.h);
+      txt(m.name,b.x+b.w/2,b.y+14,10,"#ffd640","center");txt("KEY "+m.key,b.x+b.w/2,b.y+33,7,"#a6a8c2","center")})}
+  else txt(v.ok?v.move.name+"!":v.move?"HE READ IT!":"TOO SLOW!",W/2,200,24,v.ok?"#ffd640":"#ff6b6b","center");
+}
 function pressured(c){return G.ents.some(o=>o.team!==c.team&&o.role!=="G"&&dist(o,c)<1.6)}
 function passTo(c,r,pt,kind,errMul=1){ // kind: "bullet" (fast and flat), "lob" (floats over sticks), or the default
   if(G.phase!=="live"||carrier()!==c)return;
@@ -934,16 +1019,16 @@ const toNet=(x,y)=>({u:clamp((x-VW*SCALE/2)/(NETW/2),-1.5,1.5),v:clamp((NETB-y)/
 function startShot(c){
   if(G.phase!=="live"||carrier()!==c||c.role==="G")return;
   if(GR-c.x<0.6){setMsg("NO ANGLE FROM BEHIND THE GOAL",1.1);return}
-  const D=Math.hypot(GR-c.x,GY-c.y),gk=goalie("O"),sav=R(gk.p,"sav"),press=pressured(c);
-  const k={c,stage:0,pos:0,dir:1,power:0,D,press,sav,t:0,ru:0,rv:0.45,tu:0,tv:0.45,
+  const D=Math.hypot(GR-c.x,GY-c.y),gk=goalie("O"),sav=R(gk.p,"sav"),press=pressured(c),outside=c.x<RR;
+  const k={c,stage:0,pos:0,dir:1,power:0,D,press,sav,outside,t:0,ru:0,rv:0.45,tu:0,tv:0.45,
     gu:clamp(gk.y-GY,-0.5,0.5),gside:Math.random()<.5?-1:1,
-    sway:(0.08+D/150)*(1.4-R(c.p,"sht")/110)*(press?1.6:1)};       // how much your aim wobbles
+    sway:(0.03+Math.max(0,D-5)/85)*(1.4-R(c.p,"sht")/110)*(press?1.6:1)+(outside?0.2:0)};   // how much your aim wobbles: more the farther out you are
   k.pSpeed=1.7;
   G.sm=k;G.phase="shot";input.down=false;input.aiming=false;renderBar(true);SFX.tick();
 }
 const swayAt=k=>({u:k.sway*(Math.sin(k.t*3.3)+0.6*Math.sin(k.t*7.1+1)),v:k.sway*0.8*(Math.sin(k.t*2.7+2)+0.5*Math.sin(k.t*6.3))});
 /* What the goalie covers: his body and stick, plus how far he can react. A soft shot from far out gives him time. */
-function gkReach(k){return(0.1+(k.sav-70)/200+Math.max(0,k.D-8)*0.014)*(1.45-k.power*0.7)}
+function gkReach(k){return(0.05+(k.sav-70)/200+clamp(k.D-8,0,12)*0.03+(k.outside?0.1:0)-(k.D<7?0.05:0))*(1.45-k.power*0.7)}
 function gkCovers(k,u,v){const m=gkReach(k),bw=0.27;
   if(Math.abs(u-k.gu)<=bw+m&&v<=0.8+m)return true;                                    // body, pads and helmet
   const su=k.gu+k.gside*0.36,sv=0.86;return Math.hypot(u-su,(v-sv)*1.1)<=0.17+m;       // stick head up on his stick side
@@ -969,7 +1054,8 @@ function fireShot(){const k=G&&G.sm;if(!k||k.stage!==1)return;
   const inCage=Math.abs(u)<=1&&v<=1;
   let saved=inCage&&gkCovers(k,u,v);
   if(inCage&&!saved&&k.power<0.35&&Math.random()<0.65)saved=true;   // a weak shot gets eaten anyway
-  if(saved&&k.power>0.94&&Math.random()<0.12)saved=false;           // a cannon can beat him through the body
+  if(saved&&k.power>0.94&&!k.outside&&Math.random()<0.12)saved=false;  // a cannon can beat him through the body
+  if(inCage&&!saved&&k.outside&&Math.random()<0.8)saved=true;      // from outside the line he sees it the whole way
   k.res={u,v,saved};k.stage=2;k.t2=0;SFX.shot();renderBar(true);
 }
 function shotTap(){const k=G&&G.sm;if(!k||G.phase!=="shot")return;
@@ -1013,7 +1099,7 @@ function drawShotView(){const k=G.sm,W=VW*SCALE,H=VH*SCALE,g=sc,O=lookFor("O");
     const left=Math.max(0,1-(k.t1||0)/2.8);g.fillStyle="#000";g.fillRect(W/2-150,H-26,300,12);g.fillStyle=left>0.3?"#ffd640":"#ff6b6b";g.fillRect(W/2-148,H-24,296*left,8)}
   // header and power
   g.fillStyle="rgba(0,0,0,.8)";g.fillRect(0,0,W,58);
-  txt(Math.round(k.D)+" YD SHOT",16,10,12,"#ffd640");txt(k.press?"PRESSURED":"OPEN LOOK",W-16,10,9,k.press?"#ff6b6b":"#5fcf73","right");
+  txt(Math.round(k.D)+" YD SHOT",16,10,12,"#ffd640");txt(k.outside?"OUTSIDE THE LINE: ALMOST NO CHANCE":k.D<8?"POINT BLANK":k.press?"PRESSURED":"OPEN LOOK",W-16,10,9,k.outside||k.press?"#ff6b6b":"#5fcf73","right");
   txt("POWER",16,36,8,"#a6a8c2");g.fillStyle="#333";g.fillRect(84,32,W-100,16);const pv=k.stage===0?k.pos:k.power;g.fillStyle=pv>0.9?"#5fcf73":"#ffd640";g.fillRect(84,32,(W-100)*pv,16);
   if(k.stage<2)txt(k.stage===0?"TAP WHEN THE POWER BAR IS FULL":"DRAG TO AIM ANYWHERE ON THE NET, LET GO TO SHOOT",W/2,H-50,9,"#ffffff","center");
 }
@@ -1050,7 +1136,8 @@ function aiCarry(c,dt,spd){
 /* ---------- user actions ---------- */
 function actPass(face){const c=carrier();if(!c||c!==G.ctrl||c.team!=="C")return;const r=bestPass(c,face||{x:1,y:0});if(r)passTo(c,r)}
 function actShoot(){const c=carrier();if(!c||c!==G.ctrl||c.team!=="C")return;startShot(c)}
-function actDodge(dx,dy){const c=carrier();if(!c||c!==G.ctrl||c.team!=="C")return;dodge(c,dx,dy)}
+function actDodge(dx,dy){const c=carrier();if(!c||c!==G.ctrl||c.team!=="C"||c.dcd>0||G.phase!=="live")return;
+  const side=dy?(Math.abs(dy)>0.25?Math.sign(dy):0):0;startDodge(c,side,dx,dy)}
 function actCheck(){const d=G.ctrl;if(!d||G.phase!=="live"||d.ccd>0)return;const c=carrier();if(!c||c.team==="C"){return}
   if(dist(d,c)<2.8){const a=Math.atan2(c.y-d.y,c.x-d.x);d.vx=Math.cos(a)*7;d.vy=Math.sin(a)*6;tryCheck(d,c)}else{d.ccd=0.3;setMsg("TOO FAR TO CHECK",.7)}}
 function actHit(){const d=G.ctrl;if(!d||G.phase!=="live"||d.hcd>0||d.down>0)return;const c=carrier();
@@ -1155,6 +1242,7 @@ function drawGoal(gx,side){ // side = direction the mouth faces (+1 opens toward
 function draw(){
   if(!G)return;
   if(G.phase==="shot"&&G.sm){drawShotView();return}
+  if(G.phase==="dodge"&&G.dv){drawDodgeView();return}
   const g=wc;g.setTransform(SCALE,0,0,SCALE,0,0);g.imageSmoothingEnabled=false;
   g.fillStyle="#2f6a2c";g.fillRect(0,0,VW,VH);
   if(fieldImg){const fx=(cam.x-WX0)*XS,ix=Math.floor(fx),fy=(cam.y-WY0)*YS,iy=Math.floor(fy),w=Math.min(VW+1,fieldImg.width-ix),h=Math.min(VH+1,fieldImg.height-iy);g.drawImage(fieldImg,ix,iy,w,h,-Math.round((fx-ix)*2)/2,-Math.round((fy-iy)*2)/2,w,h)}
@@ -1248,6 +1336,7 @@ screen.addEventListener("pointerdown",ev=>{
   if(G.phase==="intro"){G.introT=0;input.down=false;return}
   if(G.phase==="break"){nextPeriod();input.down=false;return}
   if(G.phase==="goal"&&G.resT>0.3){G.resT=0.3;input.down=false}
+  if(G.phase==="dodge"){dodgeTap(p);input.down=false;return}
   if(G.phase==="shot"){const k=G.sm;if(k&&k.stage===1){const n=toNet(p.x,p.y);k.tu=n.u;k.tv=n.v;return}if(k&&k.stage===0)shotTap();input.down=false;return}
   input.aiming=false;
   const c=carrier();
@@ -1288,6 +1377,8 @@ addEventListener("keydown",ev=>{
   if(G.phase==="intro"&&(ev.code==="Space"||ev.code==="Enter")){G.introT=0;return}
   if(G.phase==="break"&&(ev.code==="Space"||ev.code==="Enter")){nextPeriod();return}
   if(G.phase==="shot"){if(ev.code==="Space"||ev.code==="Enter"||ev.code==="KeyF")shotTap();return}
+  if(G.phase==="dodge"){if(ev.code==="ArrowLeft"||ev.code==="KeyA")dodgeSide(-1);else if(ev.code==="ArrowRight"||ev.code==="KeyD")dodgeSide(1);
+    else{const m=DODGES.find(x=>ev.code==="Digit"+x.key||ev.code==="Numpad"+x.key);if(m)doDodge(m.k)}return}
   if(G.phase!=="live")return;
   const c=carrier(),mine=c&&c===G.ctrl;
   if(ev.code==="Space"){if(mine)actPass(userDir()||{x:1,y:0});else actCheck()}
@@ -1306,6 +1397,7 @@ let barKey="";
 function barMode(){
   if(!G)return"";
   if(G.phase==="shot")return"shot"+(G.sm?G.sm.stage:"");
+  if(G.phase==="dodge")return"dodge"+(G.dv?G.dv.stage+"|"+G.dv.side:"");
   if(G.phase==="live"){const c=carrier();if(c&&c===G.ctrl)return"off";if(c&&c.team==="C")return"clear";if(c)return"def";return"loose"}
   return G.phase+(G.phase==="fo"?G.fo.stage+G.fo.done:"");
 }
@@ -1324,6 +1416,10 @@ function renderBar(force){
   else if(m==="loose"){bar.innerHTML=`${AB("a-hit","Hit","R")}${AB("a-sprint","Sprint","HOLD SHIFT","gold")}${AB("a-switch","Switch","E")}${SUBS}<div class="info"><b>Ground ball!</b> Run over it to scoop it up. You can hit anyone within 5 yards of a loose ball.</div>`;on("a-hit",actHit);on("a-switch",actSwitch);sprintBtn()}
   else if(m.startsWith("shot")){const st=G.sm?G.sm.stage:0;bar.innerHTML=st>1?`<div class="info">&nbsp;</div>`:`${AB("a-shot",st===0?"Power":"Shoot","SPACE","gold")}<div class="info">${st===0?"Tap when the power bar is full. More power means less time for the goalie.":"Drag on the net to aim (arrow keys work too) and let go to shoot. The goalie slides toward where you're looking, and your aim wobbles more from far out or with a defender on you."}</div>`;
     const b=$("#a-shot");if(b)b.onpointerdown=ev=>{ev.preventDefault();shotTap()}}
+  else if(m.startsWith("dodge")){const v=G.dv;
+    bar.innerHTML=!v||v.stage?`<div class="info">&nbsp;</div>`:`${AB("d-left","◀ Left","A",v.side<0?"gold":"")}${AB("d-right","Right ▶","D",v.side>0?"gold":"")}${DODGES.map(x=>AB("d-"+x.k,x.name.toLowerCase().replace(/^./,s=>s.toUpperCase()),x.key,"hot")).join("")}<div class="info">Read his tell, pick a side, then pick your move. Stick up: swim. Hands out: roll. Sitting back: switch hands. Go away from his lean.</div>`;
+    const b=(id,fn)=>{const e=$("#"+id);if(e)e.onpointerdown=ev=>{ev.preventDefault();fn()}};
+    b("d-left",()=>dodgeSide(-1));b("d-right",()=>dodgeSide(1));DODGES.forEach(x=>b("d-"+x.k,()=>doDodge(x.k)))}
   else if(m==="clear"){bar.innerHTML=`${SUBS}<div class="info">Your goalie has it and is looking for an outlet pass.</div>`;subsBtn()}
   else if(G.phase==="fo"){const f=G.fo;bar.innerHTML=f.done?`<div class="info">&nbsp;</div>`:`${AB("a-clamp","Clamp","SPACE","gold")}${f.stage!=="go"?SUBS:""}<div class="info"><b>Faceoff.</b> ${esc(G.fogoC.name)} is at the X. Tap the field or press Space the moment the whistle blows. Go early and it's a violation.</div>`;
     const b=$("#a-clamp");if(b)b.onpointerdown=ev=>{ev.preventDefault();clamp_()};subsBtn()}
@@ -1467,7 +1563,9 @@ function renderHowto(){
     <li><b>Run.</b> Like Retro Bowl, your ball carrier runs on his own: up the field, then around the top of the attack. Hold your finger on the field to steer him toward it. Keys: arrows or WASD. The Flyers attack the cage on the right.</li>
     <li><b>Throw.</b> Put your finger on your player, drag back, and let go. Aim near a teammate and the pass locks on to him (gold arrow). The pass meter shows how hard you're pulling: let go in the green band for a pinpoint pass. A quick flick is a fast, flat bullet. A slow pull floats a lob over sticks. You can also tap a teammate, or press Space for the most open man.</li>
     <li><b>Shoot.</b> Tap the cage (or press F, or the Shoot button) to wind up. First tap when the power bar is full. Then the view switches to first person, looking at the cage: drag anywhere on the net to aim and let go to shoot (arrow keys and Space work too). The goalie slides toward wherever you're aiming, so pick a corner late. Your aim wobbles more from far out or with a defender on you, and a soft shot gives him time to react. You can't score from behind the goal.</li>
-    <li><b>Dodge and sprint.</b> Swipe in a direction, or press E, for a quick dodge. A sharp split dodge can leave your defender a step behind. Hold the Sprint button (or Shift) for a speed boost. It drains the green BOOST meter and refills when you let go.</li>
+    <li><b>Dodge moves.</b> With a defender on you, tap Dodge (or swipe, or press E) and the view switches to first person, face to face with him. Read his tell: stick up means he wants to check, so swim dodge over it. Hands out means he wants to push, so roll dodge off him. Sitting back means he's waiting, so switch hands and change direction. Pick Left or Right (arrows or A/D), going away from the way he leans, then pick your move (or press 1, 2, 3) before the timer runs out. Beat him and he's left behind. Guess wrong and he can strip you.</li>
+    <li><b>Shooting range.</b> From outside the white restraining line a shot almost never goes in. The closer you get to the cage, the easier it is to score.</li>
+    <li><b>Sprint.</b> With nobody on you, a dodge is a quick burst. A sharp split dodge can leave your defender a step behind. Hold the Sprint button (or Shift) for a speed boost. It drains the green BOOST meter and refills when you let go.</li>
     <li><b>Subs.</b> Every Flyer on the field has an energy bar. It drains while he plays, faster when he sprints, and a tired player runs slower. When the Subs button flashes, someone is gassed. Tap Subs (or press X) to pause and open the line changes box: tap a player to take him out, then pick who goes in. Players get their energy back on the bench. Turn on Auto subs and tired players come off by themselves. The other team changes lines too.</li>
     <li><b>Ground balls.</b> When the ball is loose, run over it to scoop it. Ground balls win games.</li>
     <li><b>Defense.</b> You control the Flyer closest to the ball. Get on the carrier and tap near him (or press Space) to throw a check. Swipe the field (or press R, or the Hit button) to throw a body hit: land it and he goes down and usually loses the ball, whiff or bounce off and you hit the turf. You can also hit anyone within 5 yards of a loose ball. Poles check and hit harder. Tap another Flyer, or press E, to switch. Watch out, their defenders hit too.</li>
@@ -1523,7 +1621,7 @@ function frame(now){const dt=Math.min(0.05,(now-last)/1000);last=now;
   requestAnimationFrame(frame)}
 const fontsReady=document.fonts?Promise.race([document.fonts.load('16px "Press Start 2P"'),new Promise(r=>setTimeout(r,2500))]):Promise.resolve();
 fontsReady.then(()=>{showMenu("title");requestAnimationFrame(frame)});
-window.__gsl={w2s:e=>({x:wx(e.x)*SCALE/(VW*SCALE),y:(wy(e.y)-9)*SCALE/(VH*SCALE)}),startShot,shotTap,aimPoint,get input(){return input},get G(){return G},get save(){return save},stars:p=>stars(p),ROSTER,newGame,update,clamp_,nextPeriod,manageCtrl,draw,actShoot,actPass};
+window.__gsl={fireShot,actDodge,doDodge,dodgeSide,w2s:e=>({x:wx(e.x)*SCALE/(VW*SCALE),y:(wy(e.y)-9)*SCALE/(VH*SCALE)}),startShot,shotTap,aimPoint,get input(){return input},get G(){return G},get save(){return save},stars:p=>stars(p),ROSTER,newGame,update,clamp_,nextPeriod,manageCtrl,draw,actShoot,actPass};
 })();
 </script>
 
