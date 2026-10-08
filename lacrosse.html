@@ -143,7 +143,7 @@ td.note{white-space:normal;min-width:200px;color:var(--gold);font-size:14px}
     <span class="eyebrow" id="g-where">Ott Field at Gold Star Stadium</span>
     <span class="row" style="gap:8px">
       <button class="iconbtn" id="b-sound" type="button">SOUND ON</button>
-      <button class="iconbtn" id="b-quit" type="button">QUIT GAME</button>
+      <button class="iconbtn" id="b-quit" type="button">SAVE &amp; QUIT</button>
     </span>
   </div>
   <div class="stage" id="stage"><canvas id="screen" width="768" height="432" aria-label="Lacrosse field"></canvas></div>
@@ -559,8 +559,21 @@ function give(e){const b=G.ball;b.st="held";b.owner=e;b.h=1.6;b.vx=b.vy=0;G.poss
   if(e.team==="C"&&e.role!=="G")G.ctrl=e;if(e.role==="G")e.hold=rnd(1,1.6)}
 
 /* ---------- per-frame update ---------- */
+/* ---------- mid-game save: the game is saved between plays, so you can quit and pick it up later ---------- */
+const MID_KEYS=["opp","ctx","home","boost","us","them","q","clock","ot","otN","st","foTot","ps","lastPoss"];
+function saveMid(){if(!G||!save)return;const m={v:1,at:Date.now()};for(const k of MID_KEYS)if(G[k]!==undefined)m[k]=JSON.parse(JSON.stringify(G[k]));save.mid=m;writeSave()}
+function clearMid(){if(save&&save.mid){delete save.mid;writeSave()}}
+function midLabel(m){const T=TEAMS[m.opp];return (T?T.short||T.name:"")+" · "+(m.ot?"OT":"Q"+m.q)+" · "+m.us+"–"+m.them}
+function resumeMid(){const m=save&&save.mid;if(!m||!TEAMS[m.opp])return;
+  newGame(m.opp,m.ctx);
+  for(const k of MID_KEYS)if(m[k]!==undefined&&k!=="opp"&&k!=="ctx")G[k]=m[k];
+  G.introT=0;setupFaceoff();setMsg("WELCOME BACK · "+(G.ot?"OVERTIME":"Q"+G.q),2.4);
+}
+function watchSave(){if(!G)return;if(G.phase!==G._svPh){G._svPh=G.phase;if(G.phase==="fo")saveMid();else if(G.phase==="final")clearMid()}}
+
 function update(dt){
   if(!G)return;
+  watchSave();
   G.time+=dt;
   if(G.msgT>0)G.msgT-=dt;if(G.bigT>0)G.bigT-=dt;if(G.flash>0)G.flash-=dt;
   for(const e of G.ents)e.anim+=dt*(Math.hypot(e.vx,e.vy)>0.6?9:0);
@@ -1505,6 +1518,7 @@ function renderTitle(){
       <p>Take the real 2026 Flyers through their 18-game schedule, from Loyola Blakefield on opening day to the CHSAA final against St. Anthony's at Hofstra. Win the faceoff on the whistle, carry it, feed the crease and pick your corner. On defense, ride your man and throw the check. Wins earn coaching credits to build your players up.</p>
     </div>
     <div class="menu">
+      ${save&&save.mid&&TEAMS[save.mid.opp]?`<button class="btn gold" id="m-resume" type="button">Resume saved game · ${esc(midLabel(save.mid))}</button>`:""}
       ${S&&!S.done?`<button class="btn gold" id="m-cont" type="button">Continue season · Game ${S.week+1}</button>`:""}
       <button class="btn" id="m-new" type="button">${S?"New season":"Start season"}</button>
       <button class="btn alt" id="m-quick" type="button">Quick game</button>
@@ -1517,6 +1531,7 @@ function renderTitle(){
     <div class="panel small dim">Roster, numbers, positions, classes and hometowns come from the official Chaminade athletics site, and so do the schedule and real results. Star ratings use real recruiting ratings from Inside Lacrosse and the National Lacrosse Federation where they're published. Speed, stick and shot numbers, opponent strength and opponent colors are made up for the game.</div>
   </div>`;
   if($("#m-cont"))$("#m-cont").onclick=()=>showMenu("season");
+  if($("#m-resume"))$("#m-resume").onclick=()=>resumeMid();
   $("#m-new").onclick=()=>{newSeason();showMenu("season")};
   $("#m-quick").onclick=()=>showMenu("quick");$("#m-roster").onclick=()=>showMenu("roster");$("#m-office").onclick=()=>showMenu("office");$("#m-how").onclick=()=>showMenu("howto");
   document.querySelectorAll("[data-diff]").forEach(b=>b.onclick=()=>{save.diff=+b.dataset.diff;writeSave();renderTitle()});
