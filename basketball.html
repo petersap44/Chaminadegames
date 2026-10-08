@@ -92,10 +92,8 @@ kbd{font-family:var(--body);font-weight:800;background:#6b1616;border-radius:5px
 #touch.two .pad button{width:50px;height:50px;font-size:10px}
 #pauseBtn{position:fixed;bottom:max(10px,env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);z-index:4;background:rgba(58,12,12,.8);border:2px solid var(--line);border-radius:10px;color:#fff;font-weight:800;padding:6px 12px}
 @media (prefers-reduced-motion:reduce){.btn{transition:none}}
-</style>
+</style></head><body>
 
-</head>
-<body>
 <div id="wrap"><canvas id="cv" aria-label="Basketball court"></canvas></div>
 <button id="pauseBtn" hidden aria-label="Pause">II</button>
 <div id="touch" hidden></div>
@@ -112,8 +110,8 @@ const CPU=[
   {name:'Rookie',react:.24,err:1.4,swipe:.7,block:.22,jumpShot:.5},
   {name:'Varsity',react:.15,err:1.12,swipe:1.4,block:.42,jumpShot:.7},
   {name:'All-State',react:.08,err:.92,swipe:2.2,block:.66,jumpShot:.9}];
-const CHAM={name:'Chaminade',abbr:'CHAM',jersey:'#2156d6',trim:'#ffffff',num:'#ffffff',shoe:'#ffffff'};
-const CHAM_W={name:'Chaminade',abbr:'CHAM',jersey:'#f3f6ff',trim:'#2156d6',num:'#2156d6',shoe:'#2156d6'};
+const CHAM={name:'Chaminade',abbr:'CHAM',jersey:'#c8102e',trim:'#ffc629',num:'#ffc629',shoe:'#ffc629'};
+const CHAM_W={name:'Chaminade',abbr:'CHAM',jersey:'#ffc629',trim:'#c8102e',num:'#c8102e',shoe:'#c8102e'};
 
 // 2025-26 varsity roster, from athletics.chaminade-hs.org. Ratings are invented for the game.
 const R=(n,first,last,pos,ht,inch,yr,s,bio)=>({id:'c'+n,n,first,last,pos,ht,inch,yr,s,bio});
@@ -233,7 +231,7 @@ function drawHead(c,x,y,r,lk,o={}){
  // cheeks
  c.fillStyle='rgba(210,70,60,.13)';for(const s of[-1,1]){c.beginPath();c.ellipse(f*r*.1+s*r*.47,r*.34,r*.15,r*.09,0,0,7);c.fill()}
  drawHair(c,r,lk,f);
- if(lk.band){c.fillStyle=o.band||'#2156d6';c.fillRect(-r*.99,-r*.56,r*1.98,r*.18);c.fillStyle='#fff';c.fillRect(-r*.99,-r*.49,r*1.98,r*.045)}
+ if(lk.band){c.fillStyle=o.band||'#c8102e';c.fillRect(-r*.99,-r*.56,r*1.98,r*.18);c.fillStyle='#fff';c.fillRect(-r*.99,-r*.49,r*1.98,r*.045)}
  // eyes
  const ex=f*r*.12,ey=-r*.05,bc=darker(lk.hair,.8);
  for(const s of[-1,1]){const cx=ex+s*r*.31;
@@ -397,7 +395,7 @@ function drawPlayer(p){
  // head
  const dx=b.x-(hipX+headLocal[0]),dy=b.y-(hipY+headLocal[1]),d=Math.hypot(dx,dy)||1;
  const mood=p.mood>0?p.moodK:(!p.ground||p.charging?'grit':'smile');
- const spr=headSprite(p,f,mood,Math.round(dx/d*1.4),Math.round(dy/d*1.4),p.team.jersey==='#f3f6ff'?'#2156d6':p.team.jersey);
+ const spr=headSprite(p,f,mood,Math.round(dx/d*1.4),Math.round(dy/d*1.4),p.team.jersey==='#ffc629'?'#c8102e':p.team.jersey);
  const S=HR*2.9;ctx.save();ctx.translate(headLocal[0],headLocal[1]);ctx.rotate(-lean*.5+(sad?f*.12:0));ctx.drawImage(spr,-S/2,-S/2,S,S);ctx.restore();
  // front arm over body
  limb(ctx,[shoulderF[0],shoulderF[1],armF[0],armF[1],armF[2],armF[3]],7,p.look.skin);
@@ -778,7 +776,7 @@ function mainMenu(){
  <p class="foot">Players are from the 2025-26 Chaminade varsity roster posted by <a href="https://athletics.chaminade-hs.org/sports/mens-basketball/roster" target="_blank" rel="noopener">Chaminade Athletics</a>. Heads are cartoons, not likenesses, and the ratings are made up for the game. Unofficial fan game.</p>`);
  on('#m-season',()=>seasonHub());
  on('#m-cpu',()=>pickPlayer({mode:'cpu',title:'Pick your Flyer',sel:s.pid,next:pid=>pickOpponent(pid)}));
- on('#m-2p',()=>pickPlayer({mode:'2p',title:'Player 1: pick your Flyer',sel:'c25',next:p1=>pickPlayer({mode:'2p',title:'Player 2: pick your Flyer',sel:'c15',taken:p1,next:p2=>start({p1:findP(p1),p2:findP(p2),t1:CHAM,t2:CHAM_W,cpu:null,mode:'2p',tag:'PRACTICE SCRIMMAGE',vsLine:'Blue vs. White'})})}));
+ on('#m-2p',()=>pickPlayer({mode:'2p',title:'Player 1: pick your Flyer',sel:'c25',next:p1=>pickPlayer({mode:'2p',title:'Player 2: pick your Flyer',sel:'c15',taken:p1,next:p2=>start({p1:findP(p1),p2:findP(p2),t1:CHAM,t2:CHAM_W,cpu:null,mode:'2p',tag:'PRACTICE SCRIMMAGE',vsLine:'Red vs. Gold'})})}));
  on('#m-how',()=>howTo());
  on('#m-snd',el=>{muted=!muted;store.set('fhh_muted',muted);el.textContent='Sound: '+(muted?'Off':'On')});
 }
@@ -828,7 +826,7 @@ function pickOpponent(pid){
   <div class="btns"><button class="btn gold" id="go">Tip off</button><button class="btn ghost" id="back">Back</button></div>`);
   on('[data-o]',el=>{opp=el.dataset.o;render()});on('[data-d]',el=>{d=+el.dataset.d;render()});
   on('#back',()=>pickPlayer({title:'Pick your Flyer',sel:pid,next:p=>pickOpponent(p)}));
-  on('#go',()=>{store.set('fhh_opp',opp);store.set('fhh_diff',d);const t=RIVALS[opp];start({p1:findP(pid),p2:rivalPlayer(opp),t1:CHAM,t2:t,cpu:d,mode:'cpu',tag:'EXHIBITION',vsLine:`${findP(pid).name} vs. ${t.name}`,oppKey:opp})});
+  on('#go',()=>{store.set('fhh_opp',opp);store.set('fhh_diff',d);const t=RIVALS[opp];start({p1:findP(pid),p2:rivalPlayer(opp),t1:opp==='kell'?CHAM_W:CHAM,t2:t,cpu:d,mode:'cpu',tag:'EXHIBITION',vsLine:`${findP(pid).name} vs. ${t.name}`,oppKey:opp})});
  };render();
 }
 
@@ -844,7 +842,7 @@ function seasonHub(){
  <div class="btns">${done?`<button class="btn gold" id="reset">Start a new season</button>`:`<button class="btn gold" id="play">Play as ${p.name}</button><button class="btn ghost" id="swap">Change Flyer</button>`}<button class="btn ghost" id="back">Main menu</button></div>
  <div class="sched">${SEASON.map((g,i)=>{const r=s.res[i],sc=s.scores[i];return`<div class="game${i===s.i?' next':''}"><div class="res ${r||''}">${r||(i===s.i?'▶':'·')}</div><div style="min-width:0"><div class="tag">${g.tag}</div><div class="who">vs. ${RIVALS[g.opp].name}</div></div><div class="sc">${sc?sc.join('-'):''}</div></div>`}).join('')}</div>
  ${!done&&s.i>0?'<div class="btns"><button class="btn ghost" id="reset">Restart season</button></div>':''}`);
- on('#play',()=>{const t=RIVALS[nx.opp];start({p1:p,p2:rivalPlayer(nx.opp),t1:CHAM,t2:t,cpu:Math.min(2,t.d+(nx.boost||0)),mode:'season',tag:nx.tag.toUpperCase(),vsLine:`${nx.tag} · vs. ${t.name}`,oppKey:nx.opp,si:s.i})});
+ on('#play',()=>{const t=RIVALS[nx.opp];start({p1:p,p2:rivalPlayer(nx.opp),t1:nx.opp==='kell'?CHAM_W:CHAM,t2:t,cpu:Math.min(2,t.d+(nx.boost||0)),mode:'season',tag:nx.tag.toUpperCase(),vsLine:`${nx.tag} · vs. ${t.name}`,oppKey:nx.opp,si:s.i})});
  on('#swap',()=>pickPlayer({title:'Who leads the Flyers?',sel:s.pid,next:pid=>{const q=seasonState();q.pid=pid;saveSeason(q);seasonHub()},back:()=>seasonHub()}));
  on('#reset',el=>{if(el.dataset.c){saveSeason({i:0,res:[],scores:[],pid:s.pid,champ:false});seasonHub()}else{el.dataset.c=1;el.textContent='Tap again to wipe the season'}});
  on('#back',()=>mainMenu());
@@ -855,7 +853,7 @@ function showResult(){
  const line=(p,s)=>`${p.data.n} ${p.data.first===p.data.last?p.data.last:p.data.name}: ${s.pts} pts${s.threes?`, ${s.threes} three${s.threes>1?'s':''}`:''}${s.dunks?`, ${s.dunks} dunk${s.dunks>1?'s':''}`:''}${s.steals?`, ${s.steals} steal${s.steals>1?'s':''}`:''}${s.blocks?`, ${s.blocks} block${s.blocks>1?'s':''}`:''}`;
  hideTouch();document.getElementById('pauseBtn').hidden=true;
  let head,msg,btns='';
- if(cfg.mode==='2p'){head=g.score[0]>g.score[1]?'Blue wins!':'White wins!';msg='Practice is over. Bring that energy to the next game.';btns=`<button class="btn gold" id="again">Rematch</button>`}
+ if(cfg.mode==='2p'){head=g.score[0]>g.score[1]?'Red wins!':'Gold wins!';msg='Practice is over. Bring that energy to the next game.';btns=`<button class="btn gold" id="again">Rematch</button>`}
  else if(cfg.mode==='cpu'){head=win?'Flyers win!':`${c.team.name} wins`;msg=win?'Mineola is loud tonight.':'Shake it off. Run it back.';btns=`<button class="btn gold" id="again">Rematch</button>`}
  else{
   const s=seasonState(),sg=SEASON[cfg.si];
@@ -873,7 +871,7 @@ function showResult(){
  }
  show(`<div class="hero"><div class="eyebrow">Final${g.ot?' · OT':''} · ${cfg.tag}</div><h1>${head}</h1>
  <div class="big-score">${g.score[0]} – ${g.score[1]}</div><p>${msg}</p></div>
- <div class="keys"><div><h3>${a.team.abbr} · ${a.team.jersey==='#f3f6ff'?'White':'Blue'}</h3><p>${line(a,st[0])}</p><p class="muted">Shots made: ${st[0].fgm}/${st[0].fga}</p></div><div><h3>${c.team.abbr}${cfg.mode==='2p'?' · White':''}</h3><p>${line(c,st[1])}</p><p class="muted">Shots made: ${st[1].fgm}/${st[1].fga}</p></div></div>
+ <div class="keys"><div><h3>${a.team.abbr} · ${a.team.jersey==='#ffc629'?'Gold':'Red'}</h3><p>${line(a,st[0])}</p><p class="muted">Shots made: ${st[0].fgm}/${st[0].fga}</p></div><div><h3>${c.team.abbr}${cfg.mode==='2p'?' · Gold':''}</h3><p>${line(c,st[1])}</p><p class="muted">Shots made: ${st[1].fgm}/${st[1].fga}</p></div></div>
  <div class="btns">${btns}<button class="btn ghost" id="menu">Main menu</button></div>`);
  on('#again',()=>start(cfg));on('#hub',()=>{game=null;seasonHub()});on('#menu',()=>mainMenu());
 }
@@ -898,6 +896,4 @@ if(document.fonts){const rb=()=>{layers=null;hudKey='';headCache.clear()};docume
 requestAnimationFrame(frame);
 })();
 </script>
-
-</body>
-</html>
+</body></html>
