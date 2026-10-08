@@ -187,7 +187,7 @@ let layers=null;const headCache=new Map();
 addEventListener('resize',resize);resize();
 
 // crowd
-const crowd=[];{const r=rng(7);for(let row=0;row<6;row++)for(let i=0;i<70;i++){const c=r();crowd.push({x:i*14+(row%2)*7+r()*4-2,y:150+row*22+r()*4,c:c<.45?'#d62828':c<.75?'#ffd23f':c<.85?'#ffc629':'#3a1010',s:['#f6d3b3','#e0aa7d','#a96b41','#7f4b2c'][Math.floor(r()*4)],ph:r()*6})}}
+const crowd=[];{const r=rng(7);for(let row=0;row<6;row++)for(let i=0;i<70;i++){const c=r();crowd.push({x:i*14+(row%2)*7+r()*4-2,y:150+row*22+r()*4,c:c<.45?'#d62828':c<.75?'#ffd23f':c<.85?'#ffc629':'#3a1010',s:['#f9e0cc','#f6d3b3','#f0c6a2','#ecc09a'][Math.floor(r()*4)],ph:r()*6})}}
 
 // ---------- drawing ----------
 function darker(hex,k){const n=parseInt(hex.slice(1),16);const f=v=>Math.max(0,Math.round(v*k));return`rgb(${f(n>>16)},${f(n>>8&255)},${f(n&255)})`}
