@@ -359,7 +359,7 @@ function ord(n){return n+(["th","st","nd","rd"][n]||"th")}
    grandstand stays in frame and players stand up off the turf.
    World units are yards. Field x 0..120 (end zones 0-10 and 110-120), y 0..53.3 (0 = far sideline).
    ============================================================ */
-const VW=384,VH=216,XS=6.2,YS=3.6,FW=53.33;
+const VW=384,VH=216,XS=7,YS=4.6,FW=53.33;   // pixels per yard: roomy enough that the line of scrimmage isn't a pile
 const WX0=-10,WX1=130,WY0=-13,WY1=60;
 const SCALE=2; // main canvas is 2x the pixel buffer so HUD text stays crisp
 const screen=$("#screen"),sc=screen.getContext("2d");
@@ -369,15 +369,20 @@ let fieldImg=null;
 sc.imageSmoothingEnabled=false;wc.imageSmoothingEnabled=false;
 
 function prerenderStadium(homeKey,awayKey,venueName){
-  const c=document.createElement("canvas");
-  c.width=Math.ceil((WX1-WX0)*XS);c.height=Math.ceil((WY1-WY0)*YS);
-  const g=c.getContext("2d");g.imageSmoothingEnabled=false;
+  const c=document.createElement("canvas");   // rendered at 2x so lines and numbers are crisp on the 2x screen
+  const CW=Math.ceil((WX1-WX0)*XS),CH=Math.ceil((WY1-WY0)*YS);c.width=CW*2;c.height=CH*2;
+  const g=c.getContext("2d");g.imageSmoothingEnabled=false;g.scale(2,2);
   const X=x=>Math.round((x-WX0)*XS),Y=y=>Math.round((y-WY0)*YS);
   const home=TEAMS[homeKey],isGS=homeKey==="CHAM";
   // apron
-  g.fillStyle="#2f6a2c";g.fillRect(0,0,c.width,c.height);
+  g.fillStyle="#2f6a2c";g.fillRect(0,0,CW,CH);
   // turf: alternating 5-yard bands
-  for(let i=0;i<24;i++){g.fillStyle=i%2?"#4a9a3f":"#43903a";g.fillRect(X(i*5),Y(0),Math.ceil(5*XS),Y(FW)-Y(0))}
+  for(let i=0;i<24;i++){g.fillStyle=i%2?"#4c9c40":"#43903a";g.fillRect(X(i*5),Y(0),Math.ceil(5*XS),Y(FW)-Y(0))}
+  // turf texture: cross-mowed bands, then fine speckle and a soft sheen down the middle of the field
+  for(let j=0;j<12;j++){g.fillStyle=j%2?"rgba(255,255,255,.035)":"rgba(0,0,0,.035)";g.fillRect(X(0),Y(j*FW/12),X(120)-X(0),Math.ceil(FW/12*YS))}
+  {const rr=(()=>{let a=99;return()=>(a=(a*16807)%2147483647)/2147483647})();
+   for(let i=0;i<26000;i++){const x=X(rr()*120),y=Y(rr()*FW);g.fillStyle=rr()<.5?"rgba(0,0,0,.07)":"rgba(255,255,220,.06)";g.fillRect(x+(rr()<.5?0:.5),y+(rr()<.5?0:.5),.5,rr()<.4?1:.5)}
+   const sh=g.createLinearGradient(0,Y(0),0,Y(FW));sh.addColorStop(0,"rgba(0,0,0,.10)");sh.addColorStop(.45,"rgba(255,255,255,.04)");sh.addColorStop(1,"rgba(0,0,0,.12)");g.fillStyle=sh;g.fillRect(X(0),Y(0),X(120)-X(0),Y(FW)-Y(0))}
   // end zones
   const ez=(x0,word,col,txtCol)=>{
     g.fillStyle=col;g.fillRect(X(x0),Y(0),Math.ceil(10*XS),Y(FW)-Y(0));
@@ -406,10 +411,10 @@ function prerenderStadium(homeKey,awayKey,venueName){
   if(isGS){g.save();g.translate(X(60),Y(FW/2+7.5));g.scale(1,.8);g.font='8px "Press Start 2P", monospace';g.fillStyle="#f4f4ec";g.fillText("OTT FIELD",0,0);g.restore()}
   // ---------- grandstand behind the far sideline ----------
   const sTop=0,sBot=Y(-3.2);
-  g.fillStyle=isGS?"#5a1020":"#373a48";g.fillRect(0,sTop,c.width,sBot-sTop);
-  for(let ry=sTop+2;ry<sBot-4;ry+=4){g.fillStyle=isGS?"#7c1a2e":"#4b4f60";g.fillRect(0,ry,c.width,2)}
+  g.fillStyle=isGS?"#5a1020":"#373a48";g.fillRect(0,sTop,CW,sBot-sTop);
+  for(let ry=sTop+2;ry<sBot-4;ry+=4){g.fillStyle=isGS?"#7c1a2e":"#4b4f60";g.fillRect(0,ry,CW,2)}
   const crowd=["#f3eedf","#e8b63e","#a3203a","#1b1b1b","#cfcfcf","#7a5236","#d9a07a","#3b6fb6","#f3eedf"];
-  for(let ry=sTop+1;ry<sBot-6;ry+=4)for(let x=0;x<c.width;x+=3)if(Math.random()<.66){g.fillStyle=crowd[(Math.random()*crowd.length)|0];g.fillRect(x,ry,2,3)}
+  for(let ry=sTop+1;ry<sBot-6;ry+=4)for(let x=0;x<CW;x+=3)if(Math.random()<.66){g.fillStyle=crowd[(Math.random()*crowd.length)|0];g.fillRect(x,ry,2,3)}
   // press box at midfield
   const pbw=Math.round(30*XS),pbx=X(60)-pbw/2;
   g.fillStyle="#d9d4c4";g.fillRect(pbx,0,pbw,18);
@@ -417,9 +422,10 @@ function prerenderStadium(homeKey,awayKey,venueName){
   g.fillStyle=isGS?"#a3203a":"#444a5c";g.fillRect(pbx,11,pbw,7);
   g.font='8px "Press Start 2P", monospace';g.fillStyle="#f3eedf";g.textAlign="center";g.textBaseline="middle";g.fillText(venueName,X(60),15);
   // padded wall with gold stars (the stadium honors Chaminade's Gold Star alumni)
-  g.fillStyle=isGS?"#e8b63e":"#9aa0b0";g.fillRect(0,sBot-5,c.width,5);
+  g.fillStyle=isGS?"#e8b63e":"#9aa0b0";g.fillRect(0,sBot-5,CW,5);
   if(isGS)for(let sx=X(6);sx<X(118);sx+=Math.round(10*XS))drawStar(g,sx,sBot-3,2.6,"#7c1a2e");
-  g.fillStyle=isGS?"#2a0b12":"#22242c";g.fillRect(0,sBot,c.width,Y(-0.6)-sBot);
+  g.fillStyle=isGS?"#2a0b12":"#22242c";g.fillRect(0,sBot,CW,Y(-0.6)-sBot);
+  {const sg=g.createLinearGradient(0,Y(0),0,Y(6));sg.addColorStop(0,"rgba(0,0,0,.22)");sg.addColorStop(1,"rgba(0,0,0,0)");g.fillStyle=sg;g.fillRect(0,Y(-0.6),CW,Y(6)-Y(-0.6))}
   // ---------- near sideline: benches and portable bleachers ----------
   g.fillStyle=isGS?"#a3203a":"#555a6a";g.fillRect(X(38),Y(FW+1.6),X(56)-X(38),3);
   g.fillStyle=TEAMS[awayKey].c1;g.fillRect(X(64),Y(FW+1.6),X(82)-X(64),3);
@@ -494,21 +500,21 @@ function setupFormation(){
   const op=r=>D?G.oppP[r]:byNum(L[r]);
   const old=G.ents&&G.phase==="result"&&G.formSide===G.side&&G.qb&&Math.abs(G.qb.x-lx)<30?G.ents:null;G.formSide=G.side;
   const E=[];
-  [-2.4,-1.2,0,1.2,2.4].forEach((o,i)=>E.push(mk("O","OL",lx-0.8,sy+o,D?{i}:{i,p:byNum(L[["LT","LG","C","RG","RT"][i]])})));
-  E.push(mk("O","QB",lx-1.6,sy,{p:op("QB")}));
-  E.push(mk("O","RB",lx-6.5,sy,{p:op("RB"),rec:true}));
+  [-3.8,-1.9,0,1.9,3.8].forEach((o,i)=>E.push(mk("O","OL",lx-1,sy+o,D?{i}:{i,p:byNum(L[["LT","LG","C","RG","RT"][i]])})));
+  E.push(mk("O","QB",lx-2.4,sy,{p:op("QB")}));
+  E.push(mk("O","RB",lx-7.5,sy,{p:op("RB"),rec:true}));
   E.push(mk("O","WR1",lx-0.9,clamp(sy-16,2.5,FW-2.5),{p:op("WR1"),rec:true}));
   E.push(mk("O","WR2",lx-0.9,clamp(sy+16,2.5,FW-2.5),{p:op("WR2"),rec:true}));
-  E.push(mk("O","TE",lx-1.1,sy+3.8,{p:op("TE"),rec:true}));
+  E.push(mk("O","TE",lx-1.2,sy+5.8,{p:op("TE"),rec:true}));
   const dsp=5.4+def/100*1.3,cbs=6.4+def/100*1.4+DF("cbSpd");
   const dp=n=>D?{p:byNum(n)}:{},DEF_LINEUP=defLineup();
   const sp=(n,fallback,k)=>D?ySpd(byNum(n))*k:fallback;
-  [-4.2,-1.4,1.4,4.2].forEach((o,i)=>E.push(mk("D","DL",lx+1,sy+o,Object.assign({i,spd:sp(DEF_LINEUP.DL[i],dsp-0.5,.74)},dp(DEF_LINEUP.DL[i])))));
+  [-6,-2.1,2.1,6].forEach((o,i)=>E.push(mk("D","DL",lx+1.4,sy+o,Object.assign({i,spd:sp(DEF_LINEUP.DL[i],dsp-0.5,.74)},dp(DEF_LINEUP.DL[i])))));
   E.push(mk("D","CB",lx+8,clamp(sy-16,2.5,FW-2.5),Object.assign({cover:"WR1",spd:sp(DEF_LINEUP.CB1,cbs,.97)},dp(DEF_LINEUP.CB1))));
   E.push(mk("D","CB",lx+8,clamp(sy+16,2.5,FW-2.5),Object.assign({cover:"WR2",spd:sp(DEF_LINEUP.CB2,cbs,.97)},dp(DEF_LINEUP.CB2))));
-  E.push(mk("D","LB",lx+5.5,sy+6,Object.assign({cover:"TE",spd:sp(DEF_LINEUP.LB_TE,cbs-0.7,.92)},dp(DEF_LINEUP.LB_TE))));
-  E.push(mk("D","LB",lx+5.5,sy-1,Object.assign({cover:"RB",spd:sp(DEF_LINEUP.LB_RB,cbs-0.6,.92)},dp(DEF_LINEUP.LB_RB))));
-  E.push(mk("D","LB",lx+7,sy-8,Object.assign({zone:true,spd:sp(DEF_LINEUP.LB_Z,cbs-0.6,.92)},dp(DEF_LINEUP.LB_Z))));
+  E.push(mk("D","LB",lx+6,sy+7.5,Object.assign({cover:"TE",spd:sp(DEF_LINEUP.LB_TE,cbs-0.7,.92)},dp(DEF_LINEUP.LB_TE))));
+  E.push(mk("D","LB",lx+6,sy-1.5,Object.assign({cover:"RB",spd:sp(DEF_LINEUP.LB_RB,cbs-0.6,.92)},dp(DEF_LINEUP.LB_RB))));
+  E.push(mk("D","LB",lx+7.5,sy-9.5,Object.assign({zone:true,spd:sp(DEF_LINEUP.LB_Z,cbs-0.6,.92)},dp(DEF_LINEUP.LB_Z))));
   E.push(mk("D","S",lx+15,sy-11,Object.assign({deep:true,spd:sp(DEF_LINEUP.S1,cbs-0.2,.96)},dp(DEF_LINEUP.S1))));
   E.push(mk("D","S",lx+14,sy+11,Object.assign({deep:true,spd:sp(DEF_LINEUP.S2,cbs-0.2,.96)},dp(DEF_LINEUP.S2))));
   applyDefCall(E,lx,sy);
@@ -1199,46 +1205,83 @@ function portraitCanvas(p){
 const portraitURL=p=>{const c=portraitCanvas(p);return c._url||(c._url=c.toDataURL())};
 const iconImg=(p,size=32)=>`<img src="${portraitURL(p)}" width="${size}" height="${size}" alt="" style="image-rendering:pixelated;vertical-align:middle;border:2px solid var(--line)">`;
 
-/* Side-on sprite, about 9x16 px, feet at (x,y). face 1 = right, -1 = left. */
+/* Side-on player sprite, drawn at double resolution (half-pixel detail) and cached. Feet at (x,y). face 1 = right, -1 = left. */
+const PSPR={},PS_W=34,PS_H=44,PS_OX=17,PS_OY=40;   // sprite canvas in half-pixels; origin = between the feet
+const DIG=["111101101101111","010110010010111","111001111100111","111001111001111","101101111001001","111100111001111","111100111101111","111001010010010","111101111101111","111101111001111"];
+function paintSprite(g,look,skin,num,pose,frame,f){
+  const R=(x,y,w,h,c)=>{g.fillStyle=c;g.fillRect(PS_OX+x,PS_OY+y,w,h)};
+  const seg=(x0,y0,x1,y1,w,c0,c1,split)=>{const n=Math.max(1,Math.round(Math.abs(y1-y0)));for(let i=0;i<=n;i++){const u=i/n,x=Math.round(x0+(x1-x0)*u),y=Math.round(y0+(y1-y0)*u);R(x-(w>>1),y,w,1,u<split?c0:c1)}};
+  const segH=(x0,y0,x1,y1,w,c0,c1,split)=>{const n=Math.max(1,Math.round(Math.hypot(x1-x0,y1-y0)));for(let i=0;i<=n;i++){const u=i/n,x=Math.round(x0+(x1-x0)*u),y=Math.round(y0+(y1-y0)*u);R(x-(w>>1),y-(w>>1),w,w,u<split?c0:c1)}};
+  const dark=c=>shade(c,-.28),lite=c=>shade(c,.22),mask="#cfd3d8",ball="#8a4a1c";
+  const run=pose==="run",st=run?[[-5,4],[-1,1],[4,-5],[1,-1]][frame]:[-2,3];
+  const lift=run?[[0,2],[0,0],[2,0],[0,0]][frame]:[0,0];
+  // back leg (darker), then front leg: pants to the knee, sock, cleat
+  [[st[0],lift[0],1],[st[1],lift[1],0]].forEach(([fx,ly,back])=>{const pc=back?dark(look.pants):look.pants,sc=back?dark(look.sock):look.sock;
+    seg(back?-1:1,-15,fx,-2-ly,4,pc,sc,0.62);R(fx-2,-2-ly,6,2,"#16161a");R(fx+3,-1-ly,1,1,"#16161a")});
+  // back arm swings opposite the front leg
+  const sw=run?[3,1,-3,-1][frame]:0;
+  if(pose!=="cock")segH(-2,-24,-2-sw,-16,3,dark(look.jersey),dark(skin),0.45);
+  // hips/pants top, torso, shoulder pads
+  R(-5,-17,10,4,look.pants);R(-5,-17,10,1,"#1d1d22");R(-5,-14,10,1,dark(look.pants));
+  R(-5,-27,10,10,look.jersey);R(-6,-28,12,5,look.jersey);R(-5,-29,10,1,look.jersey);
+  R(-6,-28,2,5,dark(look.jersey));R(-5,-20,10,3,dark(look.jersey));R(2,-28,3,1,lite(look.jersey));
+  // number on the back of the jersey (3x5 pixel digits)
+  const ds=String(num==null?"":num),x0=-4+(ds.length<2?2:0),wid=ds.length*4-1;
+  const left=f<0?PS_W-PS_OX-x0-wid:PS_OX+x0;   // digits are never mirrored
+  g.save();g.setTransform(1,0,0,1,0,0);g.fillStyle=look.num;
+  [...ds].forEach((ch,k)=>{const d=DIG[+ch];if(d)for(let i=0;i<15;i++)if(d[i]==="1")g.fillRect(left+k*4+i%3,PS_OY-26+Math.floor(i/3),1,1)});g.restore();
+  // neck and helmet: shell, crown stripe, shine, ear hole, face, mask
+  R(0,-31,4,3,dark(skin));
+  R(-5,-39,11,9,look.helmet);R(-4,-40,9,1,look.helmet);R(-6,-37,1,6,look.helmet);R(6,-37,1,4,look.helmet);
+  R(-5,-31,11,1,dark(look.helmet));R(-6,-32,1,1,dark(look.helmet));
+  R(-4,-41,8,1,look.stripe);R(-5,-40,1,1,look.stripe);R(4,-40,2,1,look.stripe);
+  R(-3,-39,3,1,"rgba(255,255,255,.55)");R(-4,-38,1,2,"rgba(255,255,255,.35)");
+  R(-2,-35,2,2,dark(look.helmet));
+  R(3,-36,4,5,skin);R(5,-35,1,1,"#1a1a1a");R(4,-33,3,1,dark(skin));
+  R(7,-37,1,7,mask);R(4,-34,4,1,mask);R(4,-32,4,1,mask);R(3,-31,3,1,mask);
+  // front arm by pose
+  if(pose==="carry"){segH(2,-25,4,-19,3,look.jersey,skin,0.45);R(3,-23,5,4,ball);R(4,-23,3,1,lite(ball));R(5,-22,2,1,"#fff")}
+  else if(pose==="cock"){segH(-3,-26,-6,-33,3,look.jersey,skin,0.45);R(-9,-37,5,4,ball);R(-8,-37,3,1,lite(ball));segH(2,-25,6,-22,3,look.jersey,skin,0.5)}
+  else if(pose==="throw"){segH(2,-26,10,-29,3,look.jersey,skin,0.4)}
+  else if(pose==="reach"){segH(2,-26,6,-35,3,look.jersey,skin,0.45);segH(-2,-26,1,-35,3,dark(look.jersey),dark(skin),0.45)}
+  else segH(2,-25,2+sw,-17,3,look.jersey,skin,0.45);
+}
+function playerSprite(look,skin,num,pose,frame,f){
+  const key=look.jersey+look.helmet+look.pants+look.num+skin+num+pose+frame+f;let c=PSPR[key];if(c)return c;
+  const s=document.createElement("canvas");s.width=PS_W;s.height=PS_H;const sg=s.getContext("2d");
+  if(f<0){sg.translate(PS_W,0);sg.scale(-1,1)}
+  paintSprite(sg,look,skin,num,pose,frame,f);
+  // dark outline around the whole silhouette
+  const o=document.createElement("canvas");o.width=PS_W;o.height=PS_H;const og=o.getContext("2d");
+  og.drawImage(s,0,0);og.globalCompositeOperation="source-in";og.fillStyle="#141018";og.fillRect(0,0,PS_W,PS_H);
+  c=document.createElement("canvas");c.width=PS_W;c.height=PS_H;const cg=c.getContext("2d");
+  for(const[dx,dy]of[[-1,0],[1,0],[0,-1],[0,1]])cg.drawImage(o,dx,dy);cg.drawImage(s,0,0);
+  PSPR[key]=c;return c;
+}
 function drawPlayer(e,look){
   const x=wx(e.x),y=wy(e.y);
-  if(x<-12||x>VW+12||y<-4||y>VH+20)return;
+  if(x<-14||x>VW+14||y<-6||y>VH+24)return;
   const g=wc,f=e.face||1,fr=Math.floor(e.anim)%4,moving=Math.hypot(e.vx||0,e.vy||0)>0.6;
-  const px=(dx,dy,w,h,c)=>{g.fillStyle=c;g.fillRect(f>0?x+dx:x-dx-w+1,y+dy,w,h)};
   const skin=(e.p&&SKIN_BY_NUM[e.p.num])||SKIN[(e.p?e.p.num:(e.i||0)+(e.role||"").length)%4];
-  g.fillStyle="rgba(0,0,0,.3)";g.fillRect(x-4,y,9,2);
-  if(e.dive>0||e.lay>0){const L=e.dive>0?-3:0;
-    px(-8,-4+L,1,2,look.sock);px(-7,-4+L,4,3,look.pants);px(-3,-5+L,6,4,look.jersey);px(-1,-4+L,2,2,look.num);
-    px(3,-6+L,4,4,look.helmet);px(3,-6+L,4,1,look.stripe);px(7,-5+L,1,2,"#d0d0d0");
-    px(5,-2+L,4,1,skin);if(e.carry||e===G.carrier)px(8,-3+L,2,2,"#7b3f16");
-    if(e===G.ctrl){g.strokeStyle="#ffd640";g.lineWidth=1;g.beginPath();g.ellipse(x+0.5,y+1,6,2.5,0,0,Math.PI*2);g.stroke()}
-    return}
-  // legs (4-frame run cycle)
-  const st=moving?[[-2,1],[0,0],[1,-2],[0,0]][fr]:[-1,1];
-  px(st[0]-1,-4,2,3,look.pants);px(st[0]-1,-1,2,1,look.sock);px(st[0]-1,0,3,1,"#151515");
-  px(st[1]+1,-4,2,3,look.pants);px(st[1]+1,-1,2,1,look.sock);px(st[1]+1,0,3,1,"#151515");
-  px(-2,-6,5,2,look.pants);
-  // torso and shoulder pads
-  px(-3,-11,7,5,look.jersey);px(-3,-12,7,1,shade(look.jersey,-.15));
-  px(-1,-10,2,2,look.num);
-  // arm
+  const num=e.p&&e.p.num?e.p.num:e.p&&e.p.opp?{QB:7,RB:22,WR1:1,WR2:11,TE:88}[e.role]:e.team==="O"?[71,64,55,66,77][e.i||0]:[90,95,97,99][e.i||0];
   const carrying=e.carry||(e===G.qb&&e.hasBall);
   const cock=e===G.qb&&e.hasBall&&!onD()&&input.down&&input.aiming;
-  if(e===G.qb&&e.throwT>0){px(3,-12,4,2,look.jersey);px(6,-12,1,2,skin)} // follow-through
-  else if(cock){px(-3,-14,2,4,look.jersey);px(-4,-16,3,2,"#7b3f16")}     // ball cocked behind the helmet
-  else if(carrying){px(2,-9,3,2,look.jersey);px(4,-9,2,2,"#7b3f16")}else px(moving?(fr%2?-3:2):2,-10,2,3,look.jersey),px(moving?(fr%2?-3:2):2,-7,2,1,skin);
-  // helmet with stripe and face mask
-  px(-2,-16,6,4,look.helmet);px(-2,-17,5,1,look.helmet);px(0,-17,1,5,look.stripe);
-  px(3,-14,1,2,skin);px(4,-15,1,3,"#d0d0d0");
-  if(e.hl){g.fillStyle="#ffd640";g.fillRect(x-1,y-22,3,2);g.fillRect(x,y-20,1,1)}
-  if(e===G.ctrl){g.strokeStyle="#ffd640";g.lineWidth=1;g.beginPath();g.ellipse(x+0.5,y+1,6,2.5,0,0,Math.PI*2);g.stroke()}
+  const pose=e===G.qb&&e.throwT>0?"throw":cock?"cock":e.leap>0?"reach":carrying?"carry":moving?"run":"stand";
+  const lyingDown=e.dive>0||e.lay>0,air=e.leap>0?2:0;
+  // soft shadow
+  g.fillStyle="rgba(0,0,0,.28)";g.beginPath();g.ellipse(x+0.5,y+0.5,lyingDown?8:5,1.6,0,0,Math.PI*2);g.fill();
+  const spr=playerSprite(look,skin,num,pose,moving?fr:0,f);
+  if(lyingDown){g.save();g.translate(x,y-(e.dive>0?1.5:0.5));g.rotate(f*(e.dive>0?1.25:1.5));g.drawImage(spr,-PS_OX/2,-PS_OY/2,PS_W/2,PS_H/2);g.restore()}
+  else g.drawImage(spr,x-PS_OX/2,y-PS_OY/2-air,PS_W/2,PS_H/2);
+  if(e.hl){g.fillStyle="#ffd640";g.fillRect(x-1.5,y-25,4,2);g.fillRect(x-0.5,y-23,2,1)}
+  if(e===G.ctrl){g.strokeStyle="#ffd640";g.lineWidth=1;g.beginPath();g.ellipse(x+0.5,y+1,7,2.8,0,0,Math.PI*2);g.stroke()}
 }
 function draw(){
   if(!G)return;
   const g=wc;g.setTransform(SCALE,0,0,SCALE,0,0);g.imageSmoothingEnabled=false;
   g.fillStyle="#2f6a2c";g.fillRect(0,0,VW,VH);
-  if(fieldImg){const fx=(cam.x-WX0)*XS,fy=(cam.y-WY0)*YS,ix=Math.floor(fx),iy=Math.floor(fy),ox=Math.round((fx-ix)*2)/2,oy=Math.round((fy-iy)*2)/2;
-    const w=Math.min(VW+1,fieldImg.width-ix),h=Math.min(VH+1,fieldImg.height-iy);g.drawImage(fieldImg,ix,iy,w,h,-ox,-oy,w,h)}
+  if(fieldImg){const sx=Math.round((cam.x-WX0)*XS*2),sy=Math.round((cam.y-WY0)*YS*2),w=Math.min(VW*2,fieldImg.width-sx),h=Math.min(VH*2,fieldImg.height-sy);
+    g.drawImage(fieldImg,sx,sy,w,h,0,0,w/2,h/2)}
   if(G.phase==="presnap"||G.phase==="live"||G.phase==="result"){
     g.fillStyle="rgba(70,140,255,.9)";g.fillRect(wx(G.lx),wy(0),1,Math.round(FW*YS));
     const tg=G.lx+G.togo;if(tg<110&&!G.conv){g.fillStyle="rgba(255,214,64,.95)";g.fillRect(wx(tg),wy(0),1,Math.round(FW*YS))}
