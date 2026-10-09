@@ -153,11 +153,11 @@ const ROSTER=[
 const YR={Sr:'Senior',Jr:'Junior',So:'Sophomore',Fr:'Freshman'},POS={G:'Guard',F:'Forward'};
 ROSTER.forEach(p=>{p.name=p.first+' '+p.last; if(!p.bio)p.bio=`${YR[p.yr]} ${POS[p.pos].toLowerCase()}, ${p.ht}. Wears #${p.n} for the Flyers.`; p.look=lookFor(p.name);});
 // players people create, and stat edits for anyone, are saved in this browser
-const STAT_MAX=13,SKINS=[['#f9e0cc','#e6bea0'],['#f7d9c1','#e2b394'],['#f3cfb2','#dcab88'],['#f0c6a2','#d6a07a'],['#ecc09a','#d19a70']],HAIRS=['#1d140e','#2e1d12','#4a2e19','#6b4423','#8a5a2b','#b9894a','#d9b46a','#121212'];
+const STAT_MAX=10,SKINS=[['#f9e0cc','#e6bea0'],['#f7d9c1','#e2b394'],['#f3cfb2','#dcab88'],['#f0c6a2','#d6a07a'],['#ecc09a','#d19a70']],HAIRS=['#1d140e','#2e1d12','#4a2e19','#6b4423','#8a5a2b','#b9894a','#d9b46a','#121212'];
 const BASE_S={};ROSTER.forEach(p=>BASE_S[p.id]=[...p.s]);
 const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]),clean=t=>t.replace(/[<>&"'`\\]/g,'').replace(/\s+/g,' ').trim();
 const htStr=i=>`${Math.floor(i/12)}'${i%12}"`;
-function addCustom(c){const p=Object.assign({},c,{s:[...c.s],custom:true});p.name=p.first+' '+p.last;p.ht=htStr(p.inch);p.bio=`Created player. ${YR[p.yr]} ${POS[p.pos].toLowerCase()}, ${p.ht}. Wears #${p.n} for the Flyers.`;
+function addCustom(c){while(c.s[0]+c.s[1]+c.s[2]>STAT_MAX){const i=c.s.indexOf(Math.max(...c.s));c.s[i]--}const p=Object.assign({},c,{s:[...c.s],custom:true});p.name=p.first+' '+p.last;p.ht=htStr(p.inch);p.bio=`Created player. ${YR[p.yr]} ${POS[p.pos].toLowerCase()}, ${p.ht}. Wears #${p.n} for the Flyers.`;
  p.look=Object.assign(lookFor(p.name),{skin:SKINS[c.skin][0],shade:SKINS[c.skin][1],hair:HAIRS[c.hair],style:c.style,band:!!c.band});ROSTER.push(p);return p}
 
 const RIVALS={
@@ -190,7 +190,7 @@ function lookFor(key){const r=rng(hash(key));
 function gauss(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
 const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 store.get('fhh_custom',[]).forEach(addCustom);
-{const ed=store.get('fhh_stats',{});for(const id in ed){const p=ROSTER.find(q=>q.id===id);if(p&&!p.custom)p.s=[...ed[id]]}}
+{const ed=store.get('fhh_stats',{});for(const id in ed){const p=ROSTER.find(q=>q.id===id);if(p&&!p.custom&&ed[id].reduce((a,b)=>a+b,0)<=BASE_S[id].reduce((a,b)=>a+b,0))p.s=[...ed[id]]}}
 
 // ---------- audio ----------
 let AC=null,muted=store.get('fhh_muted',false);
@@ -1026,18 +1026,18 @@ function howTo(){
 }
 
 // stat steppers: Speed, Hops, Shooting from 1 to 5, with a point cap so nobody is maxed out everywhere
-const stepHTML=s=>`${['Speed','Hops','Shooting'].map((l,i)=>`<div class="stepr"><b>${l}</b><button data-st="${i}" data-dv="-1" aria-label="Less ${l}">−</button><div class="bar"><i style="width:${s[i]*20}%"></i></div><button data-st="${i}" data-dv="1" aria-label="More ${l}">+</button></div>`).join('')}<p class="muted small">${STAT_MAX-s[0]-s[1]-s[2]} of ${STAT_MAX} points left · each stat goes from 1 to 5</p>`;
-const stepS=(s,i,dv)=>{const v=s[i]+dv;if(v<1||v>5||(dv>0&&s[0]+s[1]+s[2]>=STAT_MAX))return false;s[i]=v;return true};
-function editStats(p,done){const s=[...p.s];
- const render=()=>{show(`<div class="eyebrow">Edit stats</div><h2>#${p.n} ${esc(p.name)}</h2>${stepHTML(s)}
+const stepHTML=(s,cap=STAT_MAX)=>`${['Speed','Hops','Shooting'].map((l,i)=>`<div class="stepr"><b>${l}</b><button data-st="${i}" data-dv="-1" aria-label="Less ${l}">−</button><div class="bar"><i style="width:${s[i]*20}%"></i></div><button data-st="${i}" data-dv="1" aria-label="More ${l}">+</button></div>`).join('')}<p class="muted small">${cap-s[0]-s[1]-s[2]} of ${cap} points left · each stat goes from 1 to 5</p>`;
+const stepS=(s,i,dv,cap=STAT_MAX)=>{const v=s[i]+dv;if(v<1||v>5||(dv>0&&s[0]+s[1]+s[2]>=cap))return false;s[i]=v;return true};
+function editStats(p,done){const s=[...p.s],cap=BASE_S[p.id].reduce((a,b)=>a+b,0);
+ const render=()=>{show(`<div class="eyebrow">Edit stats</div><h2>#${p.n} ${esc(p.name)}</h2>${stepHTML(s,cap)}
   <div class="btns"><button class="btn gold" id="save">Save</button><button class="btn ghost" id="reset">Original stats</button><button class="btn ghost" id="back">Cancel</button></div>`);
-  on('[data-st]',el=>{if(stepS(s,+el.dataset.st,+el.dataset.dv))render()});
+  on('[data-st]',el=>{if(stepS(s,+el.dataset.st,+el.dataset.dv,cap))render()});
   on('#reset',()=>{s.splice(0,3,...BASE_S[p.id]);render()});
   on('#save',()=>{p.s=[...s];const ed=store.get('fhh_stats',{});ed[p.id]=[...s];store.set('fhh_stats',ed);done()});
   on('#back',()=>done())};
  render()}
 function createPlayer(p,done){
- const c=p?{id:p.id,n:p.n,first:p.first,last:p.last,pos:p.pos,inch:p.inch,yr:p.yr,s:[...p.s],skin:p.skin,hair:p.hair,style:p.style,band:p.band}:{id:'u'+Date.now().toString(36),n:'',first:'',last:'',pos:'G',inch:73,yr:'Fr',s:[3,3,3],skin:0,hair:2,style:0,band:false};
+ const c=p?{id:p.id,n:p.n,first:p.first,last:p.last,pos:p.pos,inch:p.inch,yr:p.yr,s:[...p.s],skin:p.skin,hair:p.hair,style:p.style,band:p.band}:{id:'u'+Date.now().toString(36),n:'',first:'',last:'',pos:'G',inch:73,yr:'Fr',s:[3,3,2],skin:0,hair:2,style:0,band:false};
  let msg='';
  const render=()=>{
   show(`<div class="eyebrow">${p?'Edit your player':'Create a player'}</div><h2>${p?esc(p.name):'New Flyer'}</h2>

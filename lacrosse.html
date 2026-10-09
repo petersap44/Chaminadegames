@@ -314,7 +314,9 @@ if(!save||typeof save!=="object")save={};
 if(!save.lineup)save.lineup=defaultLineup();
 if(save.cc==null)save.cc=6;if(!save.train)save.train={};if(!save.up)save.up={fo:0,gk:0};
 /* Created players live in save.custom and join ROSTER on load. Bad or clashing entries are dropped; old saves just start empty. */
-const CP_POS=["Attack","Midfield","SSDM","LSM","Defense","FOGO","Goalie"],CP_CLS=["Fr.","So.","Jr.","Sr."],CP_SKIN=[0,4],CP_ATTR=["spd","stk","sht","pow","sav","fo"],CP_MIN=40,CP_MAX=90,CP_PTS=430;
+const CP_POS=["Attack","Midfield","SSDM","LSM","Defense","FOGO","Goalie"],CP_CLS=["Fr.","So.","Jr.","Sr."],CP_SKIN=[0,4],CP_ATTR=["spd","stk","sht","pow","sav","fo"],CP_MIN=40,CP_MAX=84,CP_PTS=360;
+// trim the highest ratings until a created player fits the point budget
+const cpFit=c=>{let t=CP_ATTR.reduce((s,a)=>s+c[a],0);while(t>CP_PTS){const a=CP_ATTR.reduce((m,k)=>c[k]>c[m]?k:m);if(c[a]<=CP_MIN)break;c[a]--;t--}return c};
 const cpName=s=>String(s||"").replace(/[^A-Za-z .'-]/g,"").replace(/\s+/g," ").trim().slice(0,14);
 function mkCustom(c){const p={num:c.num,name:c.first+" "+c.last,pos:c.pos,cls:c.cls,home:c.home,last:c.last,custom:true,skin:c.skin};
   p.k=POS_KEY(p.pos);p.pole=p.k==="LSM"||p.k==="D";CP_ATTR.forEach(a=>p[a]=c[a]);return p}
@@ -1950,7 +1952,7 @@ function renderRoster(){
 /* ---------- create / edit a player ---------- */
 function renderCreate(num){
   const old=num==null?null:save.custom.find(c=>c.num===num),B=BASE[POS_KEY(old?old.pos:"Midfield")];
-  const c=old?{...old}:{num:"",first:"",last:"",home:"",pos:"Midfield",cls:"Fr.",skin:0,...Object.fromEntries(CP_ATTR.map(a=>[a,clamp(B[a],CP_MIN,CP_MAX)]))};
+  const c=old?{...old}:{num:"",first:"",last:"",home:"",pos:"Midfield",cls:"Fr.",skin:0,...Object.fromEntries(CP_ATTR.map(a=>[a,clamp(B[a],CP_MIN,CP_MAX)]))};cpFit(c);
   const LBL={spd:"Speed",stk:"Stick",sht:"Shot",pow:"Check / hit",sav:"Saves (goalie)",fo:"Faceoff"};
   const sel=(id,list,cur)=>`<select id="${id}">${list.map(v=>`<option${v===cur?" selected":""}>${esc(v)}</option>`).join("")}</select>`;
   const txt=(id,l,v,ph)=>`<label for="${id}">${l}<input id="${id}" maxlength="14" autocomplete="off" value="${esc(v)}" placeholder="${ph}"></label>`;
@@ -1970,7 +1972,7 @@ function renderCreate(num){
   const sync=()=>{CP_ATTR.forEach(a=>{$("#c-"+a).value=c[a];$("#c-"+a+"-v").textContent=c[a]});$("#c-left").textContent="· "+(CP_PTS-tot())+" points left";
     const p=mkCustom({...c,num:-1,pos:$("#c-pos").value});$("#c-stars").textContent=starStr(p)+" as "+$("#c-pos").value};
   CP_ATTR.forEach(a=>$("#c-"+a).oninput=e=>{c[a]=+e.target.value;const over=tot()-CP_PTS;if(over>0)c[a]-=over;sync()});
-  $("#c-pos").onchange=()=>{if(!old){const B=BASE[POS_KEY($("#c-pos").value)];CP_ATTR.forEach(a=>c[a]=clamp(B[a],CP_MIN,CP_MAX))}sync()};
+  $("#c-pos").onchange=()=>{if(!old){const B=BASE[POS_KEY($("#c-pos").value)];CP_ATTR.forEach(a=>c[a]=clamp(B[a],CP_MIN,CP_MAX));cpFit(c)}sync()};
   document.querySelectorAll("[data-skin]").forEach(b=>b.onclick=()=>{c.skin=+b.dataset.skin;document.querySelectorAll("[data-skin]").forEach(x=>x.classList.toggle("on",x===b))});
   $("#c-back").onclick=renderRoster;
   $("#c-save").onclick=()=>{const err=m=>{$("#c-err").textContent=m};

@@ -323,7 +323,7 @@ function lineup(){return Object.assign(defaultLineup(),(save&&save.lineup)||{})}
 function ensureSave(){if(!save){save={lineup:defaultLineup(),season:null,sound:true}}if(!save.lineup)save.lineup=defaultLineup();if(save.cc==null)save.cc=6;if(!save.train)save.train={};if(!save.up)save.up={ol:0,df:0}}
 loadSave();ensureSave();
 /* Created players: kept in save.custom, rebuilt into ROSTER on load. look = {skin,visor,eb} using the game's own light skin tones. */
-const C_SKIN=["#f1c9a5","#e2b48a","#d9a066"],C_POS=["QB","RB","WR","TE","OL","DL","OLB","ILB","CB","S","K"],C_CLS=["Fr.","So.","Jr.","Sr."],C_KEYS=["spd","hnd","arm","pow"],C_BUDGET=300;
+const C_SKIN=["#f1c9a5","#e2b48a","#d9a066"],C_POS=["QB","RB","WR","TE","OL","DL","OLB","ILB","CB","S","K"],C_CLS=["Fr.","So.","Jr.","Sr."],C_KEYS=["spd","hnd","arm","pow"],C_BUDGET=250,C_MAX=85;
 function customPlayer(c){const name=c.first+" "+c.last;return{num:c.num,name,pos:c.pos,ht:c.ht,wt:c.wt,cls:c.cls,home:c.home||"",last:c.last,spd:c.spd,hnd:c.hnd,arm:c.arm,pow:c.pow,custom:true,look:{skin:c.skin,visor:!!c.visor,eb:!!c.eb}}}
 if(!Array.isArray(save.custom))save.custom=[];
 save.custom=save.custom.filter(c=>{if(!c||!(c.num>=0&&c.num<=99)||byNum(c.num))return false;ROSTER.push(customPlayer(c));return true});
@@ -1743,7 +1743,7 @@ let cEdit=null;
 function renderCreate(){
   const old=cEdit!=null&&save.custom.find(c=>c.num===cEdit),used=new Set(ROSTER.map(p=>p.num));if(old)used.delete(old.num);
   const free=[...Array(100).keys()].find(n=>!used.has(n));
-  const c=Object.assign({first:"",last:"",num:free,pos:"WR",cls:"Fr.",ht:`6'0"`,wt:185,home:"",skin:C_SKIN[0],visor:false,eb:true,spd:65,hnd:65,arm:65,pow:65},old||{});
+  const c=Object.assign({first:"",last:"",num:free,pos:"WR",cls:"Fr.",ht:`6'0"`,wt:185,home:"",skin:C_SKIN[0],visor:false,eb:true,spd:62,hnd:62,arm:62,pow:62},old||{});
   const [hf,hi]=(c.ht.match(/\d+/g)||[6,0]).map(Number),KL={spd:"SPD · speed",hnd:"HND · hands",arm:"ARM · throwing",pow:"POW · power"};
   const o=(arr,v)=>arr.map(x=>`<option${x==v?" selected":""}>${x}</option>`).join("");
   $("#menu").innerHTML=`<div class="topline"><h2 style="font-size:14px">${old?"EDIT PLAYER":"CREATE PLAYER"}</h2><button class="iconbtn" id="c-back" type="button">BACK</button></div>
@@ -1762,8 +1762,8 @@ function renderCreate(){
   <div class="panel"><div class="eyebrow" style="margin-bottom:10px">Look</div><div class="row" style="gap:18px;flex-wrap:wrap"><span class="row" role="group" aria-label="Skin tone"><span class="small dim">Skin</span>${C_SKIN.map((k,i)=>`<button type="button" class="swatch${k===c.skin?" on":""}" data-skin="${k}" aria-label="Skin tone ${i+1}" style="background:${k}"></button>`).join("")}</span>
     <span class="row"><span class="small dim">Visor</span>${[["NO",0],["YES",1]].map(([l,v])=>`<button class="iconbtn" type="button" data-visor="${v}">${l}</button>`).join("")}</span>
     <span class="row"><span class="small dim">Eye black</span>${[["NO",0],["YES",1]].map(([l,v])=>`<button class="iconbtn" type="button" data-eb="${v}">${l}</button>`).join("")}</span></div></div>
-  <div class="panel"><div class="eyebrow" style="margin-bottom:10px">Ratings · <span id="c-left" class="tnum"></span></div><p class="small dim" style="margin-top:0">Spread ${C_BUDGET} points over four ratings (each 40 to 95). Stars come from speed and hands for receivers, arm for quarterbacks, hands and power for tight ends, speed and power for everyone else. You can fine-tune later on EDIT RATINGS; saving this form again resets those typed ratings to these.</p><div class="lineup">
-    ${C_KEYS.map(k=>`<label for="c-${k}">${KL[k]} <b class="tnum" id="c-${k}v">${c[k]}</b><input id="c-${k}" type="range" min="40" max="95" value="${c[k]}" data-ck="${k}"></label>`).join("")}
+  <div class="panel"><div class="eyebrow" style="margin-bottom:10px">Ratings · <span id="c-left" class="tnum"></span></div><p class="small dim" style="margin-top:0">Spread ${C_BUDGET} points over four ratings (each 40 to ${C_MAX}). Stars come from speed and hands for receivers, arm for quarterbacks, hands and power for tight ends, speed and power for everyone else. You can fine-tune later on EDIT RATINGS; saving this form again resets those typed ratings to these.</p><div class="lineup">
+    ${C_KEYS.map(k=>`<label for="c-${k}">${KL[k]} <b class="tnum" id="c-${k}v">${c[k]}</b><input id="c-${k}" type="range" min="40" max="${C_MAX}" value="${c[k]}" data-ck="${k}"></label>`).join("")}
   </div></div>
   <div class="row" style="gap:18px;flex-wrap:wrap;padding:6px"><button class="btn" id="c-save" type="button">${old?"SAVE CHANGES":"ADD TO ROSTER"}</button>${old?`<button class="btn alt" id="c-del" type="button">DELETE PLAYER</button>`:""}</div>`;
   const val=()=>{const v={first:$("#c-first").value.trim(),last:$("#c-last").value.trim(),num:Math.round(+$("#c-num").value),pos:$("#c-pos").value,cls:$("#c-cls").value,ht:`${$("#c-hf").value}'${$("#c-hi").value}"`,wt:Math.round(clamp(+$("#c-wt").value||185,130,320)),home:$("#c-home").value.trim(),skin:c.skin,visor:c.visor,eb:c.eb};C_KEYS.forEach(k=>v[k]=+$("#c-"+k).value);return v};
