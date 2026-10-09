@@ -310,7 +310,7 @@ const defaultLineup=()=>({A:[1,6,19],M:[41,4,2],D:[21,12,17],G:44,FO:3});
 if(!save||typeof save!=="object")save={};
 if(!save.lineup)save.lineup=defaultLineup();
 if(save.cc==null)save.cc=6;if(!save.train)save.train={};if(!save.up)save.up={fo:0,gk:0};
-if(save.sound==null)save.sound=true;if(save.qlen==null)save.qlen=3;if(save.diff==null)save.diff=1;
+if(save.sound==null)save.sound=true;if(save.qlen==null)save.qlen=3;if(save.diff==null)save.diff=1;if(save.gkd==null)save.gkd=1;
 
 /* ============================================================
    SOUND
@@ -350,6 +350,10 @@ const R=(p,k)=>p.opp?p[k]:Math.min(99,p[k]+((save.train[p.num]&&save.train[p.num
 /* Difficulty: 0 Rookie, 1 Varsity (default), 2 All-American */
 const DIFF_NAMES=["Rookie","Varsity","All-American"];
 const DL_=()=>clamp(save.diff,0,2);
+/* Goalie difficulty: how big a cage the other team's goalie covers when you shoot, how fast he follows your eyes, and how hard he reacts on the release. */
+const GK_NAMES=["Rookie","Medium","Hard"];
+const GKP=[{r:0.06,g:1.6,s:2.4,tr:0.34,L:0.42,Ls:0.5},{r:0.08,g:2.0,s:3.0,tr:0.39,L:0.52,Ls:0.62},{r:0.1,g:2.4,s:3.6,tr:0.43,L:0.6,Ls:0.72}];
+const GKD=()=>GKP[clamp(save.gkd|0,0,2)];
 const DIF=k=>({aiChk:[.3,.6,.9],chk:[-.08,0,.06],gkVsOpp:[.12,0,-.05],oppGk:[-.1,0,.05],foRt:[.07,0,-.035],oppSpd:[.93,1,1.04],
   intc:[.22,.33,.42],aiHit:[.06,.15,.26],oppErr:[1.3,1,.85],shotRate:[.8,1,1.2]})[k][DL_()];
 
@@ -1050,7 +1054,7 @@ function startShot(c){
 }
 const swayAt=k=>({u:k.sway*(Math.sin(k.t*3.3)+0.6*Math.sin(k.t*7.1+1)),v:k.sway*0.8*(Math.sin(k.t*2.7+2)+0.5*Math.sin(k.t*6.3))});
 /* What the goalie covers: his body and stick, plus how far he can react. A soft shot from far out gives him time. */
-function gkReach(k){return(0.1+(k.sav-70)/350+clamp(k.D-7,0,16)*0.006+(k.outside?0.1:0)-(k.D<7?0.05:0))*(1.45-k.power*0.7)}
+function gkReach(k){return(GKD().r+(k.sav-70)/350+clamp(k.D-7,0,16)*0.006+(k.outside?0.1:0)-(k.D<7?0.05:0))*(1.45-k.power*0.7)}
 function gkCovers(k,u,v){const cs=1/(0.5+0.5*(k.sq||1)),m=gkReach(k)*cs,bw=0.30*cs;
   if(Math.abs(u-k.gu)<=bw+m&&v<=0.85+m)return true;                                    // body, pads and helmet
   return Math.hypot((u-k.su)/cs,(v-k.sv)*1.1)<=0.20+m/cs;       // stick head, wherever he's moved it       // stick head up on his stick side
@@ -1067,9 +1071,9 @@ function updateShotMeter(dt){const k=G.sm;if(!k)return;k.t+=dt;
     k.tu=clamp(k.tu+kx*1.6*dt,-1.5,1.5);k.tv=clamp(k.tv+ky*1.4*dt,0,1.45);
     const f=Math.min(1,dt*14);k.ru+=(k.tu-k.ru)*f;k.rv+=(k.tv-k.rv)*f;
     // the goalie reads your eyes: he slides toward wherever you're aiming
-    const far=clamp(k.D-8,0,14),gs=2.4+(k.sav-70)/50+far*0.05;k.gu+=clamp(clamp(k.ru*0.43,-0.8,0.8)+0.06*Math.sin(k.t*3.1)-k.gu,-gs*dt,gs*dt);   // he cheats toward your eyes but stays on his angle
+    const far=clamp(k.D-8,0,14),gs=GKD().g+(k.sav-70)/50+far*0.05;k.gu+=clamp(clamp(k.ru*GKD().tr,-0.8,0.8)+0.06*Math.sin(k.t*3.1)-k.gu,-gs*dt,gs*dt);   // he cheats toward your eyes but stays on his angle
     // ...and he leans his stick head part of the way toward where you're aiming
-    const ss=3.6+(k.sav-70)/40+far*0.065,tsu=k.gu+clamp((k.ru-k.gu)*0.4,-0.62,0.62),tsv=clamp(0.86+(k.rv-0.86)*0.4,0.15,0.92);
+    const ss=GKD().s+(k.sav-70)/40+far*0.065,tsu=k.gu+clamp((k.ru-k.gu)*0.4,-0.62,0.62),tsv=clamp(0.86+(k.rv-0.86)*0.4,0.15,0.92);
     k.su+=clamp(tsu-k.su,-ss*dt,ss*dt);k.sv+=clamp(tsv-k.sv,-ss*dt,ss*dt);
     k.t1=(k.t1||0)+dt;if(k.t1>2.8)fireShot();   // don't stare him down forever
     return}
@@ -1086,7 +1090,7 @@ function fireShot(){const k=G&&G.sm;if(!k||k.stage!==1)return;
   // he reacts as you release: a lunge of the body and a jab of the stick toward the ball (less time to react to a hard shot)
   // ...and the farther out you are, the longer the ball is in the air, so he gets there even if you switch corners late
   const far=clamp(k.D-8,0,14),fly=k.D/(17+k.power*15+R(k.c.p,"sht")/10);
-  const L0=0.18*(1.2-k.power*0.5),Lf=Math.max(0,fly-0.12)*(0.7+(k.sav-70)/60),L=(L0+Lf)*0.6,Ls=(L0*1.3+Lf)*0.72;
+  const L0=0.18*(1.2-k.power*0.5),Lf=Math.max(0,fly-0.12)*(0.7+(k.sav-70)/60),L=(L0+Lf)*GKD().L,Ls=(L0*1.3+Lf)*GKD().Ls;
   k.gu+=clamp(u-k.gu,-L,L);k.su+=clamp(u-k.su,-Ls,Ls);k.sv+=clamp(v-k.sv,-Ls,Ls);
   let saved=inCage&&gkCovers(k,u,v);
   if(inCage&&!saved&&k.power<0.45&&Math.random()<0.7)saved=true;   // a weak shot gets eaten anyway
@@ -1840,6 +1844,7 @@ function renderTitle(){
       <button class="btn alt" id="m-how" type="button">How to play</button>
     </div>
     ${optRow("Difficulty",DIFF_NAMES.map((n,i)=>[n.toUpperCase(),i]),DL_(),"diff")}
+    ${optRow("Goalies",GK_NAMES.map((n,i)=>[n.toUpperCase(),i]),clamp(save.gkd|0,0,2),"gkd")}
     ${optRow("Quarters",[[2,"2"],[3,"3"],[4,"4"]].map(([n,v])=>[n+" MIN",+v]),save.qlen,"ql")}
     <div class="panel small dim">Roster, numbers, positions, classes and hometowns come from the official Chaminade athletics site, and so do the schedule and real results. Star ratings use real recruiting ratings from Inside Lacrosse and the National Lacrosse Federation where they're published. Speed, stick and shot numbers, opponent strength and opponent colors are made up for the game.</div>
   </div>`;
@@ -1848,6 +1853,7 @@ function renderTitle(){
   $("#m-new").onclick=()=>{newSeason();showMenu("season")};
   $("#m-quick").onclick=()=>showMenu("quick");$("#m-goalie").onclick=()=>showMenu("goalie");$("#m-roster").onclick=()=>showMenu("roster");$("#m-office").onclick=()=>showMenu("office");$("#m-how").onclick=()=>showMenu("howto");
   document.querySelectorAll("[data-diff]").forEach(b=>b.onclick=()=>{save.diff=+b.dataset.diff;writeSave();renderTitle()});
+  document.querySelectorAll("[data-gkd]").forEach(b=>b.onclick=()=>{save.gkd=+b.dataset.gkd;writeSave();renderTitle()});
   document.querySelectorAll("[data-ql]").forEach(b=>b.onclick=()=>{save.qlen=+b.dataset.ql;writeSave();renderTitle()});
   const c=$("#stars"),g=c.getContext("2d");for(let i=0;i<60;i++){g.fillStyle=i%5?"#f3eedf":"#e8b63e";g.fillRect((Math.random()*320)|0,(Math.random()*120)|0,1,1)}
 }
