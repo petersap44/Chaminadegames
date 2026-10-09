@@ -878,7 +878,7 @@ function throwBall(tx,ty,bullet){
   const pressure=G.ents.some(e=>e.role==="DL"&&e.block<=0&&dist(e,qb)<3)?1.6:1;
   const err=(0.25+Math.hypot(tx-qb.x,ty-qb.y)/45)*(1.25-arm/130)*pressure*(bullet?1.25:1)*DF("err");
   tx+=rnd(-err,err);ty+=rnd(-err,err);
-  const D=Math.hypot(tx-qb.x,ty-qb.y),T=bullet?0.2+D/32:0.32+D/23;
+  const D=Math.hypot(tx-qb.x,ty-qb.y),T=bullet?0.16+D/42:0.26+D/31;   // zips: about a third faster than before
   let best=null,bt=1e9;for(const e of G.ents){if(!e.rec)continue;const tt=Math.hypot(e.x-tx,e.y-ty)/ySpd(e.p);if(tt<bt){bt=tt;best=e}}
   if(bt>T*DF("reach")+0.12)best=null; // too far off target: receiver keeps running his route
   G.ball={flying:true,x0:qb.x,y0:qb.y,x:qb.x,y:qb.y,tx,ty,u:0,T,peak:bullet?D*0.05+0.4:D*0.16+0.6,h:0,target:best,bullet};
@@ -1181,6 +1181,7 @@ function updateCamera(dt){
   if(G.phase==="kick"){fx=!G.kick?G.lx+20:(G.kick.type==="pat"||G.kick.type==="fg")?Math.max((G.kick.spot+120)/2+3,G.kick.spot+24):G.kick.type==="ko"?66:G.lx+20}
   else if(G.ball&&G.ball.flying)fx=G.ball.x+6;
   else if(G.carrier)fx=G.carrier.x+10;
+  else if(!onD()&&G.qb&&G.qb.hasBall)fx=G.lx+8;   // our ball: QB nearer the middle so there's room to pull back for a deep throw
   else fx=G.lx+18;
   const tx=clamp(fx-VW/XS/2,WX0,WX1-VW/XS);
   const k=Math.min(1,dt*4);cam.x+=(tx-cam.x)*k;cam.y+=(followY()-cam.y)*k;
@@ -1349,7 +1350,7 @@ function draw(){
 function aimTarget(){
   const dx=input.sx-input.cx,dy=input.sy-input.cy,len=Math.hypot(dx,dy);if(len<16)return null;
   // pull distance in screen units -> yards; keep screen direction (field is squashed vertically)
-  const k=0.11;let x=G.qb.x+dx*k,y=G.qb.y+dy*k*XS/YS;
+  const k=0.15;let x=G.qb.x+dx*k,y=G.qb.y+dy*k*XS/YS;
   const maxD=38+R(G.qb.p,"arm")/5,d=Math.hypot(x-G.qb.x,y-G.qb.y);
   if(d>maxD){x=G.qb.x+(x-G.qb.x)*maxD/d;y=G.qb.y+(y-G.qb.y)*maxD/d}
   return{x,y,d:Math.min(d,maxD)};
