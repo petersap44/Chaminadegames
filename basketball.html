@@ -610,9 +610,12 @@ function contested(p){return contestAmt(p)>.2}
 // Green window on the shot meter. Only a release inside it goes in. It is widest at the rim and shrinks with distance;
 // better shooters and jump shots get a little more, a hand in your face takes some away.
 function distK(p){return clamp(1.15-Math.abs(p.x-attack(p).cx)/700,.35,1.15)}
-const zone=p=>({c:.78,w:1.2*(.075+p.shot*.012)*distK(p)*(p.ground?1:1.1)*(1-contestAmt(p))*(p.meter>=1?2.6:1)*(!p.cpu&&game&&game.cfg.cpu===5?(CPU[5].green||100)/100:1)});
+const zone=p=>({c:.78,w:.8*(.075+p.shot*.012)*distK(p)*(p.ground?1:1.1)*(1-contestAmt(p))*(p.meter>=1?2.6:1)*(!p.cpu&&game&&game.cfg.cpu===5?(CPU[5].green||100)/100:1)});
+// Custom difficulty: a contested shot against a Custom defender only drops some of the time, even off a green release (Defense 99: 10%)
+function customContestFail(p){const o=opponents(p).find(q=>q.cpu&&q.cpu.d===5);if(!o||contestAmt(p)<=.2)return false;return Math.random()>1-.9*(clamp(CPU[5].d,1,99)-1)/98}
 function release(p){const z=zone(p),d=Math.abs(p.charge-z.c),hp=headPos(p);p.charging=false;let res;
- if(d<=z.w){res='make';pop(d<=z.w*.35?'PERFECT!':'GREEN!',p.x,hp.y-95,'#3ddc84',20,.8)}else{res=p.charge<z.c?'short':'long';pop(p.charge<z.c?'EARLY':'LATE',p.x,hp.y-95,'#ffb199',16,.7)}
+ if(d<=z.w&&customContestFail(p)){res=Math.random()<.5?'short':'long';pop('SMOTHERED!',p.x,hp.y-95,'#ff6a5a',20,.8)}
+ else if(d<=z.w){res='make';pop(d<=z.w*.35?'PERFECT!':'GREEN!',p.x,hp.y-95,'#3ddc84',20,.8)}else{res=p.charge<z.c?'short':'long';pop(p.charge<z.c?'EARLY':'LATE',p.x,hp.y-95,'#ffb199',16,.7)}
  shoot(p,res)}
 function shoot(p,res){
  const g=game,b=g.ball,h=attack(p),hp=headPos(p);
