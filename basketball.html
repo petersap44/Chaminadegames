@@ -112,7 +112,9 @@ HOOPS.forEach(h=>{h.cx=(h.back+h.front)/2;h.lo=Math.min(h.back,h.front);h.hi=Mat
 const CPU=[
   {name:'Rookie',react:.24,acc:.5,swipe:.7,block:.22,jumpShot:.5},
   {name:'Varsity',react:.15,acc:.62,swipe:1.4,block:.42,jumpShot:.7},
-  {name:'All-State',react:.08,acc:.74,swipe:2.2,block:.66,jumpShot:.9}];
+  {name:'All-State',react:.08,acc:.74,swipe:2.2,block:.66,jumpShot:.9},
+  {name:'D1',react:.06,acc:.82,swipe:2.8,block:.8,jumpShot:.95},
+  {name:'NBA',react:.04,acc:.9,swipe:3.4,block:.92,jumpShot:1}];
 const CHAM={name:'Chaminade',abbr:'CHAM',jersey:'#8f1229',trim:'#ffc72c',num:'#ffc72c',shoe:'#ffc72c'};
 const CHAM_W={name:'Chaminade',abbr:'CHAM',jersey:'#ffc72c',trim:'#8f1229',num:'#8f1229',shoe:'#8f1229'};
 
@@ -189,7 +191,7 @@ let PX=1;
 let VW=W,VH=H,OY=0,camX=0,camT=null;
 function resize(){const vw=innerWidth,vh=innerHeight;scale=Math.min(vw/W,vh/H);
  if(H*vw/W<vh*.6)scale=Math.min(vh/H,Math.max(scale,vw/760));
- const dpr=Math.min(1.75,window.devicePixelRatio||1);PX=scale*dpr;VW=vw/scale;VH=vh/scale;
+ const dpr=Math.min(1.5,window.devicePixelRatio||1);PX=scale*dpr;VW=vw/scale;VH=vh/scale;
  const tch=matchMedia('(pointer:coarse)').matches||('ontouchstart' in window);OY=Math.max(0,(VH-H)*(tch&&VH-H>160?.4:.5));
  cv.style.width=vw+'px';cv.style.height=vh+'px';cv.width=Math.round(vw*dpr);cv.height=Math.round(vh*dpr);ctx.setTransform(PX,0,0,PX,0,0);layers=null;headCache.clear();camT=null}
 let layers=null;const headCache=new Map();
@@ -311,10 +313,14 @@ function buildLayers(){
  const[edge,ex]=mkLayer();ex.drawImage(still,0,0,W,H);ex.drawImage(front,0,0,W,H);
  const px=(x,y)=>{const d=ex.getImageData(Math.round(x*PX),Math.round(y*PX),1,1).data;return`rgb(${d[0]},${d[1]},${d[2]})`};
  layers={back,still,crowdL,front,CY,CH,edge,corner:[px(1,1),px(W-2,1),px(1,H-2),px(W-2,H-2)]};
+ // everything that doesn't move, drawn once: the arena around the court, the court itself and the hoop stanchions
+ const FWv=Math.max(VW,W),full=document.createElement('canvas');full.width=Math.round(FWv*PX);full.height=Math.round(VH*PX);
+ const fc=full.getContext('2d');fc.setTransform(PX,0,0,PX,0,0);drawSurround(fc,FWv);fc.translate(VW>W?(VW-W)/2:0,OY);fc.drawImage(still,0,0,W,H);fc.drawImage(front,0,0,W,H);for(const h of HOOPS)drawHoopBack(h,fc);
+ layers.full=full;layers.FWv=FWv;
 }
 // fill everything outside the court with the arena: lights and rafters above, more floor below, wall to the sides
-function drawSurround(){
- const L=layers,e=L.edge,k=PX,x0=-camX+(VW>W?(VW-W)/2:0),x1=x0+W,bot=OY+H;
+function drawSurround(ctx,VW){
+ const L=layers,e=L.edge,x0=VW>W?(VW-W)/2:0,x1=x0+W,bot=OY+H;
  ctx.fillStyle=L.corner[0];ctx.fillRect(0,0,VW/2,OY);ctx.fillStyle=L.corner[1];ctx.fillRect(VW/2,0,VW/2+1,OY);
  ctx.fillStyle=L.corner[2];ctx.fillRect(0,bot,VW/2,VH-bot+1);ctx.fillStyle=L.corner[3];ctx.fillRect(VW/2,bot,VW/2+1,VH-bot+1);
  if(OY>0){ctx.drawImage(e,0,1,e.width,1,x0,0,W,OY+1);
@@ -500,7 +506,7 @@ function gameBtns(h){document.getElementById('pauseBtn').hidden=h;document.getEl
 function mkPlayer(sel,side,team,cpu){
  const d=sel,s=d.s.slice();
  return{side,data:d,team,look:d.look,s,x:side?W/2+140:W/2-140,y:FLOOR,vx:0,vy:0,ground:true,facing:side?-1:1,speed:225+s[0]*36,jumpV:650+s[1]*44,shot:s[2],bodyH:clamp(42+(d.inch-72)*1.6,36,56),
-  pickupCD:0,swipeT:0,swipeCD:0,in:{l:0,r:0,j:0,s:0,t:0},prevS:0,prevT:0,charging:false,charge:0,dashT:0,dashCD:0,dashDir:1,tapDir:0,tapT:-9,prevL:0,prevR:0,landT:0,shotT:0,px:0,py:0,anim:0,mood:0,moodK:'smile',cpu:cpu==null?null:{d:cpu},ai:{t:0,plan:null,gotAt:0,jumped:false}};
+  pickupCD:0,swipeT:0,swipeCD:0,in:{l:0,r:0,j:0,s:0,t:0,f:0},prevS:0,prevF:0,fakeT:0,fakeCD:0,fakeId:0,prevT:0,charging:false,charge:0,dashT:0,dashCD:0,dashDir:1,tapDir:0,tapT:-9,prevL:0,prevR:0,landT:0,shotT:0,px:0,py:0,anim:0,mood:0,moodK:'smile',cpu:cpu==null?null:{d:cpu},ai:{t:0,plan:null,gotAt:0,jumped:false}};
 }
 function start(cfg){
  audio();
@@ -528,7 +534,7 @@ const attack=p=>HOOPS[p.side===0?1:0];
 function updatePlayer(p,dt){
  if(p.dunkT>0){updateDunk(p,dt);if(p.mood>0)p.mood-=dt;return}
  const inp=p.in,g=game,b=g.ball,live=g.state==='play',moving=live||g.state==='scored';
- const pressS=inp.s&&!p.prevS,pressT=inp.t&&!p.prevT;p.prevS=inp.s;p.prevT=inp.t;
+ const pressS=inp.s&&!p.prevS,pressT=inp.t&&!p.prevT,pressF=inp.f&&!p.prevF;p.prevS=inp.s;p.prevT=inp.t;p.prevF=inp.f;p.fakeT-=dt;p.fakeCD-=dt;
  p.pickupCD-=dt;p.swipeT-=dt;p.swipeCD-=dt;if(p.mood>0)p.mood-=dt;
  const dir=moving?(inp.r?1:0)-(inp.l?1:0):0;
  const sp=p.speed*(b.holder===p?.9:1);
@@ -549,6 +555,8 @@ function updatePlayer(p,dt){
   if(p.slot===0&&(!lead(p.side).cpu||p.meter<1))p.meter=Math.min(1,p.meter+dt/24);
   if(pressT&&b.holder!==p)swipe(p);
   else if(pressT&&b.holder===p&&!p.charging&&mates(p).length)pass(p);
+  // pump fake: sell the shot without letting it go, defenders nearby may jump at it
+  if(pressF&&b.holder===p&&p.ground&&!p.charging&&p.fakeCD<=0){p.shotT=.3;p.fakeT=.4;p.fakeCD=.5;p.fakeId++;p.vx*=.3;sfx.dash()}
   if(b.holder!==p)p.charging=false;
   else if(p.cpu){if(pressS)shoot(p)}
   else{if(pressS&&!p.charging){p.charging=true;p.charge=0}
@@ -559,12 +567,16 @@ function updatePlayer(p,dt){
 }
 function dash(p,d){p.dashT=.26;p.dashCD=.9;p.dashDir=d;p.facing=d;p.tapDir=0;sfx.dash();for(let i=0;i<5;i++)game.dust.push({x:p.x-d*10,y:FLOOR-4,vx:-d*(60+Math.random()*120),vy:-40-Math.random()*60,a:.6})}
 // Is a defender between the shooter and the rim with a hand up?
-function contested(p){const h=attack(p),hp=headPos(p),dirH=Math.sign(h.cx-p.x)||p.facing;
- return opponents(p).some(o=>Math.abs(o.x-p.x)<80&&headPos(o).y<hp.y+40&&Math.sign(o.x-p.x)===dirH)}
+// 0 = wide open, up to .7 = a defender right on you in the air with a hand up
+function contestAmt(p){const h=attack(p),hp=headPos(p),dirH=Math.sign(h.cx-p.x)||p.facing;let c=0;
+ for(const o of opponents(p)){const dx=Math.abs(o.x-p.x);if(dx>120||(Math.sign(o.x-p.x)!==dirH&&dx>24))continue;
+  const k=1-dx/120,up=headPos(o).y<hp.y+40;c=Math.max(c,k*(up?.55:.3)+(o.ground?0:.15*k))}
+ return clamp(c,0,.7)}
+function contested(p){return contestAmt(p)>.2}
 // Green window on the shot meter. Only a release inside it goes in. It is widest at the rim and shrinks with distance;
 // better shooters and jump shots get a little more, a hand in your face takes some away.
 function distK(p){return clamp(1.15-Math.abs(p.x-attack(p).cx)/700,.35,1.15)}
-const zone=p=>({c:.78,w:1.2*(.075+p.shot*.012)*distK(p)*(p.ground?1:1.1)*(contested(p)?.65:1)});
+const zone=p=>({c:.78,w:1.2*(.075+p.shot*.012)*distK(p)*(p.ground?1:1.1)*(1-contestAmt(p))*(p.meter>=1?2:1)});
 function release(p){const z=zone(p),d=Math.abs(p.charge-z.c),hp=headPos(p);p.charging=false;let res;
  if(d<=z.w){res='make';pop(d<=z.w*.35?'PERFECT!':'GREEN!',p.x,hp.y-95,'#3ddc84',20,.8)}else{res=p.charge<z.c?'short':'long';pop(p.charge<z.c?'EARLY':'LATE',p.x,hp.y-95,'#ffb199',16,.7)}
  shoot(p,res)}
@@ -574,11 +586,11 @@ function shoot(p,res){
  b.holder=null;b.x=p.x+dirH*16;b.y=hp.y-HR-6;
  // close to the rim: release just outside the front rim so the ball doesn't clip it on the way up
  if(Math.abs(p.x-h.cx)<130)b.x=h.front-h.toBoard*(BR+44);
- const dist=Math.abs(p.x-h.cx),con=contested(p);
- if(con)pop('CONTESTED',p.x,hp.y-60,'#ff9b8e',16,.8);
+ const dist=Math.abs(p.x-h.cx),ca=contestAmt(p),con=ca>.2;
+ if(con)pop(ca>.45?'SMOTHERED':'CONTESTED',p.x,hp.y-60,'#ff9b8e',16,.8);
  // the CPU has no meter: it "hits the green" with a chance set by its level, the distance and the defense
- if(!res){const D=CPU[p.cpu?p.cpu.d:1];res=Math.random()<clamp(D.acc*distK(p)*(.85+p.shot*.05)*(p.ground?1:1.05)*(con?.6:1),.05,.85)?'make':Math.random()<.5?'short':'long'}
- const fire=p.meter>=1;if(fire){res='make';p.meter=0;sfx.fire();pop('FLYER SHOT!',p.x,hp.y-70,'#ffc72c',24)}
+ if(!res){const D=CPU[p.cpu?p.cpu.d:1];res=Math.random()<clamp(D.acc*distK(p)*(.85+p.shot*.05)*(p.ground?1:1.05)*(1-ca*1.1)*(p.meter>=1?1.35:1),.03,.88)?'make':Math.random()<.5?'short':'long'}
+ const fire=p.meter>=1&&res==='make';if(p.meter>=1){p.meter=0;if(fire){sfx.fire();pop('FLYER SHOT!',p.x,hp.y-70,'#ffc72c',24)}}
  let tx=h.cx+h.toBoard*3,ty=h.y-3;
  // a miss is aimed to clank off the front rim (early) or the back rim (late)
  if(res==='short')tx=h.front-h.toBoard*(-4+Math.random()*16);
@@ -672,7 +684,12 @@ function updateBall(dt){
  if(b.frozen){b.rot+=dt;return}
  if(!isFinite(b.x+b.y+b.vx+b.vy)){Object.assign(b,{x:W/2,y:200,vx:0,vy:0,shot:false,shooter:null,make:false,brick:false,holder:null})}
  if(b.holder&&b.holder.dunkT>0){const p=b.holder,hd=dunkHands(p);b.x=hd.f[0]+p.facing*4;b.y=hd.f[1]-BR*.7;b.vx=b.vy=0;b.rot+=dt*8;return}
- if(b.holder){const p=b.holder;if(p.charging){b.x=p.x+p.facing*8;b.y=headPos(p).y-HR-BR+2}else if(p.ground){const ph=Math.abs(Math.sin(g.time*9));b.x=p.x+p.facing*30;b.y=FLOOR-BR-ph*40}else{b.x=p.x+p.facing*22;b.y=headPos(p).y-HR-6}b.vx=p.vx;b.vy=p.vy;b.rot+=p.vx*dt/BR;return}
+ if(b.holder){const p=b.holder;let ox,ty;
+  if(p.charging){ox=p.facing*8;ty=headPos(p).y-HR-BR+2}else if(p.ground){const ph=Math.abs(Math.sin(g.time*9));ox=p.facing*30;ty=FLOOR-BR-ph*40}else{ox=p.facing*22;ty=headPos(p).y-HR-6}
+  // glide the ball between hands instead of snapping (turning around, going up for a shot, catching)
+  if(b.hp!==p){b.hp=p;b.ox=b.x-p.x}const k=Math.min(1,dt*28);b.ox+=(ox-b.ox)*k;b.x=p.x+b.ox;b.y+=(ty-b.y)*Math.min(1,dt*(p.ground&&!p.charging?40:28));
+  b.vx=p.vx;b.vy=p.vy;b.rot+=p.vx*dt/BR;return}
+ b.hp=null;
  const N=4,h=dt/N;
  for(let i=0;i<N;i++){
   b.vy+=G*h;const py=b.y;b.x+=b.vx*h;b.y+=b.vy*h;
@@ -690,7 +707,7 @@ function updateBall(dt){
    }
    if(py<hp.y&&b.y>=hp.y&&b.x>hp.lo+4&&b.x<hp.hi-4&&b.vy>0&&g.state==='play'){
     // a missed release can't fall in: it rattles out
-    if(b.brick){b.y=hp.y-1;b.vy=-Math.max(260,b.vy*.55);b.vx=-hp.toBoard*(120+Math.random()*90);sfx.rim();b.rimTouch=true;pop('IN AND OUT',hp.cx,hp.y-40,'#ffb199',16,.7)}
+    if(!b.dunk&&(b.brick||!b.make)){b.y=hp.y-1;b.vy=-Math.max(260,b.vy*.55);b.vx=-hp.toBoard*(120+Math.random()*90);sfx.rim();b.rimTouch=true;pop('IN AND OUT',hp.cx,hp.y-40,'#ffb199',16,.7)}
     else scored(hp===HOOPS[1]?0:1,hp);}
   }
   // players
@@ -787,10 +804,12 @@ function think(p,dt){
    if(Math.abs(guardX-p.x)>260&&p.dashCD<=0&&Math.random()<.3*D.swipe)inp.dash=1;
    if(Math.abs(hd.x-p.x)<70&&Math.random()<D.swipe*iv*1.6)inp.t=1;
    if(!hd.ground&&hd.vy<0&&Math.abs(hd.x-p.x)<110&&Math.random()<D.block)inp.j=1;
+   if(hd.fakeT>0&&A.fake!==hd.fakeId&&p.ground&&Math.abs(hd.x-p.x)<120){A.fake=hd.fakeId;if(Math.random()<.75-p.cpu.d*.1)inp.j=1}
   }else{
    // off the ball: stay between my man and the rim, sagging toward the ball
    const gx=man.x+Math.sign(home.cx-man.x)*55;go(gx+(hd.x-gx)*.25,10);
    if(!hd.ground&&hd.vy<0&&Math.abs(hd.x-p.x)<100&&Math.random()<D.block*.7)inp.j=1;
+   if(hd.fakeT>0&&A.fake!==hd.fakeId&&p.ground&&Math.abs(hd.x-p.x)<110){A.fake=hd.fakeId;if(Math.random()<.5-p.cpu.d*.07)inp.j=1}
    if(Math.abs(hd.x-p.x)<50&&Math.random()<D.swipe*iv*.4)inp.t=1;
   }
  }else{
@@ -811,7 +830,7 @@ function think(p,dt){
 }
 
 // ---------- input ----------
-const keys={};const touch=[{l:0,r:0,j:0,s:0,t:0},{l:0,r:0,j:0,s:0,t:0}];
+const keys={};const touch=[{l:0,r:0,j:0,s:0,t:0,f:0},{l:0,r:0,j:0,s:0,t:0,f:0}];
 addEventListener('keydown',e=>{if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space'].includes(e.code)&&game&&game.state!=='over')e.preventDefault();keys[e.code]=true;
  if((e.code==='Escape'||e.code==='KeyP')&&game&&game.state!=='over'&&!ovOpen())togglePause();});
 addEventListener('keyup',e=>{keys[e.code]=false});
@@ -819,8 +838,8 @@ addEventListener('blur',()=>{for(const k in keys)keys[k]=false});
 function readInput(p){
  if(p.ctrl==null)return{l:0,r:0,j:0,s:0,t:0};
  const two=game.humans===2,t=touch[p.ctrl];
- if(p.ctrl===0){return{l:keys.KeyA||(!two&&keys.ArrowLeft)||t.l,r:keys.KeyD||(!two&&keys.ArrowRight)||t.r,j:keys.KeyW||(!two&&keys.ArrowUp)||t.j,s:keys.KeyS||keys.Space||(!two&&keys.ArrowDown)||t.s,t:keys.KeyF||keys.KeyE||(!two&&(keys.ShiftRight||keys.Slash||keys.Enter))||t.t}}
- return{l:keys.ArrowLeft||t.l,r:keys.ArrowRight||t.r,j:keys.ArrowUp||t.j,s:keys.ArrowDown||t.s,t:keys.ShiftRight||keys.Slash||keys.Enter||t.t};
+ if(p.ctrl===0){return{l:keys.KeyA||(!two&&keys.ArrowLeft)||t.l,r:keys.KeyD||(!two&&keys.ArrowRight)||t.r,j:keys.KeyW||(!two&&keys.ArrowUp)||t.j,s:keys.Space||(!two&&keys.ArrowDown)||t.s,f:keys.KeyS||t.f,t:keys.KeyF||keys.KeyE||(!two&&(keys.ShiftRight||keys.Slash||keys.Enter))||t.t}}
+ return{l:keys.ArrowLeft||t.l,r:keys.ArrowRight||t.r,j:keys.ArrowUp||t.j,s:keys.ArrowDown||t.s,f:keys.Period||t.f,t:keys.ShiftRight||keys.Slash||keys.Enter||t.t};
 }
 const coarse=matchMedia('(pointer:coarse)').matches||('ontouchstart' in window);
 function setTouch(mode){
@@ -828,7 +847,7 @@ function setTouch(mode){
  const pad=(p,arr)=>`<div class="pad">${arr.map(([k,l])=>`<button data-p="${p}" data-k="${k}" class="${k==='s'?'shoot':k==='t'?'steal':''}" aria-label="${l}">${l}</button>`).join('')}</div>`;
  const stl=game&&game.cfg.v2?'PASS STEAL':'STEAL';
  el.className=mode===2?'two':'';
- el.innerHTML=mode===2?pad(0,[['l','◀'],['r','▶'],['j','JUMP'],['t',stl],['s','SHOOT']])+pad(1,[['l','◀'],['r','▶'],['j','JUMP'],['t',stl],['s','SHOOT']]):pad(0,[['l','◀'],['r','▶']])+pad(0,[['t',stl],['j','JUMP'],['s','SHOOT']]);
+ el.innerHTML=mode===2?pad(0,[['l','◀'],['r','▶'],['j','JUMP'],['f','FAKE'],['t',stl],['s','SHOOT']])+pad(1,[['l','◀'],['r','▶'],['j','JUMP'],['f','FAKE'],['t',stl],['s','SHOOT']]):pad(0,[['l','◀'],['r','▶']])+pad(0,[['t',stl],['f','FAKE'],['j','JUMP'],['s','SHOOT']]);
  el.hidden=false;
  el.querySelectorAll('button').forEach(bt=>{const p=+bt.dataset.p,k=bt.dataset.k;
   const on=e=>{e.preventDefault();audio();touch[p][k]=1;bt.classList.add('on');try{bt.setPointerCapture(e.pointerId)}catch(_){}};
@@ -836,7 +855,7 @@ function setTouch(mode){
   bt.addEventListener('pointerdown',on);bt.addEventListener('pointerup',off);bt.addEventListener('pointercancel',off);bt.addEventListener('lostpointercapture',off);
   bt.addEventListener('contextmenu',e=>e.preventDefault());});
 }
-function hideTouch(){document.getElementById('touch').hidden=true;touch.forEach(t=>t.l=t.r=t.j=t.s=t.t=0)}
+function hideTouch(){document.getElementById('touch').hidden=true;touch.forEach(t=>t.l=t.r=t.j=t.s=t.t=t.f=0)}
 
 // ---------- loop ----------
 let last=performance.now(),acc=0;const STEP=1/120;
@@ -877,10 +896,11 @@ function render(t){
  if(VW<W){const fx=game?game.ball.x:W/2,tx=clamp(fx-VW/2,0,W-VW);camX=camT==null?tx:camX+(tx-camX)*Math.min(1,(t-camT)*5);camT=t}else camX=0;
  if(!layers)buildLayers();
  ctx.setTransform(PX,0,0,PX,0,0);
- drawSurround();
+ const calm=!(game&&game.hype>.05);
+ ctx.drawImage(layers.full,-camX,0,layers.FWv,VH);
  ctx.save();ctx.translate(VW>W?(VW-W)/2:-camX,OY);
  if(game&&game.shake>0){ctx.translate((Math.random()-.5)*game.shake*24,(Math.random()-.5)*game.shake*24)}
- drawBackground(t);
+ if(!calm)drawBackground(t);
  if(game){for(const p of game.players)drawPlayer(p);drawBall();for(const h of HOOPS)drawHoopFront(h);drawFx();hudPops();ctx.restore();drawHUD()}
  else{for(const h of HOOPS)drawHoopFront(h);ctx.restore()}
  for(const[o,x,y]of saved){o.x=x;o.y=y}
@@ -932,8 +952,8 @@ function mainMenu(){
 function howTo(){
  show(`<div class="eyebrow">How to play</div><h2>Get buckets. Get stops.</h2>
  <div class="keys">
-  <div><h3>Player 1</h3><p>Move <kbd>A</kbd> <kbd>D</kbd> · Jump <kbd>W</kbd> · Shoot (hold) <kbd>S</kbd> or <kbd>Space</kbd> · Steal <kbd>F</kbd></p><p class="muted">Playing the CPU? Arrows, Shift and / work too.</p></div>
-  <div><h3>Player 2</h3><p>Move <kbd>←</kbd> <kbd>→</kbd> · Jump <kbd>↑</kbd> · Shoot (hold) <kbd>↓</kbd> · Steal <kbd>Right Shift</kbd> or <kbd>Enter</kbd></p></div>
+  <div><h3>Player 1</h3><p>Move <kbd>A</kbd> <kbd>D</kbd> · Jump <kbd>W</kbd> · Shoot (hold) <kbd>Space</kbd> · Pump fake <kbd>S</kbd> · Steal <kbd>F</kbd></p><p class="muted">Playing the CPU? Arrows, Shift and / work too.</p></div>
+  <div><h3>Player 2</h3><p>Move <kbd>←</kbd> <kbd>→</kbd> · Jump <kbd>↑</kbd> · Shoot (hold) <kbd>↓</kbd> · Pump fake <kbd>.</kbd> · Steal <kbd>Right Shift</kbd> or <kbd>Enter</kbd></p></div>
   <div><h3>On a phone</h3><p>Use the on-screen buttons. Turn your phone sideways for the biggest court.</p></div>
  </div>
  <div class="keys">
@@ -942,7 +962,7 @@ function howTo(){
   <div><h3>2 on 2</h3><p>Press steal while you have the ball to pass to your teammate. With a CPU teammate you always control whoever has the ball. Defenders can pick off a lazy pass.</p></div>
   <div><h3>Burst</h3><p>Double-tap left or right to burst for a short sprint. It recharges in about a second.</p></div>
   <div><h3>Defend</h3><p>Press steal next to the ball handler to swipe at the ball. Jump into a shot to block it with your big head.</p></div>
-  <div><h3>Flyer Shot</h3><p>Your Flyer Power bar fills over time and when you get scored on. When it glows, your next shot is a guaranteed fireball.</p></div>
+  <div><h3>Flyer Shot</h3><p>Your Flyer Power bar fills over time and when you get scored on. When it glows, your next shot gets a green window twice as big, and a green release becomes a fireball.</p></div>
  </div>
  <div class="btns"><button class="btn" id="back">Back</button></div>`);
  on('#back',()=>mainMenu());
@@ -983,7 +1003,7 @@ function pickOpponent(pid,v2){
   show(`<div class="eyebrow">Quick Game</div><h2>Who are the Flyers playing?</h2>
   <div class="opts">${Object.entries(RIVALS).map(([k,t])=>`<button class="opt${k===opp?' sel':''}" data-o="${k}"><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${t.jersey};margin-right:6px"></span>${t.name}</button>`).join('')}</div>
   <h3>CPU level</h3>
-  <div class="opts">${CPU.map((c,i)=>`<button class="opt${i===d?' sel':''}" data-d="${i}">${c.name}<small>${['Learning the game','A real test','Playoff mode'][i]}</small></button>`).join('')}</div>
+  <div class="opts">${CPU.map((c,i)=>`<button class="opt${i===d?' sel':''}" data-d="${i}">${c.name}<small>${['Learning the game','A real test','Playoff mode','College-level defense','Good luck'][i]}</small></button>`).join('')}</div>
   <div class="btns"><button class="btn gold" id="go">Tip off</button><button class="btn ghost" id="back">Back</button></div>`);
   on('[data-o]',el=>{opp=el.dataset.o;render()});on('[data-d]',el=>{d=+el.dataset.d;render()});
   on('#back',()=>v2?twoOnTwo():pickPlayer({title:'Pick your Flyer',sel:pid,next:p=>pickOpponent(p)}));
