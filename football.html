@@ -76,9 +76,11 @@ td.res-w{color:var(--good)} td.res-l{color:var(--bad)}
 /* Roster */
 .lineup{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,210px),1fr));gap:12px}
 .lineup label{display:flex;flex-direction:column;gap:4px;font-size:14px;color:var(--dim)}
-.lineup select{background:var(--deep);border:2px solid var(--line);padding:6px;font-size:16px;color:var(--chalk);width:100%}
+.lineup select,.lineup input:not([type=range]){background:var(--deep);border:2px solid var(--line);padding:6px;font-size:16px;color:var(--chalk);width:100%}
 input.rate{width:64px;background:var(--deep);border:2px solid var(--line);color:var(--chalk);font:inherit;font-size:16px;padding:4px 6px}
 input.rate.edited{border-color:#fff3c4;color:var(--gold)}
+input[type=range]{accent-color:var(--gold);width:100%}
+.swatch{width:36px;height:36px;border:3px solid var(--line);cursor:pointer;padding:0}.swatch.on{border-color:var(--gold);outline:2px solid #fff3c4}
 input.rate:focus-visible{outline:3px dashed var(--gold);outline-offset:2px}
 td.note{white-space:normal;min-width:200px;color:var(--gold);font-size:14px}
 
@@ -320,6 +322,11 @@ function defaultLineup(){
 function lineup(){return Object.assign(defaultLineup(),(save&&save.lineup)||{})}
 function ensureSave(){if(!save){save={lineup:defaultLineup(),season:null,sound:true}}if(!save.lineup)save.lineup=defaultLineup();if(save.cc==null)save.cc=6;if(!save.train)save.train={};if(!save.up)save.up={ol:0,df:0}}
 loadSave();ensureSave();
+/* Created players: kept in save.custom, rebuilt into ROSTER on load. look = {skin,visor,eb} using the game's own light skin tones. */
+const C_SKIN=["#f1c9a5","#e2b48a","#d9a066"],C_POS=["QB","RB","WR","TE","OL","DL","OLB","ILB","CB","S","K"],C_CLS=["Fr.","So.","Jr.","Sr."],C_KEYS=["spd","hnd","arm","pow"],C_BUDGET=300;
+function customPlayer(c){const name=c.first+" "+c.last;return{num:c.num,name,pos:c.pos,ht:c.ht,wt:c.wt,cls:c.cls,home:c.home||"",last:c.last,spd:c.spd,hnd:c.hnd,arm:c.arm,pow:c.pow,custom:true,look:{skin:c.skin,visor:!!c.visor,eb:!!c.eb}}}
+if(!Array.isArray(save.custom))save.custom=[];
+save.custom=save.custom.filter(c=>{if(!c||!(c.num>=0&&c.num<=99)||byNum(c.num))return false;ROSTER.push(customPlayer(c));return true});
 
 /* ============================================================
    SOUND (tiny square-wave bleeps, start after first tap)
@@ -1211,7 +1218,7 @@ function portraitCanvas(p){
   if(PORTRAITS[p.num])return PORTRAITS[p.num];
   const c=document.createElement("canvas");c.width=16;c.height=16;const g=c.getContext("2d");
   const h=k=>hash(p.name+k),px=(x,y,w,hh,col)=>{g.fillStyle=col;g.fillRect(x,y,w,hh)};
-  const skin=SKIN_BY_NUM[p.num]||["#f1c9a5","#e2b48a","#c98e5c","#a8703f","#6e4425"][Math.floor(h("s")*5)];
+  const lk=p.look||{},skin=lk.skin||SKIN_BY_NUM[p.num]||["#f1c9a5","#e2b48a","#c98e5c","#a8703f","#6e4425"][Math.floor(h("s")*5)];
   const crim="#a3203a",gold="#e8b63e";
   px(0,0,16,16,"#1b1f3a");                       // background
   px(2,12,12,4,crim);px(6,12,4,1,gold);           // jersey + collar
@@ -1220,8 +1227,8 @@ function portraitCanvas(p){
   px(3,2,10,8,crim);px(4,1,8,1,crim);px(2,4,1,5,crim);px(13,4,1,5,crim); // helmet shell
   px(7,1,2,6,gold);                               // stripe
   px(4,5,8,6,skin);                               // face
-  const visor=h("v")<.25;
-  if(visor)px(4,6,8,2,"#20242c");else{px(5,7,2,1,"#1a1a1a");px(9,7,2,1,"#1a1a1a");if(h("b")<.4){px(5,8,2,1,"#111");px(9,8,2,1,"#111")}}
+  const visor=lk.visor!=null?lk.visor:h("v")<.25;
+  if(visor)px(4,6,8,2,"#20242c");else{px(5,7,2,1,"#1a1a1a");px(9,7,2,1,"#1a1a1a");if(lk.eb!=null?lk.eb:h("b")<.4){px(5,8,2,1,"#111");px(9,8,2,1,"#111")}}
   px(7,9,2,1,shade(skin,-.25));                   // nose shadow
   px(3,9,10,1,"#c9c9c9");px(3,11,10,1,"#c9c9c9");px(5,9,1,3,"#c9c9c9");px(10,9,1,3,"#c9c9c9"); // face mask
   px(3,5,1,4,shade(crim,-.3));px(12,5,1,4,shade(crim,-.3));
@@ -1287,7 +1294,7 @@ function drawPlayer(e,look){
   const x=wx(e.x),y=wy(e.y);
   if(x<-14||x>VW+14||y<-6||y>VH+24)return;
   const g=wc,f=e.face||1,fr=Math.floor(e.anim)%4,moving=Math.hypot(e.vx||0,e.vy||0)>0.6;
-  const skin=(e.p&&SKIN_BY_NUM[e.p.num])||SKIN[(e.p?e.p.num:(e.i||0)+(e.role||"").length)%4];
+  const skin=(e.p&&((e.p.look&&e.p.look.skin)||SKIN_BY_NUM[e.p.num]))||SKIN[(e.p?e.p.num:(e.i||0)+(e.role||"").length)%4];
   const num=e.p&&e.p.num?e.p.num:e.p&&e.p.opp?{QB:7,RB:22,WR1:1,WR2:11,TE:88}[e.role]:e.team==="O"?[71,64,55,66,77][e.i||0]:[90,95,97,99][e.i||0];
   const carrying=e.carry||(e===G.qb&&e.hasBall);
   const cock=e===G.qb&&e.hasBall&&!onD()&&input.down&&input.aiming;
@@ -1596,7 +1603,7 @@ function addSeasonStats(){
    ============================================================ */
 function showGame(){$("#menu").hidden=true;$("#game").hidden=false;$("#b-sound").textContent=save.sound?"SOUND ON":"SOUND OFF";scrollTo(0,0)}
 function showMenu(which){$("#game").hidden=true;$("#menu").hidden=false;
-  ({title:renderTitle,season:renderSeason,roster:renderRoster,quick:renderQuick,howto:renderHowto,office:renderOffice,edit:renderEdit})[which]();scrollTo(0,0)}
+  ({title:renderTitle,season:renderSeason,roster:renderRoster,quick:renderQuick,howto:renderHowto,office:renderOffice,edit:renderEdit,create:renderCreate})[which]();scrollTo(0,0)}
 function teamChip(k){return`<span class="chip" style="background:${TEAMS[k].c1}"></span>`}
 
 function renderTitle(){
@@ -1714,8 +1721,8 @@ function renderRoster(){
   const isRB=p=>p.pos==="RB"||p.num===22||p.num===7||p.num===24,isWR=p=>p.pos==="WR"||p.pos==="TE";
   const rows=ROSTER.map(p=>{const s=T["p"+p.num]||{},q=T["q"+p.num];
     const mine=[q&&q.a?`${q.c}/${q.a}, ${q.py} pass yds, ${q.ptd} TD`:"",s.ra?`${s.ra} car, ${s.ry} yds, ${s.rtd} TD`:"",s.rc?`${s.rc} rec, ${s.cy} yds, ${s.ctd} TD`:"",s.tk||s.sk||s.dint||s.pd?`${s.tk||0} tkl, ${s.sk||0} sacks, ${s.dint||0} INT, ${s.pd||0} PD`:""].filter(Boolean).join(" · ");
-    return`<tr><td>${iconImg(p)}</td><td class="tnum">${p.num}</td><td>${esc(p.name)}</td><td>${p.pos}</td><td>${p.cls}</td><td class="tnum">${esc(p.ht)} / ${p.wt}</td><td>${esc(p.home)}</td><td class="tnum dim"><span style="color:var(--gold)">${starStr(p)}</span>${["WR","RB","TE","QB"].includes(p.pos)||p.num===22?` SPD ${R(p,"spd")} · HND ${R(p,"hnd")}${p.pos==="QB"?" · ARM "+R(p,"arm"):""}`:""}</td><td class="note">${FACTS[p.num]?esc(FACTS[p.num]):""}${mine?`<div style="color:var(--chalk)">Your season: ${mine}</div>`:""}</td></tr>`}).join("");
-  $("#menu").innerHTML=`<div class="topline"><h2 style="font-size:14px">2026 FLYERS ROSTER</h2><span class="row"><button class="iconbtn" id="r-edit" type="button">EDIT RATINGS</button><button class="iconbtn" id="r-back" type="button">BACK</button></span></div>
+    return`<tr><td>${iconImg(p)}</td><td class="tnum">${p.num}</td><td>${esc(p.name)}</td><td>${p.pos}</td><td>${p.cls}</td><td class="tnum">${esc(p.ht)} / ${p.wt}</td><td>${esc(p.home)}</td><td class="tnum dim"><span style="color:var(--gold)">${starStr(p)}</span>${["WR","RB","TE","QB"].includes(p.pos)||p.num===22?` SPD ${R(p,"spd")} · HND ${R(p,"hnd")}${p.pos==="QB"?" · ARM "+R(p,"arm"):""}`:""}</td><td class="note">${p.custom?`Created player <button class="iconbtn" type="button" data-cedit="${p.num}">EDIT</button>`:""}${FACTS[p.num]?esc(FACTS[p.num]):""}${mine?`<div style="color:var(--chalk)">Your season: ${mine}</div>`:""}</td></tr>`}).join("");
+  $("#menu").innerHTML=`<div class="topline"><h2 style="font-size:14px">2026 FLYERS ROSTER</h2><span class="row"><button class="iconbtn" id="r-new" type="button" style="color:var(--gold);border-color:var(--gold)">CREATE PLAYER</button><button class="iconbtn" id="r-edit" type="button">EDIT RATINGS</button><button class="iconbtn" id="r-back" type="button">BACK</button></span></div>
   <div class="panel"><div class="eyebrow" style="margin-bottom:10px">Starting offense</div><div class="lineup">
     ${OFF_SLOTS.map(pick).join("")}
   </div><div class="eyebrow" style="margin:18px 0 10px">Starting defense</div><div class="lineup">${DEF_SLOTS.map(pick).join("")}</div>
@@ -1723,11 +1730,71 @@ function renderRoster(){
   <p class="small dim">Pick anyone for any spot. If you choose a player who already starts somewhere else on the same side, the two swap. Ratings carry over: a fast corner covers better, a heavy line protects longer.</p><p class="small dim">Head coach Thomas Claro. Kicker Kellan Stapleton (#33). Punter Christian Birch Trani (#9). Anthony Trapani is listed at ILB by the school but leads the team in rushing, so he starts at running back.</p></div>
   <div class="panel"><div class="tbl-wrap"><table><thead><tr><th></th><th>#</th><th>NAME</th><th>POS</th><th>CL</th><th>HT / WT</th><th>HOMETOWN</th><th>GAME RATING</th><th>REAL 2026 FACTS</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   $("#r-back").onclick=()=>showMenu(save.season?"season":"title");
-  $("#r-edit").onclick=()=>showMenu("edit");
+  $("#r-edit").onclick=()=>showMenu("edit");$("#r-new").onclick=()=>{cEdit=null;showMenu("create")};
+  document.querySelectorAll("[data-cedit]").forEach(b=>b.onclick=()=>{cEdit=+b.dataset.cedit;showMenu("create")});
   document.querySelectorAll("[data-slot]").forEach(s=>s.onchange=()=>{
     const L=lineup(),slot=s.dataset.slot,v=+s.value,side=OFF_SLOTS.includes(slot)?OFF_SLOTS:DEF_SLOTS.includes(slot)?DEF_SLOTS:[slot];
     const other=side.find(k=>k!==slot&&L[k]===v);if(other)L[other]=L[slot];L[slot]=v;
     save.lineup=L;writeSave();if(other)renderRoster()});
+}
+
+/* Create (or edit, when cEdit is a created player's number) a player: bio, cartoon look, and ratings from a point budget. */
+let cEdit=null;
+function renderCreate(){
+  const old=cEdit!=null&&save.custom.find(c=>c.num===cEdit),used=new Set(ROSTER.map(p=>p.num));if(old)used.delete(old.num);
+  const free=[...Array(100).keys()].find(n=>!used.has(n));
+  const c=Object.assign({first:"",last:"",num:free,pos:"WR",cls:"Fr.",ht:`6'0"`,wt:185,home:"",skin:C_SKIN[0],visor:false,eb:true,spd:65,hnd:65,arm:65,pow:65},old||{});
+  const [hf,hi]=(c.ht.match(/\d+/g)||[6,0]).map(Number),KL={spd:"SPD · speed",hnd:"HND · hands",arm:"ARM · throwing",pow:"POW · power"};
+  const o=(arr,v)=>arr.map(x=>`<option${x==v?" selected":""}>${x}</option>`).join("");
+  $("#menu").innerHTML=`<div class="topline"><h2 style="font-size:14px">${old?"EDIT PLAYER":"CREATE PLAYER"}</h2><button class="iconbtn" id="c-back" type="button">BACK</button></div>
+  <div class="panel" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap"><canvas id="c-pv" width="16" height="16" style="width:96px;height:96px;image-rendering:pixelated;border:3px solid var(--line)"></canvas><div><div class="disp" id="c-nm" style="font-size:14px"></div><div class="small" id="c-st" style="color:var(--gold);font-size:20px;letter-spacing:2px"></div><div class="small dim" id="c-msg"></div></div></div>
+  <div class="panel"><div class="eyebrow" style="margin-bottom:10px">Bio</div><div class="lineup">
+    <label for="c-first">First name<input id="c-first" maxlength="16" autocomplete="off" value="${esc(c.first)}"></label>
+    <label for="c-last">Last name<input id="c-last" maxlength="18" autocomplete="off" value="${esc(c.last)}"></label>
+    <label for="c-num">Jersey number (0-99)<input id="c-num" type="number" min="0" max="99" inputmode="numeric" value="${c.num}"></label>
+    <label for="c-pos">Position<select id="c-pos">${o(C_POS,c.pos)}</select></label>
+    <label for="c-cls">Class<select id="c-cls">${o(C_CLS,c.cls)}</select></label>
+    <label for="c-hf">Height (ft)<select id="c-hf">${o([5,6],hf)}</select></label>
+    <label for="c-hi">Height (in)<select id="c-hi">${o([...Array(12).keys()],hi)}</select></label>
+    <label for="c-wt">Weight (lbs, 130-320)<input id="c-wt" type="number" min="130" max="320" inputmode="numeric" value="${c.wt}"></label>
+    <label for="c-home">Hometown (optional)<input id="c-home" maxlength="24" autocomplete="off" value="${esc(c.home)}"></label>
+  </div></div>
+  <div class="panel"><div class="eyebrow" style="margin-bottom:10px">Look</div><div class="row" style="gap:18px;flex-wrap:wrap"><span class="row" role="group" aria-label="Skin tone"><span class="small dim">Skin</span>${C_SKIN.map((k,i)=>`<button type="button" class="swatch${k===c.skin?" on":""}" data-skin="${k}" aria-label="Skin tone ${i+1}" style="background:${k}"></button>`).join("")}</span>
+    <span class="row"><span class="small dim">Visor</span>${[["NO",0],["YES",1]].map(([l,v])=>`<button class="iconbtn" type="button" data-visor="${v}">${l}</button>`).join("")}</span>
+    <span class="row"><span class="small dim">Eye black</span>${[["NO",0],["YES",1]].map(([l,v])=>`<button class="iconbtn" type="button" data-eb="${v}">${l}</button>`).join("")}</span></div></div>
+  <div class="panel"><div class="eyebrow" style="margin-bottom:10px">Ratings · <span id="c-left" class="tnum"></span></div><p class="small dim" style="margin-top:0">Spread ${C_BUDGET} points over four ratings (each 40 to 95). Stars come from speed and hands for receivers, arm for quarterbacks, hands and power for tight ends, speed and power for everyone else. You can fine-tune later on EDIT RATINGS; saving this form again resets those typed ratings to these.</p><div class="lineup">
+    ${C_KEYS.map(k=>`<label for="c-${k}">${KL[k]} <b class="tnum" id="c-${k}v">${c[k]}</b><input id="c-${k}" type="range" min="40" max="95" value="${c[k]}" data-ck="${k}"></label>`).join("")}
+  </div></div>
+  <div class="row" style="gap:18px;flex-wrap:wrap;padding:6px"><button class="btn" id="c-save" type="button">${old?"SAVE CHANGES":"ADD TO ROSTER"}</button>${old?`<button class="btn alt" id="c-del" type="button">DELETE PLAYER</button>`:""}</div>`;
+  const val=()=>{const v={first:$("#c-first").value.trim(),last:$("#c-last").value.trim(),num:Math.round(+$("#c-num").value),pos:$("#c-pos").value,cls:$("#c-cls").value,ht:`${$("#c-hf").value}'${$("#c-hi").value}"`,wt:Math.round(clamp(+$("#c-wt").value||185,130,320)),home:$("#c-home").value.trim(),skin:c.skin,visor:c.visor,eb:c.eb};C_KEYS.forEach(k=>v[k]=+$("#c-"+k).value);return v};
+  const spent=()=>C_KEYS.reduce((a,k)=>a+ +$("#c-"+k).value,0);
+  const err=v=>!v.first||!v.last?"Enter a first and last name.":$("#c-num").value===""||!(v.num>=0&&v.num<=99)?"Pick a number from 0 to 99.":used.has(v.num)?`#${v.num} is taken by ${byNum(v.num).name}.`:spent()>C_BUDGET?"Too many rating points.":"";
+  const upd=()=>{const v=val(),p=customPlayer(v);p.num=-1;delete PORTRAITS[-1];const pc=portraitCanvas(p),g=$("#c-pv").getContext("2d");g.clearRect(0,0,16,16);g.drawImage(pc,0,0);delete PORTRAITS[-1];
+    $("#c-nm").textContent=`#${isNaN(v.num)?"":v.num} ${v.first||"First"} ${v.last||"Last"} · ${v.pos} · ${v.cls}`;
+    const sv=k=>v[k],st=clamp(Math.round(((v.pos==="QB"?sv("arm")*.7+sv("spd")*.3:v.pos==="WR"?(sv("spd")+sv("hnd"))/2:v.pos==="TE"?(sv("hnd")+sv("pow"))/2:v.pos==="K"?sv("pow")+8:(sv("spd")+sv("pow"))/2)-58)/7),1,5);
+    $("#c-st").textContent="★".repeat(st)+"☆".repeat(5-st);const left=C_BUDGET-spent();$("#c-left").textContent=left+" points left";$("#c-left").style.color=left<0?"var(--bad)":"";
+    C_KEYS.forEach(k=>$("#c-"+k+"v").textContent=v[k]);$("#c-msg").textContent=err(v);
+    document.querySelectorAll("[data-visor]").forEach(b=>b.style.cssText=+b.dataset.visor===+c.visor?"background:var(--gold);color:#5a0d1c":"");
+    document.querySelectorAll("[data-eb]").forEach(b=>b.style.cssText=+b.dataset.eb===+c.eb?"background:var(--gold);color:#5a0d1c":"");
+    document.querySelectorAll("[data-skin]").forEach(b=>b.classList.toggle("on",b.dataset.skin===c.skin))};
+  document.querySelectorAll("#menu input,#menu select").forEach(i=>i.oninput=i.onchange=upd);
+  document.querySelectorAll("[data-ck]").forEach(i=>i.oninput=()=>{const over=spent()-C_BUDGET;if(over>0)i.value=+i.value-over;upd()});
+  document.querySelectorAll("[data-skin]").forEach(b=>b.onclick=()=>{c.skin=b.dataset.skin;upd()});
+  document.querySelectorAll("[data-visor]").forEach(b=>b.onclick=()=>{c.visor=b.dataset.visor==="1";upd()});
+  document.querySelectorAll("[data-eb]").forEach(b=>b.onclick=()=>{c.eb=b.dataset.eb==="1";upd()});
+  $("#c-back").onclick=()=>showMenu("roster");
+  /* move or drop a number everywhere the save points at it: lineup, typed ratings, training, a paused game */
+  const remap=(from,to)=>{const fix=L=>{if(!L)return;const side=s=>OFF_SLOTS.includes(s)?OFF_SLOTS:DEF_SLOTS.includes(s)?DEF_SLOTS:[s];
+      for(const s in L)if(L[s]===from){if(to!=null)L[s]=to;else{const taken=new Set(side(s).map(k=>L[k])),d=defaultLineup()[s];L[s]=d!==from&&!taken.has(d)?d:(ROSTER.find(p=>p.num!==from&&!taken.has(p.num))||{}).num}}};
+    fix(save.lineup);if(save.mid)fix(save.mid.lineup);
+    for(const o of[save.edit,save.train])if(o&&o[from]){if(to!=null)o[to]=o[from];delete o[from]}};
+  $("#c-save").onclick=()=>{const v=val(),e=err(v);if(e){$("#c-msg").textContent=e;$("#c-msg").style.color="var(--bad)";return}
+    if(old){Object.assign(old,v);const i=ROSTER.findIndex(p=>p.num===cEdit);ROSTER[i]=customPlayer(old);if(cEdit!==v.num)remap(cEdit,v.num);delete PORTRAITS[cEdit]}
+    else{save.custom.push(v);ROSTER.push(customPlayer(v))}
+    if(save.edit)delete save.edit[v.num];delete PORTRAITS[v.num];writeSave();cEdit=null;showMenu("roster")};
+  if(old)$("#c-del").onclick=()=>{if(!confirm(`Delete ${old.first} ${old.last} from the roster?`))return;
+    const n=old.num;save.custom=save.custom.filter(x=>x!==old);ROSTER.splice(ROSTER.findIndex(p=>p.num===n),1);remap(n,null);delete PORTRAITS[n];writeSave();cEdit=null;showMenu("roster")};
+  upd();
 }
 
 /* Edit any player's ratings by hand. A typed rating replaces the made-up one and any training on it. */

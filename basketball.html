@@ -62,6 +62,13 @@ button{font:inherit;color:inherit;cursor:pointer}
 .bar{height:9px;background:#220707;border-radius:5px;overflow:hidden}
 .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--royal),var(--sky))}
 .opts{display:flex;flex-wrap:wrap;gap:8px}
+.cform{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:10px 0}
+.cform label{display:flex;flex-direction:column;gap:4px;font-weight:700;font-size:14px}
+.cform input,.cform select{font:inherit;font-weight:700;color:#fff;background:#3f0e0e;border:2px solid var(--line);border-radius:10px;padding:8px 10px;min-width:0}
+.stepr{display:grid;grid-template-columns:90px auto 1fr auto;gap:8px;align-items:center;margin:6px 0}
+.stepr button{width:40px;height:40px;border-radius:10px;border:2px solid var(--line);background:#3f0e0e;color:#fff;font-size:20px;font-weight:800}
+.swatch{width:34px;height:34px;border-radius:50%;border:3px solid transparent;padding:0}
+.swatch.sel{border-color:#ffc72c}
 .opt{background:#3f0e0e;border:2px solid var(--line);border-radius:10px;padding:10px 14px;font-weight:700;font-size:17px}
 .opt.sel{border-color:var(--gold);background:#6b1616}
 .opt small{display:block;color:var(--muted);font-weight:600;font-size:13px}
@@ -143,8 +150,15 @@ const ROSTER=[
  R(32,'Andreas','Donas','F',`6'4"`,76,'Jr',[3,4,3]),
  R(40,'Nicholas','Sweeney','F',`6'3"`,75,'Jr',[3,4,3]),
 ];
-const YR={Sr:'Senior',Jr:'Junior',So:'Sophomore'},POS={G:'Guard',F:'Forward'};
+const YR={Sr:'Senior',Jr:'Junior',So:'Sophomore',Fr:'Freshman'},POS={G:'Guard',F:'Forward'};
 ROSTER.forEach(p=>{p.name=p.first+' '+p.last; if(!p.bio)p.bio=`${YR[p.yr]} ${POS[p.pos].toLowerCase()}, ${p.ht}. Wears #${p.n} for the Flyers.`; p.look=lookFor(p.name);});
+// players people create, and stat edits for anyone, are saved in this browser
+const STAT_MAX=13,SKINS=[['#f9e0cc','#e6bea0'],['#f7d9c1','#e2b394'],['#f3cfb2','#dcab88'],['#f0c6a2','#d6a07a'],['#ecc09a','#d19a70']],HAIRS=['#1d140e','#2e1d12','#4a2e19','#6b4423','#8a5a2b','#b9894a','#d9b46a','#121212'];
+const BASE_S={};ROSTER.forEach(p=>BASE_S[p.id]=[...p.s]);
+const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]),clean=t=>t.replace(/[<>&"'`\\]/g,'').replace(/\s+/g,' ').trim();
+const htStr=i=>`${Math.floor(i/12)}'${i%12}"`;
+function addCustom(c){const p=Object.assign({},c,{s:[...c.s],custom:true});p.name=p.first+' '+p.last;p.ht=htStr(p.inch);p.bio=`Created player. ${YR[p.yr]} ${POS[p.pos].toLowerCase()}, ${p.ht}. Wears #${p.n} for the Flyers.`;
+ p.look=Object.assign(lookFor(p.name),{skin:SKINS[c.skin][0],shade:SKINS[c.skin][1],hair:HAIRS[c.hair],style:c.style,band:!!c.band});ROSTER.push(p);return p}
 
 const RIVALS={
  stdom:{name:'St. Dominic',abbr:'SDOM',jersey:'#7a1c2e',trim:'#f0c75e',num:'#ffffff',shoe:'#f0c75e',s:[3,3,2],d:0},
@@ -175,6 +189,8 @@ function lookFor(key){const r=rng(hash(key));
  return{skin:sk[0],shade:sk[1],hair:hp[Math.floor(r()*hp.length)],style:Math.floor(r()*8),band:r()<.22,eye:eyes[Math.floor(r()*eyes.length)],jaw:.9+r()*.12,brow:.8+r()*.5,grin:r(),freckles:si<3&&r()<.3,nose:.8+r()*.4};}
 function gauss(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
 const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+store.get('fhh_custom',[]).forEach(addCustom);
+{const ed=store.get('fhh_stats',{});for(const id in ed){const p=ROSTER.find(q=>q.id===id);if(p&&!p.custom)p.s=[...ed[id]]}}
 
 // ---------- audio ----------
 let AC=null,muted=store.get('fhh_muted',false);
@@ -938,7 +954,7 @@ const ovOpen=()=>!ov.hidden;
 function show(html){ov.innerHTML=`<div class="panel">${html}</div>`;ov.hidden=false;ov.scrollTop=0;hideTouch();gameBtns(true);
  ov.querySelectorAll('canvas[data-head]').forEach(c=>{const p=findP(c.dataset.head),d=Math.min(2,devicePixelRatio||1),sz=c.width;c.width=sz*d;c.height=sz*d;const x=c.getContext('2d');x.scale(d,d);drawHead(x,sz/2,sz/2+2,sz*.4,p.look,{pid:p.id,facing:1,ldx:.4,ldy:.1})});}
 function hideOverlay(){ov.hidden=true;ov.innerHTML=''}
-const findP=id=>{const m=/^r(\d*)_(.+)$/.exec(id);return ROSTER.find(p=>p.id===id)||rivalPlayer(m[2],m[1]?m[1]-1:0)};
+const findP=id=>{const m=/^r(\d*)_(.+)$/.exec(id||'');return ROSTER.find(p=>p.id===id)||(m&&RIVALS[m[2]]?rivalPlayer(m[2],m[1]?m[1]-1:0):ROSTER[0])};
 // k=1 is the second player on a rival's 2-on-2 team: a bigger body that jumps more and shoots a bit less
 function rivalPlayer(key,k=0){const t=RIVALS[key];const r=rng(hash(key));const NS=[2,4,5,13,21,23,31,33],i=Math.floor(r()*8),n=NS[(i+k*3)%8];
  const s=t.s.slice();if(k){s[1]=Math.min(5,s[1]+1);s[2]=Math.max(1,s[2]-1)}
@@ -1009,6 +1025,52 @@ function howTo(){
  on('#back',()=>mainMenu());
 }
 
+// stat steppers: Speed, Hops, Shooting from 1 to 5, with a point cap so nobody is maxed out everywhere
+const stepHTML=s=>`${['Speed','Hops','Shooting'].map((l,i)=>`<div class="stepr"><b>${l}</b><button data-st="${i}" data-dv="-1" aria-label="Less ${l}">−</button><div class="bar"><i style="width:${s[i]*20}%"></i></div><button data-st="${i}" data-dv="1" aria-label="More ${l}">+</button></div>`).join('')}<p class="muted small">${STAT_MAX-s[0]-s[1]-s[2]} of ${STAT_MAX} points left · each stat goes from 1 to 5</p>`;
+const stepS=(s,i,dv)=>{const v=s[i]+dv;if(v<1||v>5||(dv>0&&s[0]+s[1]+s[2]>=STAT_MAX))return false;s[i]=v;return true};
+function editStats(p,done){const s=[...p.s];
+ const render=()=>{show(`<div class="eyebrow">Edit stats</div><h2>#${p.n} ${esc(p.name)}</h2>${stepHTML(s)}
+  <div class="btns"><button class="btn gold" id="save">Save</button><button class="btn ghost" id="reset">Original stats</button><button class="btn ghost" id="back">Cancel</button></div>`);
+  on('[data-st]',el=>{if(stepS(s,+el.dataset.st,+el.dataset.dv))render()});
+  on('#reset',()=>{s.splice(0,3,...BASE_S[p.id]);render()});
+  on('#save',()=>{p.s=[...s];const ed=store.get('fhh_stats',{});ed[p.id]=[...s];store.set('fhh_stats',ed);done()});
+  on('#back',()=>done())};
+ render()}
+function createPlayer(p,done){
+ const c=p?{id:p.id,n:p.n,first:p.first,last:p.last,pos:p.pos,inch:p.inch,yr:p.yr,s:[...p.s],skin:p.skin,hair:p.hair,style:p.style,band:p.band}:{id:'u'+Date.now().toString(36),n:'',first:'',last:'',pos:'G',inch:73,yr:'Fr',s:[3,3,3],skin:0,hair:2,style:0,band:false};
+ let msg='';
+ const render=()=>{
+  show(`<div class="eyebrow">${p?'Edit your player':'Create a player'}</div><h2>${p?esc(p.name):'New Flyer'}</h2>
+  <div class="bio"><canvas width="96" height="96" id="prev"></canvas><div>
+  <div class="cform"><label>First name<input id="cf" maxlength="14" value="${esc(c.first)}"></label><label>Last name<input id="cl" maxlength="14" value="${esc(c.last)}"></label>
+  <label>Number<input id="cn" type="number" min="0" max="99" inputmode="numeric" value="${c.n}"></label>
+  <label>Position<select id="cp">${Object.entries(POS).map(([k,v])=>`<option value="${k}"${k===c.pos?' selected':''}>${v}</option>`).join('')}</select></label>
+  <label>Height<select id="ch">${Array.from({length:17},(_,i)=>66+i).map(i=>`<option value="${i}"${i===c.inch?' selected':''}>${htStr(i)}</option>`).join('')}</select></label>
+  <label>Year<select id="cy">${['Fr','So','Jr','Sr'].map(k=>`<option value="${k}"${k===c.yr?' selected':''}>${YR[k]}</option>`).join('')}</select></label></div></div></div>
+  <h3>Look</h3>
+  <div class="opts">${SKINS.map((k,i)=>`<button class="swatch${i===c.skin?' sel':''}" data-sk="${i}" style="background:${k[0]}" aria-label="Skin tone ${i+1}"></button>`).join('')}</div>
+  <div class="opts" style="margin-top:8px">${HAIRS.map((k,i)=>`<button class="swatch${i===c.hair?' sel':''}" data-hr="${i}" style="background:${k}" aria-label="Hair color ${i+1}"></button>`).join('')}</div>
+  <div class="opts" style="margin-top:8px"><button class="opt" id="sty">Hair style ${c.style+1} of 8</button><button class="opt${c.band?' sel':''}" id="bnd">Headband: ${c.band?'On':'Off'}</button></div>
+  <h3>Stats</h3>${stepHTML(c.s)}
+  <p class="err" style="color:#ff9b8e;font-weight:700;min-height:1.2em">${msg}</p>
+  <div class="btns"><button class="btn gold" id="save">${p?'Save player':'Add to roster'}</button>${p?'<button class="btn ghost" id="del">Delete player</button>':''}<button class="btn ghost" id="back">Cancel</button></div>`);
+  const cv=ov.querySelector('#prev'),d=Math.min(2,devicePixelRatio||1);cv.width=96*d;cv.height=96*d;const x=cv.getContext('2d');x.scale(d,d);
+  const draw=()=>{const lk=Object.assign(lookFor((c.first||'A')+' '+(c.last||'B')),{skin:SKINS[c.skin][0],shade:SKINS[c.skin][1],hair:HAIRS[c.hair],style:c.style,band:c.band});x.clearRect(0,0,96,96);drawHead(x,48,50,38,lk,{pid:c.id,facing:1,ldx:.4,ldy:.1})};draw();
+  const keep=()=>{c.first=clean(ov.querySelector('#cf').value);c.last=clean(ov.querySelector('#cl').value);c.n=ov.querySelector('#cn').value;c.pos=ov.querySelector('#cp').value;c.inch=+ov.querySelector('#ch').value;c.yr=ov.querySelector('#cy').value};
+  ov.querySelectorAll('.cform input,.cform select').forEach(el=>el.addEventListener('input',()=>{keep();draw()}));
+  on('[data-sk]',el=>{keep();c.skin=+el.dataset.sk;render()});on('[data-hr]',el=>{keep();c.hair=+el.dataset.hr;render()});
+  on('#sty',()=>{keep();c.style=(c.style+1)%8;render()});on('#bnd',()=>{keep();c.band=!c.band;render()});
+  on('[data-st]',el=>{keep();if(stepS(c.s,+el.dataset.st,+el.dataset.dv))render()});
+  on('#back',()=>done());
+  on('#del',el=>{if(!el.dataset.c){el.dataset.c=1;el.textContent='Tap again to delete';return}
+   store.set('fhh_custom',store.get('fhh_custom',[]).filter(q=>q.id!==c.id));const i=ROSTER.findIndex(q=>q.id===c.id);if(i>=0)ROSTER.splice(i,1);removePhoto(c.id);done()});
+  on('#save',()=>{keep();const n=parseInt(c.n,10);
+   if(!c.first||!c.last){msg='Give your player a first and last name.';return render()}
+   if(!(n>=0&&n<=99)){msg='Pick a number from 0 to 99.';return render()}
+   if(ROSTER.some(q=>q.n===n&&q.id!==c.id)){msg=`#${n} is taken. Pick another number.`;return render()}
+   c.n=n;const list=store.get('fhh_custom',[]).filter(q=>q.id!==c.id);list.push(c);store.set('fhh_custom',list);
+   const i=ROSTER.findIndex(q=>q.id===c.id);if(i>=0)ROSTER.splice(i,1);headCache.clear&&headCache.clear();addCustom(c);done(c.id)});
+ };render()}
 function pickPlayer({title,sel,taken,next,back}){
  let cur=sel&&sel!==taken?sel:ROSTER.find(p=>p.id!==taken).id;
  const render=()=>{
@@ -1016,10 +1078,14 @@ function pickPlayer({title,sel,taken,next,back}){
   show(`<div class="eyebrow">Chaminade Flyers · 2025-26 varsity</div><h2>${title}</h2>
   <div class="bio"><canvas width="96" height="96" data-head="${p.id}"></canvas><div><h3>#${p.n} ${p.name}</h3><div class="muted">${POS[p.pos]} · ${p.ht} · ${YR[p.yr]}</div><p>${p.bio}</p>${statBars(p.s)}
   <div class="btns" style="justify-content:flex-start"><label class="btn ghost small" for="ph" tabindex="0">${PHOTOS[p.id]?'Change photo':'Add your own photo'}</label><input type="file" id="ph" accept="image/*" hidden>${PHOTOS[p.id]?'<button class="btn ghost small" id="rmph">Use drawn face</button>':''}</div>
-  <p class="muted small" id="phmsg">Optional. The photo is saved only in this browser and is never uploaded or shared.</p></div></div>
+  <p class="muted small" id="phmsg">Optional. The photo is saved only in this browser and is never uploaded or shared.</p>
+  <div class="btns" style="justify-content:flex-start"><button class="btn ghost small" id="edst">${p.custom?'Edit player':'Edit stats'}</button></div></div></div>
   <div class="btns"><button class="btn gold" id="go">Play as ${p.last}</button><button class="btn ghost" id="back">Back</button></div>
-  <div class="roster">${ROSTER.map(q=>`<button class="card${q.id===cur?' sel':''}${q.id===taken?' taken':''}" data-id="${q.id}" ${q.id===taken?'disabled':''} aria-label="${q.name}"><canvas width="64" height="64" data-head="${q.id}"></canvas><span class="nm">${q.first} ${q.last}</span><span class="meta">#${q.n} · ${q.pos} · ${q.ht} · ${q.yr}</span></button>`).join('')}</div>`);
-  on('.card',el=>{cur=el.dataset.id;const y=ov.scrollTop;render();ov.scrollTop=0});
+  <div class="roster">${ROSTER.map(q=>`<button class="card${q.id===cur?' sel':''}${q.id===taken?' taken':''}" data-id="${q.id}" ${q.id===taken?'disabled':''} aria-label="${q.name}"><canvas width="64" height="64" data-head="${q.id}"></canvas><span class="nm">${q.first} ${q.last}</span><span class="meta">#${q.n} · ${q.pos} · ${q.ht} · ${q.yr}${q.custom?' · yours':''}</span></button>`).join('')}<button class="card" id="mkp" style="justify-content:center;font-weight:800;font-size:18px">+ Create player</button></div>`);
+  const here=()=>pickPlayer({title,sel:cur,taken,next,back});
+  on('#edst',()=>p.custom?createPlayer(p,here):editStats(p,here));
+  on('#mkp',()=>createPlayer(null,id=>pickPlayer({title,sel:typeof id==='string'?id:cur,taken,next,back})));
+  on('.card[data-id]',el=>{cur=el.dataset.id;const y=ov.scrollTop;render();ov.scrollTop=0});
   on('#go',()=>next(cur));on('#back',()=>back?back():mainMenu());
   const fi=ov.querySelector('#ph');fi.addEventListener('change',()=>{const fl=fi.files&&fi.files[0];if(!fl)return;savePhoto(cur,fl,err=>{if(err){ov.querySelector('#phmsg').textContent=err;return}render()})});
   on('#rmph',()=>{removePhoto(cur);render()});

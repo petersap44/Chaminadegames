@@ -75,7 +75,10 @@ td.res-w{color:var(--good)} td.res-l{color:var(--bad)}
 /* Roster */
 .lineup{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,210px),1fr));gap:12px}
 .lineup label{display:flex;flex-direction:column;gap:4px;font-size:14px;color:var(--dim)}
-.lineup select{background:var(--deep);border:2px solid var(--line);padding:6px;font-size:16px;color:var(--chalk);width:100%}
+.lineup select,.lineup input{background:var(--deep);border:2px solid var(--line);padding:6px;font-size:16px;color:var(--chalk);width:100%}
+.lineup input[type=range]{padding:0;border:0;background:none;accent-color:var(--gold)}
+.lineup input:focus-visible{outline:3px dashed var(--gold);outline-offset:3px}
+.skinpick.on{background:var(--gold);border-color:#fff3c4}
 td.note{white-space:normal;min-width:200px;color:var(--gold);font-size:14px}
 
 /* Game */
@@ -310,6 +313,25 @@ const defaultLineup=()=>({A:[1,6,19],M:[41,4,2],D:[21,12,17],G:44,FO:3});
 if(!save||typeof save!=="object")save={};
 if(!save.lineup)save.lineup=defaultLineup();
 if(save.cc==null)save.cc=6;if(!save.train)save.train={};if(!save.up)save.up={fo:0,gk:0};
+/* Created players live in save.custom and join ROSTER on load. Bad or clashing entries are dropped; old saves just start empty. */
+const CP_POS=["Attack","Midfield","SSDM","LSM","Defense","FOGO","Goalie"],CP_CLS=["Fr.","So.","Jr.","Sr."],CP_SKIN=[0,4],CP_ATTR=["spd","stk","sht","pow","sav","fo"],CP_MIN=40,CP_MAX=90,CP_PTS=430;
+const cpName=s=>String(s||"").replace(/[^A-Za-z .'-]/g,"").replace(/\s+/g," ").trim().slice(0,14);
+function mkCustom(c){const p={num:c.num,name:c.first+" "+c.last,pos:c.pos,cls:c.cls,home:c.home,last:c.last,custom:true,skin:c.skin};
+  p.k=POS_KEY(p.pos);p.pole=p.k==="LSM"||p.k==="D";CP_ATTR.forEach(a=>p[a]=c[a]);return p}
+function cleanCustom(c){if(!c||typeof c!=="object")return null;const n=+c.num,first=cpName(c.first),last=cpName(c.last);
+  if(!Number.isInteger(n)||n<0||n>99||!first||!last)return null;
+  const o={num:n,first,last,home:cpName(c.home),pos:CP_POS.includes(c.pos)?c.pos:"Midfield",cls:CP_CLS.includes(c.cls)?c.cls:"Fr.",skin:CP_SKIN.includes(c.skin)?c.skin:0};
+  CP_ATTR.forEach(a=>o[a]=clamp(Math.round(+c[a])||60,CP_MIN,CP_MAX));return o}
+if(!Array.isArray(save.custom))save.custom=[];
+save.custom=save.custom.map(cleanCustom).filter(c=>{if(!c||byNum(c.num))return false;ROSTER.push(mkCustom(c));return true});
+/* any lineup spot pointing at a player who's gone gets an unused player, natural position first */
+function fixLineup(){const L=save.lineup,D=defaultLineup(),NAT={A:["A"],M:["M","SSDM","LSM"],D:["D","LSM"],G:["G"],FO:["FO"]};
+  const slots=[["A",0],["A",1],["A",2],["M",0],["M",1],["M",2],["D",0],["D",1],["D",2],["G",null],["FO",null]];
+  const get=(k,i)=>i==null?L[k]:L[k][i],set=(k,i,v)=>{if(i==null)L[k]=v;else L[k][i]=v};
+  slots.forEach(([k,i])=>{if(byNum(get(k,i)))return;const used=new Set(slots.map(([kk,ii])=>get(kk,ii)));
+    const free=ROSTER.filter(p=>!used.has(p.num)),d=i==null?D[k]:D[k][i];
+    const p=(!used.has(d)&&byNum(d))||free.find(p=>NAT[k].includes(p.k))||free[0];if(p)set(k,i,p.num)})}
+try{fixLineup()}catch(e){save.lineup=defaultLineup()}
 if(save.sound==null)save.sound=true;if(save.qlen==null)save.qlen=3;if(save.diff==null)save.diff=1;if(save.gkd==null)save.gkd=1;
 
 /* ============================================================
@@ -1497,7 +1519,7 @@ function portraitCanvas(p){
   const key=p.num+(p.opp?"o":"");if(PORTRAITS[key])return PORTRAITS[key];
   const c=document.createElement("canvas");c.width=16;c.height=16;const g=c.getContext("2d");
   const px=(x,y,w,hh,col)=>{g.fillStyle=col;g.fillRect(x,y,w,hh)};
-  const skin=SKIN[Math.floor(hash(p.name+"s")*5)],crim="#a3203a",gold="#e8b63e";
+  const skin=SKIN[p.skin!=null&&!p.opp?p.skin:Math.floor(hash(p.name+"s")*5)],crim="#a3203a",gold="#e8b63e";
   px(0,0,16,16,"#1b1f3a");
   px(2,12,12,4,crim);px(6,12,4,1,gold);px(1,13,2,3,crim);px(13,13,2,3,crim);
   px(5,10,6,3,skin);
@@ -1520,7 +1542,7 @@ function drawPlayer(e){
   const x=wx(e.x),y=wy(e.y);if(x<-SPR_OX||x>VW+SPR_OX)return;
   const f=e.face||1,gk=e.role==="G",pole=!!(e.p.pole||gk),moving=Math.hypot(e.vx,e.vy)>0.6;
   const pose=e.down>0?"d":moving?Math.floor(e.anim)%4:"s",ball=G.ball.st==="held"&&G.ball.owner===e;
-  const skin=(e.p.num+(e.team==="O"?2:0))%5,look=lookFor(e.team);
+  const skin=e.team==="C"&&e.p.skin!=null?e.p.skin:(e.p.num+(e.team==="O"?2:0))%5,look=lookFor(e.team);
   const key=e.team+(gk?"g":pole?"p":"n")+pose+(f>0?"r":"l")+(ball?"b":"")+skin+"#"+e.p.num;
   let c=SPR[key];
   if(!c){c=document.createElement("canvas");c.width=SPR_W*SCALE;c.height=SPR_H*SCALE;const g=c.getContext("2d");g.setTransform(SCALE,0,0,SCALE,0,0);
@@ -1871,7 +1893,7 @@ function renderSeason(){
       <div class="dim small">Final record ${w}-${l}. The real 2026 Flyers went 13-5 and lost the final 13-12.</div><div class="row"><button class="btn" id="s-new" type="button">New season</button></div>`}
   const sched=SCHEDULE.map((g,i)=>{const r=S.results[i];const res=r?`<td class="${r.us>r.them?"res-w":"res-l"} tnum">${r.us>r.them?"W":"L"} ${r.us}-${r.them}${r.ot?" OT":""}</td>`:`<td class="dim">${i===S.week&&!S.done?"Next":"·"}</td>`;
     return`<tr${i===S.week&&!S.done?' class="us"':""}><td>${g.date}</td><td>${teamChip(g.opp)} ${g.home||g.neutral?"vs":"at"} ${esc(TEAMS[g.opp].name)}${g.title?" (final)":""}</td>${res}<td class="dim tnum">${g.real}</td></tr>`}).join("");
-  const T=S.stats,lead=(k)=>{const e=Object.entries(T).filter(([n,s])=>s[k]).sort((a,z)=>z[1][k]-a[1][k])[0];return e?`${esc(byNum(+e[0]).name)} (${e[1][k]})`:"·"};
+  const T=S.stats,lead=(k)=>{const e=Object.entries(T).filter(([n,s])=>s[k]&&byNum(+n)).sort((a,z)=>z[1][k]-a[1][k])[0];return e?`${esc(byNum(+e[0]).name)} (${e[1][k]})`:"·"};
   $("#menu").innerHTML=`
   <div class="topline"><h2 style="font-size:14px">2026 SEASON</h2><span class="row"><button class="iconbtn" id="s-office" type="button">FRONT OFFICE · ${save.cc} CC</button><button class="iconbtn" id="s-roster" type="button">ROSTER</button><button class="iconbtn" id="s-home" type="button">MENU</button></span></div>
   <div class="grid2">
@@ -1907,8 +1929,8 @@ function renderRoster(){
   const rows=ROSTER.map(p=>{const s=T[p.num];
     const mine=s?[s.g||s.a?`${s.g||0} G, ${s.a||0} A`:"",s.gb?`${s.gb} GB`:"",s.ct?`${s.ct} CT`:"",s.sv?`${s.sv} saves`:""].filter(Boolean).join(" · "):"";
     const starts=FIELD_SLOTS.some(([k,i])=>slotGet(L,k,i)===p.num)||L.FO===p.num;
-    return`<tr${starts?' class="us"':""}><td>${iconImg(p)}</td><td class="tnum">${p.num}</td><td>${esc(p.name)}</td><td>${esc(p.pos)}</td><td>${p.cls}</td><td>${esc(p.home)}</td><td class="tnum dim"><span style="color:var(--gold)">${starStr(p)}</span> ${ratingLine(p)}</td><td class="note">${REAL_STARS[p.num]?`<div>${"★".repeat(REAL_STARS[p.num][0])} ${esc(REAL_STARS[p.num][1])}</div>`:""}${COMMITS[p.num]?`<div style="color:var(--chalk)">Committed: ${esc(COMMITS[p.num])}</div>`:""}${FACTS[p.num]?esc(FACTS[p.num]):""}${mine?`<div style="color:var(--chalk)">Your season: ${mine}</div>`:""}</td></tr>`}).join("");
-  $("#menu").innerHTML=`<div class="topline"><h2 style="font-size:14px">2026 FLYERS ROSTER</h2><span class="row"><button class="iconbtn" id="r-reset" type="button">RESET LINEUP</button><button class="iconbtn" id="r-back" type="button">BACK</button></span></div>
+    return`<tr${starts?' class="us"':""}><td>${iconImg(p)}</td><td class="tnum">${p.num}</td><td>${esc(p.name)}</td><td>${esc(p.pos)}</td><td>${esc(p.cls)}</td><td>${esc(p.home)}</td><td class="tnum dim"><span style="color:var(--gold)">${starStr(p)}</span> ${ratingLine(p)}</td><td class="note">${p.custom?`<div class="row" style="gap:8px"><span>Created player</span><button class="iconbtn" type="button" data-edit="${p.num}">EDIT</button></div>`:""}${REAL_STARS[p.num]?`<div>${"★".repeat(REAL_STARS[p.num][0])} ${esc(REAL_STARS[p.num][1])}</div>`:""}${COMMITS[p.num]?`<div style="color:var(--chalk)">Committed: ${esc(COMMITS[p.num])}</div>`:""}${FACTS[p.num]?esc(FACTS[p.num]):""}${mine?`<div style="color:var(--chalk)">Your season: ${mine}</div>`:""}</td></tr>`}).join("");
+  $("#menu").innerHTML=`<div class="topline"><h2 style="font-size:14px">2026 FLYERS ROSTER</h2><span class="row"><button class="iconbtn" id="r-new" type="button">CREATE PLAYER</button><button class="iconbtn" id="r-reset" type="button">RESET LINEUP</button><button class="iconbtn" id="r-back" type="button">BACK</button></span></div>
   <div class="panel"><div class="eyebrow" style="margin-bottom:10px">Attack</div><div class="lineup">${[0,1,2].map(i=>pick("A",i)).join("")}</div>
   <div class="eyebrow" style="margin:18px 0 10px">Midfield</div><div class="lineup">${[0,1,2].map(i=>pick("M",i)).join("")}</div>
   <div class="eyebrow" style="margin:18px 0 10px">Defense</div><div class="lineup">${[0,1,2].map(i=>pick("D",i)).join("")}</div>
@@ -1917,11 +1939,51 @@ function renderRoster(){
   <p class="small dim">Head coach Gregory Kay. Starters are highlighted in the table below. Star ratings start at each player's real recruiting rating where one is published (Gillis 5, Balsamo, Walsh, Fox and Pizzo 4). Everyone else starts at 3 stars or less until you train him.</p></div>
   <div class="panel"><div class="tbl-wrap"><table><thead><tr><th></th><th>#</th><th>NAME</th><th>POS</th><th>CL</th><th>HOMETOWN</th><th>GAME RATING</th><th>REAL RATINGS, COMMITS, 2026 NOTES</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   $("#r-back").onclick=()=>showMenu(save.season?"season":"title");
-  $("#r-reset").onclick=()=>{save.lineup=defaultLineup();writeSave();renderRoster()};
+  $("#r-reset").onclick=()=>{save.lineup=defaultLineup();fixLineup();writeSave();renderRoster()};
+  $("#r-new").onclick=()=>renderCreate(null);
+  document.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>renderCreate(+b.dataset.edit));
   document.querySelectorAll("[data-slot]").forEach(sel=>sel.onchange=()=>{
     const L=save.lineup,k=sel.dataset.slot,i=sel.dataset.i===""?null:+sel.dataset.i,v=+sel.value,old=slotGet(L,k,i);
     if(k!=="FO"){const o=FIELD_SLOTS.find(([kk,ii])=>!(kk===k&&ii===i)&&slotGet(L,kk,ii)===v);if(o)slotSet(L,o[0],o[1],old)}
     slotSet(L,k,i,v);writeSave();renderRoster()});
+}
+/* ---------- create / edit a player ---------- */
+function renderCreate(num){
+  const old=num==null?null:save.custom.find(c=>c.num===num),B=BASE[POS_KEY(old?old.pos:"Midfield")];
+  const c=old?{...old}:{num:"",first:"",last:"",home:"",pos:"Midfield",cls:"Fr.",skin:0,...Object.fromEntries(CP_ATTR.map(a=>[a,clamp(B[a],CP_MIN,CP_MAX)]))};
+  const LBL={spd:"Speed",stk:"Stick",sht:"Shot",pow:"Check / hit",sav:"Saves (goalie)",fo:"Faceoff"};
+  const sel=(id,list,cur)=>`<select id="${id}">${list.map(v=>`<option${v===cur?" selected":""}>${esc(v)}</option>`).join("")}</select>`;
+  const txt=(id,l,v,ph)=>`<label for="${id}">${l}<input id="${id}" maxlength="14" autocomplete="off" value="${esc(v)}" placeholder="${ph}"></label>`;
+  $("#menu").innerHTML=`<div class="topline"><h2 style="font-size:14px">${old?"EDIT PLAYER":"CREATE A PLAYER"}</h2><button class="iconbtn" id="c-back" type="button">BACK</button></div>
+  <div class="panel"><div class="eyebrow" style="margin-bottom:10px">The player</div><div class="lineup">
+    ${txt("c-first","First name",c.first,"First")}${txt("c-last","Last name",c.last,"Last")}
+    <label for="c-num">Jersey number (0-99)<input id="c-num" type="number" min="0" max="99" inputmode="numeric" value="${c.num}"${old?" disabled":""}></label>
+    <label for="c-pos">Position${sel("c-pos",CP_POS,c.pos)}</label><label for="c-cls">Class${sel("c-cls",CP_CLS,c.cls)}</label>${txt("c-home","Hometown (optional)",c.home,"Hometown")}</div>
+  <div class="eyebrow" style="margin:18px 0 10px">Look</div><div class="row" style="gap:12px" id="c-skins">${CP_SKIN.map(i=>`<button type="button" class="iconbtn skinpick${i===c.skin?" on":""}" data-skin="${i}" aria-label="Skin tone ${i+1}"><img alt="" width="48" height="48" style="image-rendering:pixelated" src="${portraitCanvas({num:"cp"+i,name:"",skin:i}).toDataURL()}"></button>`).join("")}</div>
+  <div class="eyebrow" style="margin:18px 0 10px">Ratings <span id="c-left" class="tnum"></span></div>
+  <div class="lineup">${CP_ATTR.map(a=>`<label for="c-${a}">${LBL[a]} <b class="tnum" id="c-${a}-v" style="color:var(--chalk)">${c[a]}</b><input id="c-${a}" type="range" min="${CP_MIN}" max="${CP_MAX}" value="${c[a]}"></label>`).join("")}</div>
+  <p class="small dim">Every rating goes from ${CP_MIN} to ${CP_MAX}, and you get ${CP_PTS} points to spread across all six, so nobody is great at everything. Goalies live on Saves, FOGOs on Faceoff, poles on Speed and Check. You can still train them in the Front Office.</p>
+  <div style="color:var(--gold);font-size:20px;letter-spacing:2px" id="c-stars"></div>
+  <p id="c-err" class="small" style="color:var(--bad);min-height:1.4em" role="alert"></p>
+  <div class="row" style="gap:16px"><button class="btn gold" id="c-save" type="button">${old?"Save changes":"Add to roster"}</button>${old?`<button class="btn alt" id="c-del" type="button">Delete player</button>`:""}</div></div>`;
+  const tot=()=>CP_ATTR.reduce((s,a)=>s+c[a],0);
+  const sync=()=>{CP_ATTR.forEach(a=>{$("#c-"+a).value=c[a];$("#c-"+a+"-v").textContent=c[a]});$("#c-left").textContent="· "+(CP_PTS-tot())+" points left";
+    const p=mkCustom({...c,num:-1,pos:$("#c-pos").value});$("#c-stars").textContent=starStr(p)+" as "+$("#c-pos").value};
+  CP_ATTR.forEach(a=>$("#c-"+a).oninput=e=>{c[a]=+e.target.value;const over=tot()-CP_PTS;if(over>0)c[a]-=over;sync()});
+  $("#c-pos").onchange=()=>{if(!old){const B=BASE[POS_KEY($("#c-pos").value)];CP_ATTR.forEach(a=>c[a]=clamp(B[a],CP_MIN,CP_MAX))}sync()};
+  document.querySelectorAll("[data-skin]").forEach(b=>b.onclick=()=>{c.skin=+b.dataset.skin;document.querySelectorAll("[data-skin]").forEach(x=>x.classList.toggle("on",x===b))});
+  $("#c-back").onclick=renderRoster;
+  $("#c-save").onclick=()=>{const err=m=>{$("#c-err").textContent=m};
+    const o=cleanCustom({...c,first:$("#c-first").value,last:$("#c-last").value,home:$("#c-home").value,pos:$("#c-pos").value,cls:$("#c-cls").value,num:old?old.num:$("#c-num").value.trim()===""?NaN:+$("#c-num").value});
+    if(!cpName($("#c-first").value)||!cpName($("#c-last").value))return err("Give your player a first and last name (letters only).");
+    if(!o)return err("Pick a jersey number from 0 to 99.");
+    if(!old&&byNum(o.num))return err(`#${o.num} is taken by ${byNum(o.num).name}. Pick another number.`);
+    if(old){Object.assign(old,o);Object.assign(byNum(o.num),mkCustom(o))}else{save.custom.push(o);ROSTER.push(mkCustom(o))}
+    delete PORTRAITS[o.num];writeSave();SFX.catch();renderRoster()};
+  if(old)$("#c-del").onclick=()=>{if(!confirm(`Delete #${old.num} ${old.first} ${old.last}? Their training and season stats go with them.`))return;
+    const n=old.num;save.custom=save.custom.filter(x=>x.num!==n);ROSTER.splice(ROSTER.findIndex(p=>p.num===n),1);delete save.train[n];delete PORTRAITS[n];
+    if(save.season&&save.season.stats)delete save.season.stats[n];if(save.mid&&save.mid.ps)delete save.mid.ps[n];fixLineup();writeSave();renderRoster()};
+  sync();
 }
 function ratingLine(p){return p.k==="G"?`SAV ${R(p,"sav")} · STK ${R(p,"stk")}`:p.k==="FO"?`FO ${R(p,"fo")} · SPD ${R(p,"spd")}`:`SPD ${R(p,"spd")} · STK ${R(p,"stk")} · ${p.pole?"CHK "+R(p,"pow"):"SHT "+R(p,"sht")}`}
 function renderHowto(){
