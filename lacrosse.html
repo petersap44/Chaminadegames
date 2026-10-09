@@ -367,13 +367,18 @@ const wc=sc; // the field and players draw straight onto the screen canvas (no e
 let fieldImg=null;
 function drawStar(g,cx,cy,r,col){g.fillStyle=col;g.beginPath();for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5,rr=i%2?r*.45:r;g.lineTo(cx+Math.cos(a)*rr,cy+Math.sin(a)*rr)}g.closePath();g.fill()}
 function prerenderStadium(homeKey,venueName){
-  const c=document.createElement("canvas");
-  c.width=Math.ceil((WX1-WX0)*XS);c.height=Math.ceil((WY1-WY0)*YS);
-  const g=c.getContext("2d");g.imageSmoothingEnabled=false;
+  const c=document.createElement("canvas");   // rendered at 2x so lines and text are crisp on the 2x screen
+  const CW=Math.ceil((WX1-WX0)*XS),CH=Math.ceil((WY1-WY0)*YS);c.width=CW*2;c.height=CH*2;
+  const g=c.getContext("2d");g.imageSmoothingEnabled=false;g.scale(2,2);
   const X=x=>Math.round((x-WX0)*XS),Y=y=>Math.round((y-WY0)*YS);
   const home=TEAMS[homeKey]||{name:venueName,short:"N",c1:"#3a4060",c2:"#f3eedf"},isGS=homeKey==="CHAM";
-  g.fillStyle="#2f6a2c";g.fillRect(0,0,c.width,c.height);
+  g.fillStyle="#2f6a2c";g.fillRect(0,0,CW,CH);
   for(let i=0;i<FL/5;i++){g.fillStyle=i%2?"#4a9a3f":"#43903a";g.fillRect(X(i*5),Y(0),Math.ceil(5*XS),Y(FWD)-Y(0))}
+  // turf texture: cross-mowed bands, fine speckle and a soft sheen
+  for(let j=0;j<12;j++){g.fillStyle=j%2?"rgba(255,255,255,.035)":"rgba(0,0,0,.035)";g.fillRect(X(0),Y(j*FWD/12),X(FL)-X(0),Math.ceil(FWD/12*YS))}
+  {const rr=(()=>{let a=77;return()=>(a=(a*16807)%2147483647)/2147483647})();
+   for(let i=0;i<30000;i++){const x=X(rr()*FL),y=Y(rr()*FWD);g.fillStyle=rr()<.5?"rgba(0,0,0,.07)":"rgba(255,255,220,.06)";g.fillRect(x+(rr()<.5?0:.5),y+(rr()<.5?0:.5),.5,rr()<.4?1:.5)}
+   const sh=g.createLinearGradient(0,Y(0),0,Y(FWD));sh.addColorStop(0,"rgba(0,0,0,.10)");sh.addColorStop(.45,"rgba(255,255,255,.04)");sh.addColorStop(1,"rgba(0,0,0,.12)");g.fillStyle=sh;g.fillRect(X(0),Y(0),X(FL)-X(0),Y(FWD)-Y(0))}
   g.fillStyle="#f4f4ec";
   const hl=(x0,x1,y)=>g.fillRect(X(x0),Y(y),X(x1)-X(x0),1),vl=(x,y0,y1)=>g.fillRect(X(x),Y(y0),1,Y(y1)-Y(y0));
   // boundary
@@ -398,18 +403,19 @@ function prerenderStadium(homeKey,venueName){
   if(isGS)g.fillText("FLYERS",X(MID),Y(4.5));g.restore();
   // grandstand behind the far sideline
   const sBot=Y(-3);
-  g.fillStyle=isGS?"#5a1020":"#373a48";g.fillRect(0,0,c.width,sBot);
-  for(let ry=2;ry<sBot-4;ry+=4){g.fillStyle=isGS?"#7c1a2e":"#4b4f60";g.fillRect(0,ry,c.width,2)}
+  g.fillStyle=isGS?"#5a1020":"#373a48";g.fillRect(0,0,CW,sBot);
+  for(let ry=2;ry<sBot-4;ry+=4){g.fillStyle=isGS?"#7c1a2e":"#4b4f60";g.fillRect(0,ry,CW,2)}
   const crowd=["#f3eedf","#e8b63e","#a3203a","#1b1b1b","#cfcfcf","#7a5236","#d9a07a","#3b6fb6","#f3eedf"];
-  for(let ry=1;ry<sBot-6;ry+=4)for(let x=0;x<c.width;x+=3)if(Math.random()<.66){g.fillStyle=crowd[(Math.random()*crowd.length)|0];g.fillRect(x,ry,2,3)}
+  for(let ry=1;ry<sBot-6;ry+=4)for(let x=0;x<CW;x+=3)if(Math.random()<.66){g.fillStyle=crowd[(Math.random()*crowd.length)|0];g.fillRect(x,ry,2,3)}
   const pbw=Math.round(34*XS),pbx=X(MID)-pbw/2;
   g.fillStyle="#d9d4c4";g.fillRect(pbx,0,pbw,18);
   g.fillStyle="#2d3a52";for(let wx=pbx+5;wx<pbx+pbw-9;wx+=12)g.fillRect(wx,3,8,6);
   g.fillStyle=isGS?"#a3203a":"#444a5c";g.fillRect(pbx,11,pbw,7);
   g.font='8px "Press Start 2P", monospace';g.fillStyle="#f3eedf";g.textAlign="center";g.textBaseline="middle";g.fillText(venueName,X(MID),15);
-  g.fillStyle=isGS?"#e8b63e":"#9aa0b0";g.fillRect(0,sBot-5,c.width,5);
+  g.fillStyle=isGS?"#e8b63e":"#9aa0b0";g.fillRect(0,sBot-5,CW,5);
   if(isGS)for(let sx=X(4);sx<X(FL-2);sx+=Math.round(8*XS))drawStar(g,sx,sBot-3,2.6,"#7c1a2e");
-  g.fillStyle=isGS?"#2a0b12":"#22242c";g.fillRect(0,sBot,c.width,Y(-0.8)-sBot);
+  g.fillStyle=isGS?"#2a0b12":"#22242c";g.fillRect(0,sBot,CW,Y(-0.8)-sBot);
+  {const sg=g.createLinearGradient(0,Y(0),0,Y(6));sg.addColorStop(0,"rgba(0,0,0,.22)");sg.addColorStop(1,"rgba(0,0,0,0)");g.fillStyle=sg;g.fillRect(0,Y(-0.8),CW,Y(6)-Y(-0.8))}
   // benches on the near side
   g.fillStyle="#a3203a";g.fillRect(X(MID-19),Y(FWD+2),14*XS,3);
   g.fillStyle="#555a6a";g.fillRect(X(MID+5),Y(FWD+2),14*XS,3);
@@ -573,6 +579,7 @@ function watchSave(){if(!G)return;if(G.phase!==G._svPh){G._svPh=G.phase;if(G.pha
 
 function update(dt){
   if(!G)return;
+  if(G.phase==="gk"){if(G.flash>0)G.flash-=dt;updateGK(dt);return}
   watchSave();
   G.time+=dt;
   if(G.msgT>0)G.msgT-=dt;if(G.bigT>0)G.bigT-=dt;if(G.flash>0)G.flash-=dt;
@@ -1093,7 +1100,8 @@ function shotTap(){const k=G&&G.sm;if(!k||G.phase!=="shot")return;
   if(k.stage===0){k.power=k.pos;k.stage=1;k.t1=0;SFX.tick();renderBar(true);return}
   if(k.stage===1)fireShot();
 }
-function drawShotView(){const k=G.sm,W=VW*SCALE,H=VH*SCALE,g=sc,O=lookFor("O");
+/* The cage seen from out front: stands, turf, crease, net, the goalie (in look O) and the posts. */
+function drawNetScene(k,O,gnum){const W=VW*SCALE,H=VH*SCALE,g=sc;
   g.setTransform(1,0,0,1,0,0);
   // stands, then turf
   g.fillStyle="#3a1018";g.fillRect(0,0,W,150);for(let y=8;y<150;y+=10){g.fillStyle="#4c1622";g.fillRect(0,y,W,4)}
@@ -1116,7 +1124,7 @@ function drawShotView(){const k=G.sm,W=VW*SCALE,H=VH*SCALE,g=sc,O=lookFor("O");
   const gx=netX(k.gu),gsx=0.35+0.65*NV.sq,px=(dx,dy,w,h,c)=>{g.fillStyle=c;g.fillRect(gx+dx*gsx,y1-dy,w*gsx,h)};
   px(-34,60,26,60,O.shorts);px(8,60,26,60,O.shorts);px(-34,8,26,8,"#151515");px(8,8,26,8,"#151515");    // legs
   px(-40,150,80,92,O.jersey);px(-30,140,60,58,shade(O.jersey,-.15));                                     // jersey and chest pad
-  txt(String(goalie("O").p.num),gx,y1-130,14,O.num,"center");
+  txt(String(gnum),gx,y1-130,14,O.num,"center");
   px(-24,196,48,46,O.helmet);px(-18,186,36,30,O.cage);px(-14,182,28,22,"#e1b38c");                       // helmet, cage, face
   for(let i=-14;i<=14;i+=7)px(i,186,2,30,O.cage);
   const sx=netX(k.su),sy=netY(k.sv,k.su),hx=gx+(sx>=gx?46:-46)*gsx,hy=y1-110;
@@ -1126,6 +1134,10 @@ function drawShotView(){const k=G.sm,W=VW*SCALE,H=VH*SCALE,g=sc,O=lookFor("O");
   // posts and crossbar
   g.fillStyle="#ff6a1a";g.fillRect(x0-10,yL-10,10,y1-yL+10);g.fillRect(x1,yR-10,10,y1-yR+10);
   g.beginPath();g.moveTo(x0-10,yL-10);g.lineTo(x1+10,yR-10);g.lineTo(x1+10,yR);g.lineTo(x0-10,yL);g.closePath();g.fill();
+  return{x0,x1,y0,y1,yL,yR};
+}
+function drawShotView(){const k=G.sm,W=VW*SCALE,H=VH*SCALE,g=sc;
+  drawNetScene(k,lookFor("O"),goalie("O").p.num);
   // ball in flight
   if(k.stage===2){const u=Math.min(1,k.t2/0.45),r=k.res,bx=W/2+(netX(r.u)-W/2)*u,by=H+20+(netY(r.v,r.u)-H-20)*u,sz=Math.round(22-14*u);
     g.fillStyle="#fffbe8";g.fillRect(bx-sz/2,by-sz/2,sz,sz);if(u>=1)txt(r.saved?"SAVE!":Math.abs(r.u)>1||r.v>1?(Math.abs(r.u)<1.08&&r.v<1.08?"PIPE!":"WIDE!"):"GOAL!",W/2,70,26,r.saved||Math.abs(r.u)>1||r.v>1?"#ffffff":"#ffd640","center")}
@@ -1139,6 +1151,95 @@ function drawShotView(){const k=G.sm,W=VW*SCALE,H=VH*SCALE,g=sc,O=lookFor("O");
   txt(Math.round(k.D)+" YD SHOT",16,10,12,"#ffd640");txt(k.outside?"OUTSIDE THE LINE: ALMOST NO CHANCE":k.D<8?"POINT BLANK":k.press?"PRESSURED":"OPEN LOOK",W-16,10,9,k.outside||k.press?"#ff6b6b":"#5fcf73","right");
   txt("POWER",16,36,8,"#a6a8c2");g.fillStyle="#333";g.fillRect(84,32,W-100,16);const pv=k.stage===0?k.pos:k.power;g.fillStyle=pv>0.9?"#5fcf73":"#ffd640";g.fillRect(84,32,(W-100)*pv,16);
   if(k.stage<2)txt(k.stage===0?"TAP WHEN THE POWER BAR IS FULL":"DRAG TO AIM ANYWHERE ON THE NET, LET GO TO SHOOT",W/2,H-50,9,"#ffffff","center");
+}
+/* ============================================================
+   GOALIE MODE: you're the Flyers' goalie. Shooters wind up from all over the field;
+   drag to slide your body and move your stick, read the shooter's eyes, and make the save.
+   ============================================================ */
+const GK_SHOTS=20;let W_GS=1.8,W_SS=2.8,W_BW=0.24,W_SR=0.17;
+function startGoalieMode(oppKey){
+  newGame(oppKey,{type:"goalie",home:true});
+  const gk=goalie("C");
+  G.phase="gk";G.gm={n:0,saves:0,goals:0,wide:0,state:"wait",t:0,k:null,sav:R(gk.p,"sav"),streak:0,best:0,log:[]};
+  input.cx=VW*SCALE/2;input.cy=NETB-120;
+  setMsg("",0);renderBar(true);nextGKShot();
+}
+function nextGKShot(){const m=G.gm;
+  if(m.n>=GK_SHOTS){m.state="done";m.t=0;SFX.whistle();
+    const pct=Math.round(100*m.saves/Math.max(1,m.saves+m.goals));save.gkBest=Math.max(save.gkBest||0,pct);writeSave();renderBar(true);return}
+  m.n++;const lvl=(m.n-1)/(GK_SHOTS-1);   // shooters get sharper as the round goes on
+  const pool=G.ents.filter(e=>e.team==="O"&&(e.role==="A"||e.role==="M")),sh=pool[(Math.random()*pool.length)|0];
+  const ang=rnd(-1.05,1.05),D=rnd(6,15),pw=clamp(rnd(0.55,0.85)+lvl*0.2,0,1);
+  NV={sq:Math.max(0.22,Math.pow(Math.cos(ang),1.6)),tilt:Math.sin(ang)*0.34,side:Math.sign(ang),off:-Math.sign(ang)*Math.min(300,Math.abs(Math.sin(ang))*360)};
+  const corner=()=>Math.random()<0.2?{u:rnd(-0.4,0.4),v:Math.random()<.5?rnd(0.05,0.2):rnd(0.6,0.85)}:({u:(Math.random()<.5?-1:1)*rnd(0.6,0.97),v:Math.random()<.55?rnd(0.08,0.3):rnd(0.62,0.92)});   // mostly corners, some off the hip or five-hole
+  const aim=corner(),fake=Math.random()<0.2+lvl*0.4;
+  const k={sh,D,ang,sq:NV.sq,power:pw,sav:m.sav,outside:false,
+    gu:clamp(m.k?m.k.gu:0,-0.6,0.6),su:0.4,sv:0.86,ru:rnd(-0.3,0.3),rv:0.5,aim,fake,fakeAim:fake?{u:-aim.u*rnd(0.7,1),v:Math.random()<.5?aim.v:1-aim.v}:null,
+    wind:rnd(1.1,1.9)-lvl*0.35,fly:clamp(0.5-pw*0.3-lvl*0.06+D*0.014,0.22,0.5),tell:0.5-lvl*0.3,t:0};
+  k.su=k.gu+0.4;m.k=k;m.state="wait";m.t=0;
+}
+function updateGK(dt){const m=G.gm;if(!m)return;m.t+=dt;const k=m.k;
+  if(m.state==="done")return;
+  // your goalie: body slides toward your finger, the stick head goes where you point (within arm's reach)
+  const kx=(input.keys.ArrowRight||input.keys.KeyD?1:0)-(input.keys.ArrowLeft||input.keys.KeyA?1:0),ky=(input.keys.ArrowDown||input.keys.KeyS?1:0)-(input.keys.ArrowUp||input.keys.KeyW?1:0);
+  if(kx||ky){input.cx=clamp(input.cx+kx*700*dt,0,VW*SCALE);input.cy=clamp(input.cy+ky*500*dt,60,VH*SCALE)}
+  const n=toNet(input.cx,input.cy),tu=clamp(n.u,-1.2,1.2),tv=clamp(n.v,0.05,1);
+  const gs=W_GS*(1+(k.sav-70)/100),ss=W_SS*(1+(k.sav-70)/100);
+  k.gu+=clamp(clamp(tu,-0.8,0.8)-k.gu,-gs*dt,gs*dt);
+  const tsu=k.gu+clamp(tu-k.gu,-0.62,0.62),tsv=clamp(tv,0.12,0.95);
+  k.su+=clamp(tsu-k.su,-ss*dt,ss*dt);k.sv+=clamp(tsv-k.sv,-ss*dt,ss*dt);
+  if(m.state==="wait"){if(m.t>0.9){m.state="aim";m.t=0}return}
+  if(m.state==="aim"){ // the shooter looks at a spot (his eyes give it away), maybe switches late, then lets it go
+    k.t+=dt;const tgt=k.fake?k.fakeAim:k.aim,f=Math.min(1,dt*5);   // a faker keeps his eyes on the wrong spot right up to the release
+    k.ru+=(tgt.u-k.ru)*f;k.rv+=(tgt.v-k.rv)*f;
+    if(k.t>=k.wind){const e=0.06+k.D*0.004;k.res={u:k.aim.u+rnd(-e,e),v:Math.max(0.03,k.aim.v+rnd(-e,e))};m.state="fly";m.t=0;SFX.shot()}
+    return}
+  if(m.state==="fly"){if(m.t>=k.fly){const r=k.res,inCage=Math.abs(r.u)<=1&&r.v<=1;
+      // reach margin: tighter than when the computer plays goalie, so your positioning matters
+      const cs=1/(0.7+0.3*k.sq),mm=(0.04+(k.sav-70)/300)*cs;
+      const saved=inCage&&(Math.abs(r.u-k.gu)<=W_BW*cs+mm&&r.v<=0.85+mm||Math.hypot((r.u-k.su)/cs,(r.v-k.sv)*1.1)<=W_SR+mm/cs);
+      r.kind=!inCage?"wide":saved?"save":"goal";
+      if(r.kind==="save"){m.saves++;m.streak++;m.best=Math.max(m.best,m.streak);SFX.catch()}else if(r.kind==="goal"){m.goals++;m.streak=0;SFX.bad();G.flash=0.5}else m.wide++;
+      m.log.push(r.kind);m.state="result";m.t=0;renderBar(true)}
+    return}
+  if(m.state==="result"&&m.t>1.1)nextGKShot();
+}
+function drawGKView(){const m=G.gm,k=m.k,W=VW*SCALE,H=VH*SCALE,g=sc;
+  drawNetScene(k,lookFor("C"),goalie("C").p.num);
+  const O=lookFor("O");
+  // the shooter, from behind, winding up at the bottom of the screen
+  const side=k.ang>0?-1:1,bx=W/2-side*170,by=H+10,wind=m.state==="aim"?Math.min(1,k.t/k.wind):m.state==="wait"?0:1.2;
+  const rr=(x,y,w,h,r)=>{g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath()};
+  const tw=wind*side*10;   // he turns his shoulders into the shot
+  g.fillStyle="rgba(0,0,0,.25)";g.beginPath();g.ellipse(bx,by+4,110,18,0,0,Math.PI*2);g.fill();
+  g.fillStyle=O.jersey;rr(bx-82+tw,by-128,164,150,34);g.fill();g.strokeStyle="#141018";g.lineWidth=4;g.stroke();
+  g.fillStyle=shade(O.jersey,-.18);rr(bx-82+tw,by-128,30,150,20);g.fill();
+  txt(String(k.sh.p.num||""),bx+tw,by-92,24,O.num,"center");
+  g.fillStyle=shade(O.helmet,-.1);g.beginPath();g.ellipse(bx+tw*1.4,by-150,44,48,0,0,Math.PI*2);g.fill();g.stroke();
+  g.fillStyle=O.helmet;g.beginPath();g.ellipse(bx+tw*1.4,by-156,40,40,0,0,Math.PI*2);g.fill();
+  g.fillStyle="rgba(255,255,255,.35)";g.fillRect(bx+tw*1.4-4,by-196,8,62);g.fillStyle="rgba(255,255,255,.25)";g.beginPath();g.ellipse(bx+tw*1.4-16,by-176,8,12,-.4,0,Math.PI*2);g.fill();
+  const ang=-0.6-wind*1.6*side,sx=bx+side*60+tw,sy=by-110,ex=sx+Math.cos(ang*side)*160*side,ey=sy-Math.sin(Math.abs(ang))*170;
+  g.strokeStyle="#e4e4e4";g.lineWidth=7;g.beginPath();g.moveTo(sx,sy);g.lineTo(ex,ey);g.stroke();
+  g.fillStyle="#f6f6f0";g.fillRect(ex-14,ey-22,28,30);g.fillStyle="rgba(60,60,60,.5)";g.fillRect(ex-10,ey-18,20,22);g.fillStyle=O.glove;rr(sx-17,sy-17,34,34,8);g.fill();g.lineWidth=3;g.stroke();
+  // his eyes: a faint red marker drifting toward where he's looking (it fades as shooters get better)
+  if(m.state==="aim"){const rx=netX(k.ru),ry=netY(k.rv,k.ru);g.globalAlpha=Math.max(0.12,k.tell);g.strokeStyle="#ff3b30";g.lineWidth=3;g.beginPath();g.arc(rx,ry,18,0,Math.PI*2);g.stroke();g.globalAlpha=1}
+  // the ball
+  if(m.state==="fly"||m.state==="result"){const r=k.res,u=m.state==="fly"?Math.min(1,m.t/k.fly):1,x0=ex,y0=ey,tx=netX(r.u),ty=netY(r.v,r.u),bxp=x0+(tx-x0)*u,byp=y0+(ty-y0)*u-Math.sin(u*Math.PI)*30,sz=Math.round(20-11*u);
+    g.fillStyle="#fffbe8";g.fillRect(bxp-sz/2,byp-sz/2,sz,sz);g.fillStyle="rgba(0,0,0,.25)";g.fillRect(bxp-sz/2,byp+sz/2,sz,2)}
+  // where you're pointing
+  if(m.state!=="done"){const px=netX(clamp(toNet(input.cx,input.cy).u,-1.2,1.2)),py=netY(clamp(toNet(input.cx,input.cy).v,0.05,1));g.strokeStyle="rgba(255,214,64,.7)";g.lineWidth=2;g.strokeRect(px-8,py-8,16,16)}
+  if(m.state==="result"){const r=k.res;txt(r.kind==="save"?(m.streak>=3?"SAVE! "+m.streak+" IN A ROW":"SAVE!"):r.kind==="goal"?"GOAL":"WIDE",W/2,74,26,r.kind==="save"?"#5fcf73":r.kind==="goal"?"#ff6b6b":"#ffffff","center")}
+  // header
+  g.fillStyle="rgba(0,0,0,.8)";g.fillRect(0,0,W,58);
+  txt("GOALIE MODE · SHOT "+m.n+"/"+GK_SHOTS,16,10,11,"#ffd640");
+  txt("SAVES "+m.saves+"  GOALS "+m.goals,W-16,10,11,"#ffffff","right");
+  if(k&&m.state!=="done")txt((k.sh.p.num?"#"+k.sh.p.num+" ":"")+k.sh.p.last.toUpperCase()+" · "+Math.round(k.D)+" YDS"+(k.sq<0.6?" · SHARP ANGLE":""),16,34,8,"#a6a8c2");
+  if(m.state==="wait"||m.state==="aim")txt("DRAG TO MOVE YOUR GOALIE AND STICK · WATCH HIS EYES",W/2,H-22,8,"#ffffff","center");
+  if(m.state==="done"){g.fillStyle="rgba(0,0,0,.72)";g.fillRect(0,0,W,H);const sog=m.saves+m.goals,pct=Math.round(100*m.saves/Math.max(1,sog));
+    txt("FINAL",W/2,96,12,"#a6a8c2","center");txt(m.saves+" SAVES ON "+sog+" SHOTS",W/2,128,20,"#ffd640","center");
+    txt(pct+"% SAVE PERCENTAGE",W/2,170,14,"#ffffff","center");
+    txt(pct>=70?"BRICK WALL. CHSAA ALL-STAR STUFF.":pct>=55?"BIG TIME GOALIE PLAY.":pct>=40?"SOLID. KEEP READING HIS EYES.":"TOUGH DAY IN THE CAGE. RUN IT BACK.",W/2,204,9,"#5fcf73","center");
+    txt("LONGEST SAVE STREAK: "+m.best+"   ·   BEST EVER: "+(save.gkBest||pct)+"%",W/2,236,8,"#a6a8c2","center")}
 }
 /* ---------- passing: drag back from your player and let go, like a Retro Bowl throw ---------- */
 function aimPoint(){const c=G.ctrl;if(!c)return null;
@@ -1231,18 +1332,20 @@ const iconImg=(p,size=32)=>`<img src="${portraitURL(p)}" width="${size}" height=
 function line(g,x0,y0,x1,y1,col){g.fillStyle=col;const n=Math.max(Math.abs(x1-x0),Math.abs(y1-y0));for(let i=0;i<=n;i++){const u=n?i/n:0;g.fillRect(Math.round((x0+(x1-x0)*u)*2)/2,Math.round((y0+(y1-y0)*u)*2)/2,1,1)}}
 /* Side-on sprite, about 9x17 px, feet at (x,y), stick held up and forward.
    Each pose is drawn once into a small canvas and reused, so a frame is a handful of drawImage calls. */
-const SPR={},SPR_W=32,SPR_H=30,SPR_OX=16,SPR_OY=26;let sprFor=null,looks=null;
+const SPR={},SPR_W=36,SPR_H=36,SPR_OX=18,SPR_OY=32;let sprFor=null,looks=null;
 function lookFor(t){if(sprFor!==G){sprFor=G;looks={C:teamLook("C"),O:teamLook("O")};for(const k in SPR)delete SPR[k]}return looks[t]}
 function drawPlayer(e){
   const x=wx(e.x),y=wy(e.y);if(x<-SPR_OX||x>VW+SPR_OX)return;
   const f=e.face||1,gk=e.role==="G",pole=!!(e.p.pole||gk),moving=Math.hypot(e.vx,e.vy)>0.6;
   const pose=e.down>0?"d":moving?Math.floor(e.anim)%4:"s",ball=G.ball.st==="held"&&G.ball.owner===e;
   const skin=(e.p.num+(e.team==="O"?2:0))%5,look=lookFor(e.team);
-  const key=e.team+(gk?"g":pole?"p":"n")+pose+(f>0?"r":"l")+(ball?"b":"")+skin;
+  const key=e.team+(gk?"g":pole?"p":"n")+pose+(f>0?"r":"l")+(ball?"b":"")+skin+"#"+e.p.num;
   let c=SPR[key];
   if(!c){c=document.createElement("canvas");c.width=SPR_W*SCALE;c.height=SPR_H*SCALE;const g=c.getContext("2d");g.setTransform(SCALE,0,0,SCALE,0,0);
-    paintPlayer(g,SPR_OX,SPR_OY,f,pose,SKIN[skin],gk,pole,ball,look);SPR[key]=c}
-  wc.drawImage(c,x-SPR_OX,y-SPR_OY,SPR_W,SPR_H);
+    paintPlayer(g,SPR_OX,SPR_OY,f,pose,SKIN[skin],gk,pole,ball,look,e.p.num);SPR[key]=c=outlineSprite(c)}
+  wc.fillStyle="rgba(0,0,0,.28)";wc.beginPath();wc.ellipse(x+0.5,y+0.5,e.down>0?8:5,1.6,0,0,Math.PI*2);wc.fill();
+  if(e.down>0){wc.save();wc.translate(x,y-1);wc.rotate(f*1.45);wc.drawImage(c,-SPR_OX,-SPR_OY,SPR_W,SPR_H);wc.restore()}
+  else wc.drawImage(c,x-SPR_OX,y-SPR_OY,SPR_W,SPR_H);
   if(ball){ // make the ball carrier obvious: pulsing ring, glowing ball, arrow (red when the other team has it)
     const g=wc,t=performance.now()/1000,opp=e.team!=="C",col=opp?"#ff3b30":"#ffd640",pu=0.5+0.5*Math.sin(t*8);
     g.strokeStyle=col;g.globalAlpha=0.55+0.45*pu;g.lineWidth=1.5;g.beginPath();g.ellipse(x+0.5,y+1,8+pu*2.5,3+pu,0,0,Math.PI*2);g.stroke();g.globalAlpha=1;
@@ -1253,28 +1356,53 @@ function drawPlayer(e){
   }
   if(e===G.ctrl){const g=wc;g.strokeStyle="#ffd640";g.lineWidth=1;g.beginPath();g.ellipse(x+0.5,y+1,e.down>0?7:6,2.5,0,0,Math.PI*2);g.stroke()}
 }
-function paintPlayer(g,x,y,f,pose,skin,gk,pole,ball,look){
-  const px=(dx,dy,w,h,c)=>{g.fillStyle=c;g.fillRect(f>0?x+dx:x-dx-w+1,y+dy,w,h)};
-  g.fillStyle="rgba(0,0,0,.3)";g.fillRect(x-4,y,9,2);
-  if(pose==="d"){g.fillRect(x-7,y,15,2);
-    px(-6,-3,3,2,skin);px(-3,-3,3,2,look.shorts);px(0,-4,6,3,look.jersey);px(6,-5,4,4,look.helmet);px(9,-4,1,3,look.cage);
-    line(g,x-f*2,y-6,x+f*8,y-7,"#d8d8d8");return}
-  const st=pose==="s"?[-1,1]:[[-2,1],[0,0],[1,-2],[0,0]][pose];
-  px(st[0]-1,-4,2,3,skin);px(st[0]-1,-2,2,1,look.sock);px(st[0]-1,0,3,1,"#151515");
-  px(st[1]+1,-4,2,3,skin);px(st[1]+1,-2,2,1,look.sock);px(st[1]+1,0,3,1,"#151515");
-  px(-2,-6,5,2,look.shorts);
-  px(-3,-11,7,5,look.jersey);if(gk){px(-3,-11,7,4,shade(look.jersey,-.1));px(-2,-10,5,3,"#2b2b2b")}else px(-1,-10,2,2,look.num);
-  // helmet and cage
-  px(-2,-16,5,4,look.helmet);px(-2,-17,4,1,look.helmet);px(3,-15,1,3,look.cage);px(2,-13,2,1,look.cage);
-  px(1,-14,1,1,skin);
-  // stick: glove at the hand, shaft up and forward, head on top
-  const hx=f>0?x+3:x-3,hy=y-9;
-  const len=gk?11:pole?15:5,sx=hx+f*(gk?4:pole?7:2),sy=hy-len; // long poles on D/LSM, short sticks on offense
-  line(g,hx-f*(pole&&!gk?4:2),hy+(pole&&!gk?3:2),sx,sy,gk?"#d8d8d8":pole?"#9aa0a8":"#e4e4e4");
-  g.fillStyle=look.glove;g.fillRect(hx-1,hy-1,2,2);
-  const hw=gk?5:3,hh=gk?5:3;g.fillStyle="#f6f6f0";g.fillRect(sx-Math.floor(hw/2),sy-hh+1,hw,hh);
-  g.fillStyle="rgba(40,40,40,.6)";g.fillRect(sx-Math.floor(hw/2)+1,sy-hh+2,hw-2,hh-2);
-  if(ball){g.fillStyle="#fffbe8";g.fillRect(sx,sy-1,2,2)}
+const DIG=["111101101101111","010110010010111","111001111100111","111001111001111","101101111001001","111100111001111","111100111101111","111001010010010","111101111101111","111101111001111"];
+/* Players are painted at double resolution (half-pixel detail) onto a 2x sprite canvas, then outlined. (x,y) = feet in world pixels. */
+function paintPlayer(g,x,y,f,pose,skin,gk,pole,ball,look,num){
+  g.save();g.setTransform(1,0,0,1,0,0);
+  const OX=x*SCALE,OY=y*SCALE;
+  const R=(dx,dy,w,h,c)=>{g.fillStyle=c;g.fillRect(f>0?OX+dx:OX-dx-w,OY+dy,w,h)};
+  const seg=(x0,y0,x1,y1,w,c0,c1,split)=>{const n=Math.max(1,Math.round(Math.hypot(x1-x0,y1-y0)));for(let i=0;i<=n;i++){const u=i/n;R(Math.round(x0+(x1-x0)*u)-(w>>1),Math.round(y0+(y1-y0)*u)-(w>>1),w,w,u<split?c0:c1)}};
+  const dark=c=>shade(c,-.28),lite=c=>shade(c,.22);
+  const run=pose!=="s"&&pose!=="d",fr=run?pose:0;
+  const st=run?[[-5,4],[-1,1],[4,-5],[1,-1]][fr]:[-2,3],lift=run?[[0,2],[0,0],[2,0],[0,0]][fr]:[0,0];
+  // legs: shorts, bare knee, sock, cleat (back leg darker)
+  [[st[0],lift[0],1],[st[1],lift[1],0]].forEach(([fx,ly,back])=>{const k=c=>back?dark(c):c;
+    seg(back?-1:1,-13,fx,-2-ly,4,k(look.shorts),k(skin),0.35);seg(fx,-6-ly,fx,-2-ly,4,k(look.sock),k(look.sock),1);
+    R(fx-2,-2-ly,6,2,"#16161a");R(fx+4,-1-ly,1,1,"#16161a")});
+  // torso: pinnie over shoulder pads, shorts on top
+  const bw=gk?12:10;
+  R(-bw/2,-14,bw,4,look.shorts);R(-bw/2,-11,bw,1,dark(look.shorts));
+  R(-bw/2,-24,bw,11,look.jersey);R(-bw/2-1,-25,bw+2,5,look.jersey);R(-bw/2,-26,bw,1,look.jersey);
+  R(-bw/2-1,-25,2,5,dark(look.jersey));R(-bw/2,-17,bw,2,dark(look.jersey));R(1,-25,3,1,lite(look.jersey));
+  if(gk){R(-3,-23,8,8,"#2b2b30");R(-2,-22,6,1,"#45454c")}   // goalie chest protector
+  else{const ds=String(num==null?"":num),x0=-3+(ds.length<2?2:0);   // number, never mirrored
+    [...ds].forEach((ch,k)=>{const d=DIG[+ch];if(!d)return;for(let i=0;i<15;i++)if(d[i]==="1"){const px=x0+k*4+i%3;g.fillStyle=look.num;g.fillRect(f>0?OX+px:OX-(x0+(ds.length*4-1))+(px-x0)+0,OY-23+Math.floor(i/3),1,1)}})}
+  // helmet: shell, visor ridge, shine, cage over the face
+  R(0,-28,4,3,dark(skin));
+  R(-5,-36,10,8,look.helmet);R(-4,-37,8,1,look.helmet);R(-6,-34,1,5,look.helmet);
+  R(-5,-29,9,1,dark(look.helmet));R(-4,-36,7,1,lite(look.helmet));R(-3,-35,2,2,"rgba(255,255,255,.45)");
+  R(3,-35,4,1,dark(look.helmet));
+  R(3,-33,4,5,skin);R(5,-32,1,1,"#1a1a1a");
+  R(7,-34,1,7,look.cage);R(4,-31,4,1,look.cage);R(4,-29,4,1,look.cage);R(3,-27,4,1,look.cage);
+  // stick: both gloves on the shaft, head up and forward (long pole on D, short stick on attack)
+  const len=(gk?11:pole?15:5)*2,hx=6,hy=-18,sx=hx+(gk?4:pole?7:2)*2,sy=hy-len;
+  const shaft=gk?"#d8d8d8":pole?"#9aa0a8":"#e4e4e4";
+  seg(-2,-21,hx-4,hy+3,3,dark(look.jersey),dark(look.glove),0.4);           // back arm to the bottom hand
+  seg(hx-(pole&&!gk?8:4),hy+(pole&&!gk?6:4),sx,sy,2,shaft,shaft,1);
+  seg(2,-21,hx,hy,3,look.jersey,look.glove,0.45);                          // front arm to the top hand
+  R(hx-2,hy-2,4,4,look.glove);R(hx-2,hy-2,4,1,lite(look.glove));R(hx-6,hy+2,4,4,dark(look.glove));
+  const hw=gk?10:6,hh=gk?11:7;
+  R(sx-hw/2,sy-hh+1,hw,hh,"#f6f6f0");R(sx-hw/2+1,sy-hh+2,hw-2,hh-3,"rgba(60,60,60,.55)");
+  for(let i=1;i<hh-2;i+=2)R(sx-hw/2+1,sy-hh+1+i,hw-2,1,"rgba(255,255,255,.22)");
+  if(ball){R(sx-2,sy-4,4,4,"#fffbe8");R(sx-1,sy-4,2,1,"#ffffff")}
+  g.restore();
+}
+function outlineSprite(c){
+  const o=document.createElement("canvas");o.width=c.width;o.height=c.height;const og=o.getContext("2d");
+  og.drawImage(c,0,0);og.globalCompositeOperation="source-in";og.fillStyle="#141018";og.fillRect(0,0,o.width,o.height);
+  const r=document.createElement("canvas");r.width=c.width;r.height=c.height;const rg=r.getContext("2d");
+  for(const[dx,dy]of[[-1,0],[1,0],[0,-1],[0,1]])rg.drawImage(o,dx,dy);rg.drawImage(c,0,0);return r;
 }
 function drawGoal(gx,side){ // side = direction the mouth faces (+1 opens toward +x)
   const g=wc,x=wx(gx),yt=wy(GY-1),yb=wy(GY+1),H=13,bx=wx(gx-side*2.2),by=wy(GY);
@@ -1286,11 +1414,12 @@ function drawGoal(gx,side){ // side = direction the mouth faces (+1 opens toward
 }
 function draw(){
   if(!G)return;
+  if(G.phase==="gk"&&G.gm){drawGKView();return}
   if(G.phase==="shot"&&G.sm){drawShotView();return}
   if(G.phase==="dodge"&&G.dv){drawDodgeView();return}
   const g=wc;g.setTransform(SCALE,0,0,SCALE,0,0);g.imageSmoothingEnabled=false;
   g.fillStyle="#2f6a2c";g.fillRect(0,0,VW,VH);
-  if(fieldImg){const fx=(cam.x-WX0)*XS,ix=Math.floor(fx),fy=(cam.y-WY0)*YS,iy=Math.floor(fy),w=Math.min(VW+1,fieldImg.width-ix),h=Math.min(VH+1,fieldImg.height-iy);g.drawImage(fieldImg,ix,iy,w,h,-Math.round((fx-ix)*2)/2,-Math.round((fy-iy)*2)/2,w,h)}
+  if(fieldImg){const sx=Math.round((cam.x-WX0)*XS*2),sy=Math.round((cam.y-WY0)*YS*2),w=Math.min(VW*2,fieldImg.width-sx),h=Math.min(VH*2,fieldImg.height-sy);g.drawImage(fieldImg,sx,sy,w,h,0,0,w/2,h/2)}
   const b=G.ball;
   const things=G.ents.map(e=>({y:e.y,f:()=>drawPlayer(e)}));
   things.push({y:GY-0.9,f:()=>drawGoal(GL,1)},{y:GY-0.9,f:()=>drawGoal(GR,-1)});
@@ -1389,7 +1518,7 @@ screen.addEventListener("pointerdown",ev=>{
   const c=carrier();
   if(G.phase==="live"&&c&&c===G.ctrl&&c.team==="C"){const px=wx(c.x)*SCALE,py=(wy(c.y)-9)*SCALE;if(Math.hypot(p.x-px,p.y-py)<70)input.aiming=true}
 });
-screen.addEventListener("pointermove",ev=>{if(!input.down)return;const p=canvasPt(ev);input.cx=p.x;input.cy=p.y});
+screen.addEventListener("pointermove",ev=>{if(!input.down&&!(G&&G.phase==="gk"))return;const p=canvasPt(ev);input.cx=p.x;input.cy=p.y});
 function release(){
   if(!input.down)return;input.down=false;
   if(G&&G.phase==="shot"){if(G.sm&&G.sm.stage===1)fireShot();return}
@@ -1423,6 +1552,7 @@ addEventListener("keydown",ev=>{
   if(G.phase==="fo"&&(ev.code==="Space"||ev.code==="Enter")){clamp_();return}
   if(G.phase==="intro"&&(ev.code==="Space"||ev.code==="Enter")){G.introT=0;return}
   if(G.phase==="break"&&(ev.code==="Space"||ev.code==="Enter")){nextPeriod();return}
+  if(G.phase==="gk"){if(G.gm&&G.gm.state==="done"){if(ev.code==="Space"||ev.code==="Enter")startGoalieMode(G.opp);else if(ev.code==="Escape"){G=null;showMenu("title")}}return}
   if(G.phase==="shot"){if(ev.code==="Space"||ev.code==="Enter"||ev.code==="KeyF")shotTap();return}
   if(G.phase==="dodge"){if(ev.code==="ArrowLeft"||ev.code==="KeyA")dodgeSide(-1);else if(ev.code==="ArrowRight"||ev.code==="KeyD")dodgeSide(1);
     else{const m=DODGES.find(x=>ev.code==="Digit"+x.key||ev.code==="Numpad"+x.key);if(m)doDodge(m.k)}return}
@@ -1443,6 +1573,7 @@ addEventListener("pointerup",()=>{input.sprintBtn=false});addEventListener("poin
 let barKey="";
 function barMode(){
   if(!G)return"";
+  if(G.phase==="gk")return"gk"+(G.gm&&G.gm.state==="done"?"done":"");
   if(G.phase==="shot")return"shot"+(G.sm?G.sm.stage:"");
   if(G.phase==="dodge")return"dodge"+(G.dv?G.dv.stage+"|"+G.dv.side:"");
   if(G.phase==="live"){const c=carrier();if(c&&c===G.ctrl)return"off";if(c&&c.team==="C")return"clear";if(c)return"def";return"loose"}
@@ -1456,6 +1587,9 @@ function renderBar(force){
   const subsBtn=()=>{const b=$("#a-subs");if(b)b.onclick=ev=>{b.blur();openSubs()}};
   const SUBS=AB("a-subs","Subs","X");
   const sprintBtn=()=>{subsBtn();const b=$("#a-sprint");if(b){b.onpointerdown=ev=>{ev.preventDefault();input.sprintBtn=true};b.oncontextmenu=ev=>ev.preventDefault()}};
+  if(m==="gk"){bar.innerHTML=`<div class="info"><b>You're in goal.</b> Drag (or use the arrow keys) to slide your goalie and move his stick. The faint red circle is where the shooter is looking. Good shooters look one way and shoot the other, so wait for it.</div>`;return}
+  if(m==="gkdone"){bar.innerHTML=`${AB("a-again","Play again","SPACE","gold")}${AB("a-menu","Menu","ESC")}<div class="info">Best save percentage so far: ${save.gkBest||0}%.</div>`;
+    on("a-again",()=>startGoalieMode(G.opp));on("a-menu",()=>{G=null;showMenu("title")});return}
   if(m==="off"){bar.innerHTML=`${AB("a-pass","Pass","SPACE")}${AB("a-shoot","Shoot","F","hot")}${AB("a-dodge","Dodge","E")}${AB("a-sprint","Sprint","HOLD SHIFT","gold")}${SUBS}<div class="info">He runs on his own. Drag back from him to throw: aim near a teammate to lock on, and let go when the pass meter is in the green. Hold the field to steer, swipe to dodge, tap the cage to shoot.</div>`;
     on("a-pass",()=>actPass(userDir()||{x:1,y:0}));on("a-shoot",()=>actShoot());on("a-dodge",()=>actDodge());sprintBtn()}
   else if(m==="def"){bar.innerHTML=`${AB("a-check","Check","SPACE","hot")}${AB("a-hit","Hit","R","hot")}${AB("a-sprint","Sprint","HOLD SHIFT","gold")}${AB("a-switch","Switch","E")}${SUBS}<div class="info">Check to knock the ball out of his stick. Hit (or swipe the field) to lay him out with your shoulder. Land it and he goes down, miss and you do. Poles check and hit harder.</div>`;
@@ -1502,7 +1636,7 @@ function addSeasonStats(){const T=save.season.stats;for(const n in G.ps){const t
    ============================================================ */
 function showGame(){$("#menu").hidden=true;$("#game").hidden=false;$("#b-sound").textContent=save.sound?"SOUND ON":"SOUND OFF";scrollTo(0,0)}
 function showMenu(which){$("#subbox").hidden=true;$("#game").hidden=true;$("#menu").hidden=false;barKey="";
-  ({title:renderTitle,season:renderSeason,roster:renderRoster,quick:renderQuick,howto:renderHowto,office:renderOffice})[which]();scrollTo(0,0)}
+  ({title:renderTitle,season:renderSeason,roster:renderRoster,quick:()=>renderQuick(false),goalie:()=>renderQuick(true),howto:renderHowto,office:renderOffice})[which]();scrollTo(0,0)}
 const teamChip=k=>`<span class="chip" style="background:${TEAMS[k].c1}"></span>`;
 const record=()=>{const S=save.season;let w=0,l=0;(S?S.results:[]).forEach(r=>{if(r){r.us>r.them?w++:l++}});return[w,l]};
 function optRow(label,items,cur,attr){return`<div class="row"><span class="eyebrow">${label}</span>${items.map(([n,v])=>`<button class="iconbtn" type="button" data-${attr}="${v}" style="${v===cur?"color:var(--gold);border-color:var(--gold)":""}">${n}</button>`).join("")}</div>`}
@@ -1522,6 +1656,7 @@ function renderTitle(){
       ${S&&!S.done?`<button class="btn gold" id="m-cont" type="button">Continue season · Game ${S.week+1}</button>`:""}
       <button class="btn" id="m-new" type="button">${S?"New season":"Start season"}</button>
       <button class="btn alt" id="m-quick" type="button">Quick game</button>
+      <button class="btn alt" id="m-goalie" type="button">Goalie mode</button>
       <button class="btn alt" id="m-roster" type="button">Roster & lineup</button>
       <button class="btn alt" id="m-office" type="button">Front office</button>
       <button class="btn alt" id="m-how" type="button">How to play</button>
@@ -1533,7 +1668,7 @@ function renderTitle(){
   if($("#m-cont"))$("#m-cont").onclick=()=>showMenu("season");
   if($("#m-resume"))$("#m-resume").onclick=()=>resumeMid();
   $("#m-new").onclick=()=>{newSeason();showMenu("season")};
-  $("#m-quick").onclick=()=>showMenu("quick");$("#m-roster").onclick=()=>showMenu("roster");$("#m-office").onclick=()=>showMenu("office");$("#m-how").onclick=()=>showMenu("howto");
+  $("#m-quick").onclick=()=>showMenu("quick");$("#m-goalie").onclick=()=>showMenu("goalie");$("#m-roster").onclick=()=>showMenu("roster");$("#m-office").onclick=()=>showMenu("office");$("#m-how").onclick=()=>showMenu("howto");
   document.querySelectorAll("[data-diff]").forEach(b=>b.onclick=()=>{save.diff=+b.dataset.diff;writeSave();renderTitle()});
   document.querySelectorAll("[data-ql]").forEach(b=>b.onclick=()=>{save.qlen=+b.dataset.ql;writeSave();renderTitle()});
   const c=$("#stars"),g=c.getContext("2d");for(let i=0;i<60;i++){g.fillStyle=i%5?"#f3eedf":"#e8b63e";g.fillRect((Math.random()*320)|0,(Math.random()*120)|0,1,1)}
@@ -1567,13 +1702,13 @@ function renderSeason(){
   if($("#s-sim"))$("#s-sim").onclick=()=>{const g=SCHEDULE[S.week];const[a,b]=simScore(g.opp);save.cc+=a>b?2:1;recordSeasonGame(a,b,false);renderSeason()};
   if($("#s-play"))$("#s-play").onclick=()=>{const g=SCHEDULE[S.week];newGame(g.opp,{type:"season",home:g.home,neutral:g.neutral,site:g.site,title:g.title})};
 }
-function renderQuick(){
+function renderQuick(gkMode){
   const keys=[...new Set(SCHEDULE.map(g=>g.opp))];
   const opts=keys.map(k=>`<button class="btn alt" data-k="${k}" type="button" style="display:flex;gap:10px;align-items:center">${teamChip(k)} ${esc(TEAMS[k].name)}</button>`).join("");
-  $("#menu").innerHTML=`<div class="topline"><h2 style="font-size:14px">QUICK GAME</h2><button class="iconbtn" id="q-home" type="button">MENU</button></div>
-  <p class="dim">Pick an opponent from the 2026 schedule. Quick games are played at Ott Field and don't count toward the season.</p><div class="menu">${opts}</div>`;
+  $("#menu").innerHTML=`<div class="topline"><h2 style="font-size:14px">${gkMode?"GOALIE MODE":"QUICK GAME"}</h2><button class="iconbtn" id="q-home" type="button">MENU</button></div>
+  <p class="dim">${gkMode?`You play goalie for the Flyers. Face ${GK_SHOTS} shots from the team you pick, and they get sharper as you go.${save.gkBest?" Your best: "+save.gkBest+"% saves.":""}`:"Pick an opponent from the 2026 schedule. Quick games are played at Ott Field and don't count toward the season."}</p><div class="menu">${opts}</div>`;
   $("#q-home").onclick=()=>showMenu("title");
-  document.querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>newGame(b.dataset.k,{type:"quick",home:true}));
+  document.querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>gkMode?startGoalieMode(b.dataset.k):newGame(b.dataset.k,{type:"quick",home:true}));
 }
 const FIELD_SLOTS=[["A",0],["A",1],["A",2],["M",0],["M",1],["M",2],["D",0],["D",1],["D",2],["G",null]];
 const slotGet=(L,k,i)=>i==null?L[k]:L[k][i];
@@ -1608,6 +1743,7 @@ function ratingLine(p){return p.k==="G"?`SAV ${R(p,"sav")} · STK ${R(p,"stk")}`
 function renderHowto(){
   $("#menu").innerHTML=`<div class="topline"><h2 style="font-size:14px">HOW TO PLAY</h2><button class="iconbtn" id="h-back" type="button">BACK</button></div>
   <div class="panel howto"><ol>
+    <li><b>Goalie mode.</b> Pick it from the main menu to play in the cage. Shooters wind up from all angles. Drag (or use the arrow keys) to slide your goalie and move his stick, and watch the faint red circle for where the shooter is looking. Late in the round they look one way and shoot the other.</li>
     <li><b>Faceoff.</b> Every quarter and every goal starts at the X. Wait for DOWN, then SET, then tap (or press Space) the instant the WHISTLE shows. Beat their FOGO to the clamp and the ball is yours. Go early and it's a violation. A dead heat squirts out as a ground ball.</li>
     <li><b>Run.</b> Like Retro Bowl, your ball carrier runs on his own: up the field, then around the top of the attack. Hold your finger on the field to steer him toward it. Keys: arrows or WASD. The Flyers attack the cage on the right.</li>
     <li><b>Throw.</b> Put your finger on your player, drag back, and let go. Aim near a teammate and the pass locks on to him (gold arrow). The pass meter shows how hard you're pulling: let go in the green band for a pinpoint pass. A quick flick is a fast, flat bullet. A slow pull floats a lob over sticks. You can also tap a teammate, or press Space for the most open man.</li>
@@ -1658,7 +1794,7 @@ function renderOffice(){
   document.querySelectorAll("[data-up]").forEach(b=>b.onclick=()=>{const k=b.dataset.up,lv=save.up[k]||0,c=COST[lv];if(save.cc<c||lv>=3)return;save.cc-=c;save.up[k]=lv+1;writeSave();SFX.catch();renderOffice()});
 }
 
-$("#b-quit").onclick=()=>{if(!G)return;const t=G.ctx.type;G=null;showMenu(t==="quick"?"title":"season")};
+$("#b-quit").onclick=()=>{if(!G)return;const t=G.ctx.type;G=null;showMenu(t==="quick"||t==="goalie"?"title":"season")};
 $("#b-sound").onclick=()=>{save.sound=!save.sound;writeSave();$("#b-sound").textContent=save.sound?"SOUND ON":"SOUND OFF"};
 
 /* ============================================================
