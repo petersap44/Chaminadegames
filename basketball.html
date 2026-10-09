@@ -610,7 +610,7 @@ function contested(p){return contestAmt(p)>.2}
 // Green window on the shot meter. Only a release inside it goes in. It is widest at the rim and shrinks with distance;
 // better shooters and jump shots get a little more, a hand in your face takes some away.
 function distK(p){return clamp(1.15-Math.abs(p.x-attack(p).cx)/700,.35,1.15)}
-const zone=p=>({c:.78,w:1.2*(.075+p.shot*.012)*distK(p)*(p.ground?1:1.1)*(1-contestAmt(p))*(p.meter>=1?2.6:1)});
+const zone=p=>({c:.78,w:1.2*(.075+p.shot*.012)*distK(p)*(p.ground?1:1.1)*(1-contestAmt(p))*(p.meter>=1?2.6:1)*(!p.cpu&&game&&game.cfg.cpu===5?(CPU[5].green||100)/100:1)});
 function release(p){const z=zone(p),d=Math.abs(p.charge-z.c),hp=headPos(p);p.charging=false;let res;
  if(d<=z.w){res='make';pop(d<=z.w*.35?'PERFECT!':'GREEN!',p.x,hp.y-95,'#3ddc84',20,.8)}else{res=p.charge<z.c?'short':'long';pop(p.charge<z.c?'EARLY':'LATE',p.x,hp.y-95,'#ffb199',16,.7)}
  shoot(p,res)}
@@ -793,7 +793,7 @@ function endGame(){
 const FAKE_BITE=[.8,.55,.35,.18,.06];
 // Custom difficulty (level 6): Offense and Defense ratings from 1 to 99 set the CPU's numbers. 99 / 99 makes every open shot and is very hard to beat.
 function applyCustom(){const c=store.get('fhh_custom_lvl',{o:75,d:75}),o=(clamp(c.o,1,99)-1)/98,d=(clamp(c.d,1,99)-1)/98,L=(a,b,k)=>a+(b-a)*k;
- CPU[5]={name:'Custom',o:c.o,d:c.d,acc:L(.4,1.25,o),fall:L(.9,0,o),con:L(1.2,0,o),cap:L(.6,1,o),jumpShot:L(.4,1,o),react:L(.3,.02,d),swipe:L(.5,5,d),block:L(.15,1,d),spd:L(.9,1.2,d),guard:L(48,26,d)};
+ CPU[5]={name:'Custom',o:c.o,d:c.d,green:clamp(c.g||100,25,250),acc:L(.4,1.25,o),fall:L(.9,0,o),con:L(1.2,0,o),cap:L(.6,1,o),jumpShot:L(.4,1,o),react:L(.3,.02,d),swipe:L(.5,5,d),block:L(.15,1,d),spd:L(.9,1.2,d),guard:L(48,26,d)};
  FAKE_BITE[5]=L(.85,0,d);CROSS_BITE[5]=L(.85,0,d)}
 applyCustom();
 function think(p,dt){
@@ -999,7 +999,7 @@ function mainMenu(){
   <button class="mode" id="m-2p"><b>2 Players</b><span>Flyers practice scrimmage on one keyboard or one phone.</span></button>
   <button class="mode" id="m-how"><b>How to Play</b><span>Controls, dunks, steals and the Flyer Shot.</span></button>
   <button class="mode" id="m-keys"><b>Controls</b><span>Change the keys for Player 1 and Player 2.</span></button>
-  <button class="mode" id="m-cust"><b>Custom Difficulty</b><span>Set the CPU's offense and defense from 1 to 99. Both at 99 is close to impossible.</span></button>
+  <button class="mode" id="m-cust"><b>Custom Difficulty</b><span>Set the CPU's offense and defense from 1 to 99 and how big your green is. Both at 99 is close to impossible.</span></button>
  </div>
  <div class="btns"><button class="btn gold" id="m-diff">Difficulty: ${CPU[clamp(store.get('fhh_diff',1),0,CPU.length-1)].name}</button><a class="btn ghost" href="index.html" style="text-decoration:none">&#9664; All Chaminade games</a><button class="btn ghost" id="m-snd">Sound: ${muted?'Off':'On'}</button></div>
  <p class="foot">Players are from the 2025-26 Chaminade varsity roster posted by <a href="https://athletics.chaminade-hs.org/sports/mens-basketball/roster" target="_blank" rel="noopener">Chaminade Athletics</a>. Heads are cartoons, not likenesses, and the ratings are made up for the game. Unofficial fan game.</p>`);
@@ -1015,11 +1015,14 @@ function mainMenu(){
 }
 
 function customDiff(done){const c=store.get('fhh_custom_lvl',{o:75,d:75});
+ const gtag=v=>v<=40?'Tiny':v<=75?'Small':v<=125?'Normal':v<=180?'Big':'Huge';
  const tag=v=>v>=95?'Almost impossible':v>=85?'Elite':v>=70?'Tough':v>=50?'Solid':v>=30?'Easy':'Very easy';
  show(`<div class="eyebrow">Settings</div><h2>Custom difficulty</h2><p class="muted">Set how good the CPU is on each end. Put both at 99 for something close to impossible: they make every open shot and you'll have a hard time getting past them.</p>
  ${[['o','Offense','How often the CPU makes its shots, from close and from deep, even with a hand in its face.'],['d','Defense','How fast the CPU reacts, slides, reaches and blocks, and how rarely it bites on fakes.']].map(([k,n,h])=>`<h3>${n}: <span id="v-${k}">${c[k]}</span> <small class="muted" id="t-${k}">${tag(c[k])}</small></h3><p class="muted small">${h}</p><input type="range" min="1" max="99" value="${c[k]}" id="r-${k}" style="width:100%;accent-color:#ffc72c">`).join('')}
+ <h3>Your green meter: <span id="v-g">${c.g||100}%</span> <small class="muted" id="t-g">${gtag(c.g||100)}</small></h3><p class="muted small">How big the green window is on your shot meter when you play on Custom. 100% is normal; smaller is harder to hit, bigger is easier.</p><input type="range" min="25" max="250" step="5" value="${c.g||100}" id="r-g" style="width:100%;accent-color:#3ddc84">
  <div class="btns"><button class="btn gold" id="use">Play on Custom</button><button class="btn ghost" id="back">Back</button></div>`);
  for(const k of['o','d']){const r=ov.querySelector('#r-'+k);r.addEventListener('input',()=>{c[k]=+r.value;ov.querySelector('#v-'+k).textContent=c[k];ov.querySelector('#t-'+k).textContent=tag(c[k]);store.set('fhh_custom_lvl',c);applyCustom()})}
+ {const r=ov.querySelector('#r-g');r.addEventListener('input',()=>{c.g=+r.value;ov.querySelector('#v-g').textContent=c.g+'%';ov.querySelector('#t-g').textContent=gtag(c.g);store.set('fhh_custom_lvl',c);applyCustom()})}
  on('#use',()=>{store.set('fhh_custom_lvl',c);applyCustom();store.set('fhh_diff',5);done()});
  on('#back',()=>done())}
 function controlsScreen(){
