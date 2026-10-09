@@ -946,45 +946,40 @@ function dodgeTap(pt){const v=G.dv;if(!v||v.stage!==0)return;
 }
 function drawDodgeView(){const v=G.dv,W=VW*SCALE,H=VH*SCALE,g=sc,L=lookFor(v.d.team),d=v.d;
   g.setTransform(1,0,0,1,0,0);
-  // stands, turf, and the cage way behind him
-  g.fillStyle="#3a1018";g.fillRect(0,0,W,140);for(let y=8;y<140;y+=10){g.fillStyle="#4c1622";g.fillRect(0,y,W,4)}
-  for(let i=0;i<240;i++){const x=(i*97)%W,y=10+((i*53)%120);g.fillStyle=["#f3eedf","#e8b63e","#a3203a","#cfcfcf","#3b6fb6"][i%5];g.fillRect(x,y,4,5)}
-  g.fillStyle="#3f8a36";g.fillRect(0,140,W,H-140);for(let y=140;y<H;y+=22){g.fillStyle="#46963c";g.fillRect(0,y,W,11)}
-  g.fillStyle="#ff6a1a";g.fillRect(W/2-34,118,4,30);g.fillRect(W/2+30,118,4,30);g.fillRect(W/2-34,116,68,4);
-  g.fillStyle="rgba(255,255,255,.18)";g.fillRect(W/2-30,120,60,28);
+  g.drawImage(fpBackdrop(140),0,0);
+  // the cage, far behind him
+  g.fillStyle="rgba(0,0,0,.2)";g.fillRect(W/2-40,148,80,6);g.fillStyle="rgba(255,255,255,.18)";g.fillRect(W/2-30,120,60,28);
+  g.lineCap="round";g.lineWidth=5;g.strokeStyle="#ff6a1a";g.beginPath();g.moveTo(W/2-32,150);g.lineTo(W/2-32,118);g.lineTo(W/2+32,118);g.lineTo(W/2+32,150);g.stroke();
   // the defender: leaning one way, showing his tell
-  const r=v.stage===1?Math.min(1,v.t2/0.45):0,slide=v.stage===1&&v.ok?-v.side*r*260:0,grow=v.stage===1&&!v.ok?1+r*0.25:1;
-  const cx=W/2+v.lean*34+slide,low=v.act==="sit"?22:v.act==="push"?10:0,base=372;
-  g.save();g.translate(cx,base);g.scale(grow,grow);g.globalAlpha=v.stage===1&&v.ok?1-r*0.6:1;
-  const px=(x,y,w,h,c)=>{g.fillStyle=c;g.fillRect(x,-y,w,h)};
-  px(-40,92-low,30,92-low,L.shorts);px(10,92-low,30,92-low,L.shorts);px(-42,10,34,10,"#151515");px(8,10,34,10,"#151515");
-  px(-50,212-low,100,122,L.jersey);px(-36,200-low,72,70,shade(L.jersey,-.15));
-  px(-30,262-low,60,54,L.helmet);px(-22,250-low,44,34,L.cage);px(-17,246-low,34,24,"#e1b38c");for(let i=-17;i<=17;i+=8)px(i,250-low,2,34,L.cage);
-    // stick and gloves show the tell
-  g.fillStyle="#d8d8d8";
-  if(v.act==="check"){g.save();g.translate(44,-200+low);g.rotate(-0.9);g.fillRect(0,-4,d.p.pole?150:96,7);g.fillStyle="#f6f6f0";g.fillRect(d.p.pole?150:96,-14,26,26);g.restore();
-    px(36,206-low,24,22,L.glove);px(-60,160-low,22,22,L.glove)}
-  else if(v.act==="push"){g.fillRect(-90,-150+low,180,7);px(-96,160-low,24,24,L.glove);px(72,160-low,24,24,L.glove);g.fillStyle="#f6f6f0";g.fillRect(-120,-160+low,28,26)}
-  else{g.save();g.translate(30,-130+low);g.rotate(0.55);g.fillRect(0,-4,d.p.pole?140:90,7);g.fillStyle="#f6f6f0";g.fillRect(d.p.pole?140:90,-14,26,26);g.restore();
-    px(22,140-low,24,22,L.glove);px(-56,150-low,22,22,L.glove)}
+  const r=v.stage===1?Math.min(1,v.t2/0.45):0,slide=v.stage===1&&v.ok?-v.side*r*300:0,grow=v.stage===1&&!v.ok?1+r*0.3:1;
+  const cx=W/2+v.lean*40+slide,base=408,pole=!!d.p.pole,S=1.0*grow;
+  const pose=v.act==="check"?{crouch:0.15,l:[-34,-176],r:[42,-206],st0:[-34,-176],st1:[150,pole?-360:-320]}
+            :v.act==="push"?{crouch:0.35,l:[-62,-150],r:[62,-150],st0:[-120,-152],st1:[pole?190:150,-152]}
+            :{crouch:0.55,l:[-40,-112],r:[34,-104],st0:[-40,-112],st1:[pole?150:120,-34]};
+  g.save();g.translate(cx,base);g.rotate(v.lean*0.05);g.scale(S,S);g.globalAlpha=v.stage===1&&v.ok?1-r*0.6:1;
+  bigPlayer(g,L,{num:d.p.num,hands:{l:pose.l,r:pose.r},crouch:pose.crouch});
+  const[a0,a1]=[pose.st0,pose.st1],dl=Math.hypot(a1[0]-a0[0],a1[1]-a0[1]);
+  bigStick(g,a0[0],a0[1],a1[0],a1[1],pole?40:44,46,pole?"#9aa0a8":"#e4e4e4",false);
+  bigGlove(g,pose.l[0],pose.l[1],L.glove);bigGlove(g,pose.r[0],pose.r[1],L.glove);
   g.restore();g.globalAlpha=1;
-  if(!(v.stage===1&&v.ok))txt(String(d.p.num),cx,base-(172-low)*grow,16,L.num,"center");
-  // your gloves and stick, first person
-  const hand=v.c.hand||1,ME=lookFor(v.c.team);
-  g.save();g.translate(W/2+hand*250,H+6);g.rotate(hand*0.3);g.fillStyle="#d8d8d8";g.fillRect(-4,-150,8,150);g.fillStyle="#f6f6f0";g.fillRect(-18,-190,36,44);g.fillStyle="rgba(40,40,40,.5)";g.fillRect(-13,-185,26,34);
-  g.fillStyle="#fffbe8";g.fillRect(-6,-162,12,12);g.fillStyle=ME.glove;g.fillRect(-16,-96,32,28);g.restore();
+  // your stick and gloves, first person (cradling the ball)
+  const hand=v.c.hand||1,ME=lookFor(v.c.team),sw=v.stage===1?v.side*Math.min(1,v.t2/0.3)*140:0,bob=Math.sin(G.time*9)*6;
+  const hx=W/2+hand*250+sw,hy=H-150+bob;
+  bigStick(g,W/2+hand*190+sw,H-40,hx+hand*26,H-280+bob,58,62,"#e4e4e4",true);
+  bigGlove(g,W/2+hand*196+sw,H-84,ME.glove,1.5);bigGlove(g,hx,hy,ME.glove,1.5);
   // header, tell, timer
   g.fillStyle="rgba(0,0,0,.8)";g.fillRect(0,0,W,58);
   txt("BEAT #"+d.p.num+" "+d.p.last.toUpperCase().slice(0,12),16,10,12,"#ffd640");
   txt("LEANING "+(v.lean<0?"LEFT":"RIGHT"),W-16,10,9,"#a6a8c2","right");
   if(v.stage===0){txt(TELLS[v.act],W/2,36,10,"#ffffff","center");
-    const left=Math.max(0,1-v.t/v.lim);g.fillStyle="#000";g.fillRect(W/2-150,64,300,12);g.fillStyle=left>0.3?"#ffd640":"#ff6b6b";g.fillRect(W/2-148,66,296*left,8);
-    for(const s of [-1,1]){const b=DV_ARROW(s),on=v.side===s;g.fillStyle=on?"#ffd640":"rgba(0,0,0,.6)";g.fillRect(b.x,b.y,b.w,b.h);
-      g.fillStyle=on?"#5a0d1c":"#ffffff";const ax=b.x+b.w/2,ay=b.y+44;for(let i=0;i<22;i++)g.fillRect(ax+s*(i-11)-1,ay-(22-i),3,(22-i)*2);
+    const left=Math.max(0,1-v.t/v.lim);g.fillStyle="#000";rrect(g,W/2-150,64,300,12,6);g.fill();g.fillStyle=left>0.3?"#ffd640":"#ff6b6b";rrect(g,W/2-148,66,296*left,8,4);g.fill();
+    for(const s of [-1,1]){const b=DV_ARROW(s),on=v.side===s;g.fillStyle=on?"#ffd640":"rgba(0,0,0,.6)";rrect(g,b.x,b.y,b.w,b.h,14);g.fill();g.lineWidth=3;g.strokeStyle=on?"#5a0d1c":"rgba(255,255,255,.35)";g.stroke();
+      g.fillStyle=on?"#5a0d1c":"#ffffff";const ax=b.x+b.w/2,ay=b.y+44;g.beginPath();g.moveTo(ax+s*24,ay);g.lineTo(ax-s*14,ay-24);g.lineTo(ax-s*14,ay+24);g.closePath();g.fill();
       txt(s<0?"LEFT":"RIGHT",ax,b.y+b.h-24,9,on?"#5a0d1c":"#ffffff","center")}
-    DODGES.forEach((m,i)=>{const b=DV_BOX(i);g.fillStyle="rgba(0,0,0,.82)";g.fillRect(b.x,b.y,b.w,b.h);g.fillStyle="#e0aa2e";g.fillRect(b.x,b.y,b.w,3);g.fillRect(b.x,b.y+b.h-3,b.w,3);g.fillRect(b.x,b.y,3,b.h);g.fillRect(b.x+b.w-3,b.y,3,b.h);
+    DODGES.forEach((m,i)=>{const b=DV_BOX(i);g.fillStyle="rgba(0,0,0,.82)";rrect(g,b.x,b.y,b.w,b.h,12);g.fill();g.lineWidth=3;g.strokeStyle="#e0aa2e";g.stroke();
       txt(m.name,b.x+b.w/2,b.y+14,10,"#ffd640","center");txt("KEY "+m.key,b.x+b.w/2,b.y+33,7,"#a6a8c2","center")})}
-  else txt(v.ok?v.move.name+"!":v.move?"HE READ IT!":"TOO SLOW!",W/2,200,24,v.ok?"#ffd640":"#ff6b6b","center");
+  else{const msg=v.ok?v.move.name+"!":v.move?"HE READ IT!":"TOO SLOW!";if(v.ok){g.fillStyle="rgba(255,214,64,"+(0.25*(1-r))+")";g.fillRect(0,0,W,H)}
+    txt(msg,W/2,200,24,v.ok?"#ffd640":"#ff6b6b","center")}
 }
 function pressured(c){return G.ents.some(o=>o.team!==c.team&&o.role!=="G"&&dist(o,c)<1.6)}
 function passTo(c,r,pt,kind,errMul=1){ // kind: "bullet" (fast and flat), "lob" (floats over sticks), or the default
@@ -1100,47 +1095,145 @@ function shotTap(){const k=G&&G.sm;if(!k||G.phase!=="shot")return;
   if(k.stage===0){k.power=k.pos;k.stage=1;k.t1=0;SFX.tick();renderBar(true);return}
   if(k.stage===1)fireShot();
 }
-/* The cage seen from out front: stands, turf, crease, net, the goalie (in look O) and the posts. */
+/* ---------- first-person views: stadium backdrop and big, detailed players ---------- */
+const BG_CACHE={};
+function fpBackdrop(horizon){const W=VW*SCALE,H=VH*SCALE,key=W+"x"+H+"@"+horizon+(G&&G.home?"h":"a");if(BG_CACHE[key])return BG_CACHE[key];
+  const c=document.createElement("canvas");c.width=W;c.height=H;const g=c.getContext("2d");
+  const home=!G||G.home||G.ctx.neutral;
+  // evening sky and light towers
+  let gr=g.createLinearGradient(0,0,0,horizon);gr.addColorStop(0,"#0d1430");gr.addColorStop(0.55,"#2a2448");gr.addColorStop(1,"#5a3048");g.fillStyle=gr;g.fillRect(0,0,W,horizon);
+  for(const lx of [70,W-70]){g.fillStyle="#2a2c38";g.fillRect(lx-3,8,6,horizon-30);g.fillStyle="#3a3d4c";g.fillRect(lx-26,4,52,22);
+    for(let i=0;i<4;i++)for(let j=0;j<2;j++){g.fillStyle="#fff6c8";g.fillRect(lx-23+i*12,7+j*9,9,6)}
+    const glow=g.createRadialGradient(lx,15,4,lx,15,120);glow.addColorStop(0,"rgba(255,246,200,.35)");glow.addColorStop(1,"rgba(255,246,200,0)");g.fillStyle=glow;g.fillRect(lx-120,0,240,140)}
+  // grandstand: tiers of seats and a crowd with heads and shirts
+  const st=34,sb=horizon-16;
+  gr=g.createLinearGradient(0,st,0,sb);gr.addColorStop(0,home?"#4a0f1c":"#2c2f3c");gr.addColorStop(1,home?"#6e1a2c":"#3c4050");g.fillStyle=gr;g.fillRect(0,st,W,sb-st);
+  const shirts=home?["#a3203a","#e8b63e","#a3203a","#f3eedf","#7c1a2e","#e8b63e","#2a2a2a"]:["#f3eedf","#3b6fb6","#a3203a","#cfcfcf","#e8b63e","#2a2a2a"],skins=["#f1c9a5","#e2b48a","#c98e5c","#f3d2b4"];
+  let rs=7;const rnd2=()=>(rs=(rs*16807)%2147483647)/2147483647;
+  for(let row=0,y=st+8;y<sb-6;row++,y+=11){g.fillStyle="rgba(0,0,0,.18)";g.fillRect(0,y+7,W,3);
+    for(let x=(row%2)*5;x<W;x+=10){if(rnd2()<.12)continue;const s=shirts[(rnd2()*shirts.length)|0];g.fillStyle=s;g.fillRect(x,y+1,8,7);g.fillStyle=skins[(rnd2()*skins.length)|0];g.fillRect(x+2,y-4,5,5);
+      if(rnd2()<.08){g.fillStyle=s;g.fillRect(x+1,y-9,2,6)}}}
+  // padded wall with stars and the Chaminade name
+  g.fillStyle=home?"#e8b63e":"#9aa0b0";g.fillRect(0,sb-6,W,8);g.fillStyle=home?"#7c1a2e":"#22242c";g.fillRect(0,sb+2,W,14);
+  if(home){for(let x=20;x<W;x+=60)drawStar(g,x,sb-2,3.4,"#7c1a2e");g.font='9px "Press Start 2P", monospace';g.textAlign="center";g.textBaseline="middle";g.fillStyle="#e8b63e";g.fillText("CHAMINADE FLYERS  ·  GOLD STAR STADIUM",W/2,sb+9)}
+  // turf in perspective: mowing bands that widen toward you, then speckle
+  for(let i=0;i<14;i++){const y0=horizon+Math.pow(i/14,1.7)*(H-horizon),y1=horizon+Math.pow((i+1)/14,1.7)*(H-horizon);g.fillStyle=i%2?"#469a3c":"#3f8c36";g.fillRect(0,y0,W,y1-y0+1)}
+  for(let i=0;i<9000;i++){const y=horizon+rnd2()*(H-horizon),x=rnd2()*W;g.fillStyle=rnd2()<.5?"rgba(0,0,0,.08)":"rgba(255,255,220,.07)";g.fillRect(x,y,1,1+((y-horizon)/(H-horizon))*2)}
+  gr=g.createLinearGradient(0,horizon,0,horizon+40);gr.addColorStop(0,"rgba(0,0,0,.35)");gr.addColorStop(1,"rgba(0,0,0,0)");g.fillStyle=gr;g.fillRect(0,horizon,W,40);
+  // vignette
+  const vg=g.createRadialGradient(W/2,H*0.55,H*0.35,W/2,H*0.55,W*0.7);vg.addColorStop(0,"rgba(0,0,0,0)");vg.addColorStop(1,"rgba(0,0,0,.45)");g.fillStyle=vg;g.fillRect(0,0,W,H);
+  return BG_CACHE[key]=c;
+}
+function rrect(g,x,y,w,h,r){r=Math.min(r,w/2,h/2);g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath()}
+const INK="#140f18";
+/* A big front-facing lacrosse player, feet at (0,0) in local units (about 260 tall). hands: {l:[x,y],r:[x,y]} in the same units. */
+function bigPlayer(g,L,o){
+  const c=o.crouch||0,hip=-100+c*26,sh=-202+c*30,hd=-240+c*32,skin=o.skin||"#e8b896",lw=g.lineWidth;
+  g.lineJoin="round";g.lineCap="round";g.strokeStyle=INK;g.lineWidth=4;
+  // shadow
+  g.fillStyle="rgba(0,0,0,.3)";g.beginPath();g.ellipse(0,4,o.goalie?78:64,13,0,0,Math.PI*2);g.fill();
+  // legs: thigh (shorts), shin (sock), cleat
+  const leg=(sx,fx)=>{const kx=(sx+fx)/2+(sx<0?-c*16:c*16),ky=hip+(0-hip)*0.52;
+    g.lineWidth=27;g.strokeStyle=INK;g.beginPath();g.moveTo(sx,hip+6);g.lineTo(kx,ky);g.lineTo(fx,-14);g.stroke();
+    g.lineWidth=21;g.strokeStyle=o.goalie?shade(L.shorts,-.05):skin;g.beginPath();g.moveTo(kx,ky);g.lineTo(fx,-14);g.stroke();
+    g.strokeStyle=L.sock;g.beginPath();g.moveTo(kx+(fx-kx)*0.35,ky+(-14-ky)*0.35);g.lineTo(fx,-14);g.stroke();
+    g.strokeStyle=L.shorts;g.beginPath();g.moveTo(sx,hip+6);g.lineTo(kx+(sx-kx)*0.15,ky-4);g.stroke();
+    g.fillStyle="#18181c";rrect(g,fx-17,-20,34,20,8);g.fill();g.lineWidth=3;g.strokeStyle=INK;g.stroke();g.fillStyle="#f3f3f3";g.fillRect(fx-11,-14,22,3)};
+  const st=o.goalie?36:28+c*14;leg(-18,-st);leg(18,st);
+  // shorts
+  g.fillStyle=L.shorts;rrect(g,-40,hip-26,80,40,10);g.fill();g.lineWidth=4;g.strokeStyle=INK;g.stroke();
+  g.fillStyle=shade(L.shorts,-.2);g.fillRect(-38,hip-4,76,6);
+  // torso: jersey with side shading
+  g.beginPath();g.moveTo(-46,sh+8);g.quadraticCurveTo(-50,(sh+hip)/2,-36,hip-14);g.lineTo(36,hip-14);g.quadraticCurveTo(50,(sh+hip)/2,46,sh+8);g.quadraticCurveTo(0,sh-6,-46,sh+8);g.closePath();
+  let gr=g.createLinearGradient(-50,0,50,0);gr.addColorStop(0,shade(L.jersey,-.22));gr.addColorStop(0.35,L.jersey);gr.addColorStop(0.8,shade(L.jersey,.08));gr.addColorStop(1,shade(L.jersey,-.15));
+  g.fillStyle=gr;g.fill();g.lineWidth=4;g.strokeStyle=INK;g.stroke();
+  if(o.goalie){g.fillStyle="#26262c";rrect(g,-30,sh+10,60,hip-sh-30,12);g.fill();g.stroke();g.fillStyle="#3a3a42";for(let i=0;i<3;i++)g.fillRect(-24,sh+20+i*18,48,4);
+    g.fillStyle="#26262c";rrect(g,-14,sh-14,28,22,6);g.fill();g.stroke()}   // chest protector and throat guard
+  else{g.fillStyle=shade(L.jersey,-.18);g.fillRect(-46,sh+18,10,40);g.fillRect(36,sh+18,10,40)}
+  if(o.num!=null&&o.num!==""){g.font=(o.goalie?18:30)+'px "Press Start 2P", monospace';g.textAlign="center";g.textBaseline="middle";const ny=o.goalie?hip-26:(sh+hip)/2+6;
+    g.lineWidth=6;g.strokeStyle=INK;g.strokeText(String(o.num),0,ny);g.fillStyle=L.num;g.fillText(String(o.num),0,ny)}
+  // shoulder pads
+  for(const s of[-1,1]){g.fillStyle=shade(L.jersey,s<0?-.1:.06);g.beginPath();g.ellipse(s*44,sh+12,20,16,0,0,Math.PI*2);g.fill();g.lineWidth=4;g.strokeStyle=INK;g.stroke()}
+  // arms to the hands, with arm pads
+  const arm=(s,h)=>{const sx=s*48,sy=sh+18,ex=(sx+h[0])/2+s*18,ey=(sy+h[1])/2+14;
+    g.lineWidth=24;g.strokeStyle=INK;g.beginPath();g.moveTo(sx,sy);g.lineTo(ex,ey);g.lineTo(h[0],h[1]);g.stroke();
+    g.lineWidth=18;g.strokeStyle=L.jersey;g.beginPath();g.moveTo(sx,sy);g.lineTo(ex,ey);g.stroke();
+    g.strokeStyle="#2a2a30";g.beginPath();g.moveTo(ex,ey);g.lineTo(h[0],h[1]);g.stroke();
+    g.fillStyle="#3c3c44";g.beginPath();g.arc(ex,ey,10,0,Math.PI*2);g.fill()};
+  arm(-1,o.hands.l);arm(1,o.hands.r);
+  // helmet: shell with shine, visor band, cage over the face
+  g.fillStyle=shade(L.helmet,-.25);g.beginPath();g.ellipse(0,hd+6,38,40,0,0,Math.PI*2);g.fill();g.lineWidth=4;g.strokeStyle=INK;g.stroke();
+  gr=g.createRadialGradient(-12,hd-18,4,0,hd,42);gr.addColorStop(0,shade(L.helmet,.45));gr.addColorStop(0.5,L.helmet);gr.addColorStop(1,shade(L.helmet,-.2));
+  g.fillStyle=gr;g.beginPath();g.ellipse(0,hd-2,36,34,0,Math.PI,0);g.lineTo(36,hd+4);g.lineTo(-36,hd+4);g.closePath();g.fill();
+  g.fillStyle=shade(L.helmet,-.3);g.fillRect(-36,hd,72,7);
+  g.fillStyle=skin;rrect(g,-21,hd+8,42,34,10);g.fill();
+  g.fillStyle="#1a1a1a";g.fillRect(-12,hd+16,7,5);g.fillRect(5,hd+16,7,5);g.fillStyle=shade(skin,-.2);g.fillRect(-10,hd+30,20,3);
+  g.strokeStyle=L.cage;g.lineWidth=3;for(let x=-18;x<=18;x+=9){g.beginPath();g.moveTo(x,hd+8);g.lineTo(x*0.8,hd+44);g.stroke()}
+  for(const y of [hd+18,hd+30,hd+42]){g.beginPath();g.moveTo(-22,y);g.lineTo(22,y);g.stroke()}
+  g.lineWidth=4;g.strokeStyle=INK;rrect(g,-23,hd+7,46,40,12);g.stroke();
+  g.lineWidth=lw;
+}
+function bigGlove(g,x,y,col,s=1){g.save();g.translate(x,y);g.scale(s,s);g.fillStyle=col;rrect(g,-16,-15,32,30,9);g.fill();g.lineWidth=4;g.strokeStyle=INK;g.stroke();
+  g.fillStyle=shade(col,.25);g.fillRect(-11,-11,22,5);g.fillStyle=shade(col,-.25);rrect(g,-17,8,34,10,4);g.fill();g.stroke();g.restore()}
+/* A stick: shaft from (x0,y0) to the head at (x1,y1); the head is drawn square to the shaft. */
+function bigStick(g,x0,y0,x1,y1,hw,hl,shaft,ball){
+  const a=Math.atan2(y1-y0,x1-x0);
+  g.lineCap="round";g.lineWidth=11;g.strokeStyle=INK;g.beginPath();g.moveTo(x0,y0);g.lineTo(x1,y1);g.stroke();
+  g.lineWidth=7;g.strokeStyle=shaft;g.stroke();g.lineWidth=2;g.strokeStyle="rgba(255,255,255,.55)";g.beginPath();g.moveTo(x0-Math.sin(a)*2,y0+Math.cos(a)*2);g.lineTo(x1-Math.sin(a)*2,y1+Math.cos(a)*2);g.stroke();
+  g.save();g.translate(x1,y1);g.rotate(a+Math.PI/2);
+  g.beginPath();g.moveTo(-hw*0.32,4);g.quadraticCurveTo(-hw*0.62,-hl*0.45,-hw/2,-hl);g.quadraticCurveTo(0,-hl-hw*0.18,hw/2,-hl);g.quadraticCurveTo(hw*0.62,-hl*0.45,hw*0.32,4);g.closePath();
+  g.fillStyle="rgba(40,40,46,.55)";g.fill();g.save();g.clip();g.strokeStyle="rgba(255,255,255,.55)";g.lineWidth=1.5;
+  for(let i=-hw;i<hw+hl;i+=7){g.beginPath();g.moveTo(-hw/2+i,4);g.lineTo(-hw/2+i-hl,-hl-4);g.stroke();g.beginPath();g.moveTo(hw/2-i,4);g.lineTo(hw/2-i+hl,-hl-4);g.stroke()}
+  g.restore();g.lineWidth=7;g.strokeStyle=INK;g.stroke();g.lineWidth=4;g.strokeStyle="#f6f6f0";g.stroke();
+  if(ball){g.fillStyle="#fffbe8";g.beginPath();g.arc(0,-hl*0.42,hw*0.2,0,Math.PI*2);g.fill();g.lineWidth=3;g.strokeStyle=INK;g.stroke()}
+  g.restore();
+}
+function bigBall(g,x,y,r){g.fillStyle="rgba(0,0,0,.25)";g.beginPath();g.ellipse(x,y+r*1.3,r,r*0.35,0,0,Math.PI*2);g.fill();
+  const gr=g.createRadialGradient(x-r*0.35,y-r*0.35,r*0.1,x,y,r);gr.addColorStop(0,"#ffffff");gr.addColorStop(0.7,"#f4f0de");gr.addColorStop(1,"#c9c3ad");
+  g.fillStyle=gr;g.beginPath();g.arc(x,y,r,0,Math.PI*2);g.fill();g.lineWidth=Math.max(2,r*0.18);g.strokeStyle=INK;g.stroke()}
+/* The cage seen from out front: stadium, crease, net, the goalie (in look O) and the posts. */
 function drawNetScene(k,O,gnum){const W=VW*SCALE,H=VH*SCALE,g=sc;
   g.setTransform(1,0,0,1,0,0);
-  // stands, then turf
-  g.fillStyle="#3a1018";g.fillRect(0,0,W,150);for(let y=8;y<150;y+=10){g.fillStyle="#4c1622";g.fillRect(0,y,W,4)}
-  for(let i=0;i<260;i++){const x=(i*97)%W,y=10+((i*53)%130);g.fillStyle=["#f3eedf","#e8b63e","#a3203a","#cfcfcf","#3b6fb6"][i%5];g.fillRect(x,y,4,5)}
-  g.fillStyle="#3f8a36";g.fillRect(0,150,W,H-150);for(let y=150;y<H;y+=22){g.fillStyle="#46963c";g.fillRect(0,y,W,11)}
-  // crease
-  g.strokeStyle="#f4f4ec";g.lineWidth=3;g.beginPath();g.ellipse(W/2+NV.off,NETB+6,250*(0.45+0.55*NV.sq),58,0,0,Math.PI*2);g.stroke();
-  // net mesh
+  g.drawImage(fpBackdrop(150),0,0);
   const x0=netX(-1),x1=netX(1),y0=netY(1),y1=netY(0),yL=netY(1,-1),yR=netY(1,1);
+  // crease, painted in perspective
+  g.lineWidth=5;g.strokeStyle="rgba(255,255,255,.85)";g.beginPath();g.ellipse(W/2+NV.off,NETB+6,250*(0.45+0.55*NV.sq),58,0,0,Math.PI*2);g.stroke();
+  g.fillStyle="rgba(255,255,255,.05)";g.fill();
+  // shadow of the cage on the turf
+  g.fillStyle="rgba(0,0,0,.22)";g.beginPath();g.moveTo(x0,y1);g.lineTo(x1,y1);g.lineTo(x1+30,y1+16);g.lineTo(x0-30,y1+16);g.closePath();g.fill();
   // side of the cage, seen past the far post when you shoot from an angle
   if(NV.side){const fu=-NV.side,fx=netX(fu),ft=netY(1,fu),dep=110*Math.abs(NV.tilt)/0.3*0.9,bx=fx+fu*dep;
-    g.fillStyle="rgba(255,255,255,.07)";g.beginPath();g.moveTo(fx,y1);g.lineTo(fx,ft);g.lineTo(bx,ft+28);g.lineTo(bx,y1-6);g.closePath();g.fill();
-    g.strokeStyle="rgba(255,255,255,.28)";g.lineWidth=1;for(let i=1;i<6;i++){const t=i/6,xx=fx+(bx-fx)*t;g.beginPath();g.moveTo(xx,ft+28*t);g.lineTo(xx,y1-6*t);g.stroke()}
-    g.strokeStyle="#ff6a1a";g.lineWidth=4;g.beginPath();g.moveTo(fx,ft);g.lineTo(bx,ft+28);g.lineTo(bx,y1-6);g.stroke()}
-  g.fillStyle="rgba(255,255,255,.10)";g.beginPath();g.moveTo(x0,y1);g.lineTo(x0,yL);g.lineTo(x1,yR);g.lineTo(x1,y1);g.closePath();g.fill();
-  g.strokeStyle="rgba(255,255,255,.35)";g.lineWidth=1;
-  for(let i=0;i<=16;i++){const u=-1+i/8;g.beginPath();g.moveTo(netX(u),netY(1,u));g.lineTo(netX(u),y1);g.stroke()}
-  for(let i=0;i<=14;i++){const v=i/14;g.beginPath();g.moveTo(x0,netY(v,-1));g.lineTo(x1,netY(v,1));g.stroke()}
+    g.fillStyle="rgba(255,255,255,.08)";g.beginPath();g.moveTo(fx,y1);g.lineTo(fx,ft);g.lineTo(bx,ft+28);g.lineTo(bx,y1-6);g.closePath();g.fill();
+    g.strokeStyle="rgba(255,255,255,.3)";g.lineWidth=1;for(let i=1;i<6;i++){const t=i/6,xx=fx+(bx-fx)*t;g.beginPath();g.moveTo(xx,ft+28*t);g.lineTo(xx,y1-6*t);g.stroke()}
+    g.strokeStyle=INK;g.lineWidth=8;g.beginPath();g.moveTo(fx,ft);g.lineTo(bx,ft+28);g.lineTo(bx,y1-6);g.stroke();
+    g.strokeStyle="#ff6a1a";g.lineWidth=5;g.stroke()}
+  // back of the net: a diamond mesh
+  g.save();g.beginPath();g.moveTo(x0,y1);g.lineTo(x0,yL);g.lineTo(x1,yR);g.lineTo(x1,y1);g.closePath();
+  g.fillStyle="rgba(255,255,255,.10)";g.fill();g.clip();
+  g.strokeStyle="rgba(255,255,255,.4)";g.lineWidth=1.2;const span=x1-x0,step=Math.max(9,span/26);
+  for(let i=-30;i<60;i++){const xx=x0+i*step;g.beginPath();g.moveTo(xx,y1);g.lineTo(xx+(y1-Math.min(yL,yR)),Math.min(yL,yR));g.stroke();g.beginPath();g.moveTo(xx,y1);g.lineTo(xx-(y1-Math.min(yL,yR)),Math.min(yL,yR));g.stroke()}
+  g.restore();
+  // posts and crossbar (he stands in front of them): round orange pipe with a highlight
+  const pipe=(ax,ay,bx2,by2)=>{g.lineCap="round";g.lineWidth=15;g.strokeStyle=INK;g.beginPath();g.moveTo(ax,ay);g.lineTo(bx2,by2);g.stroke();g.lineWidth=10;g.strokeStyle="#ff6a1a";g.stroke();g.lineWidth=3;g.strokeStyle="#ffb07a";g.beginPath();g.moveTo(ax-2,ay-2);g.lineTo(bx2-2,by2-2);g.stroke()};
+  pipe(x0-5,y1,x0-5,yL-5);pipe(x1+5,y1,x1+5,yR-5);pipe(x0-5,yL-5,x1+5,yR-5);
   // goalie
-  const gx=netX(k.gu),gsx=0.35+0.65*NV.sq,px=(dx,dy,w,h,c)=>{g.fillStyle=c;g.fillRect(gx+dx*gsx,y1-dy,w*gsx,h)};
-  px(-34,60,26,60,O.shorts);px(8,60,26,60,O.shorts);px(-34,8,26,8,"#151515");px(8,8,26,8,"#151515");    // legs
-  px(-40,150,80,92,O.jersey);px(-30,140,60,58,shade(O.jersey,-.15));                                     // jersey and chest pad
-  txt(String(gnum),gx,y1-130,14,O.num,"center");
-  px(-24,196,48,46,O.helmet);px(-18,186,36,30,O.cage);px(-14,182,28,22,"#e1b38c");                       // helmet, cage, face
-  for(let i=-14;i<=14;i+=7)px(i,186,2,30,O.cage);
-  const sx=netX(k.su),sy=netY(k.sv,k.su),hx=gx+(sx>=gx?46:-46)*gsx,hy=y1-110;
-  g.strokeStyle="#d8d8d8";g.lineWidth=6;g.lineCap="butt";g.beginPath();g.moveTo(hx,hy);g.lineTo(sx,sy+14);g.stroke();   // stick shaft from his glove
-  g.fillStyle="#f6f6f0";g.fillRect(sx-24,sy-30,48,44);g.fillStyle="rgba(40,40,40,.55)";g.fillRect(sx-18,sy-24,36,32); // big goalie head
-  g.fillStyle=O.glove;px(-56,120,20,22,O.glove);px(36,120,20,22,O.glove);
-  // posts and crossbar
-  g.fillStyle="#ff6a1a";g.fillRect(x0-10,yL-10,10,y1-yL+10);g.fillRect(x1,yR-10,10,y1-yR+10);
-  g.beginPath();g.moveTo(x0-10,yL-10);g.lineTo(x1+10,yR-10);g.lineTo(x1+10,yR);g.lineTo(x0-10,yL);g.closePath();g.fill();
+  const gx=netX(k.gu),gsx=0.35+0.65*NV.sq,S=0.82;
+  const sx=netX(k.su),sy=netY(k.sv,k.su),stickRight=sx>=gx;
+  const top=[(stickRight?46:-46),-128],low=[(stickRight?-30:30),-150];   // local units: top hand by the stick side, bottom hand across the body
+  g.save();g.translate(gx,y1);g.scale(S*gsx,S);
+  bigPlayer(g,O,{goalie:true,num:gnum,hands:{l:stickRight?low:top,r:stickRight?top:low},crouch:0.25});
+  g.restore();
+  const hx=gx+top[0]*S*gsx,hy=y1+top[1]*S,bx=gx+low[0]*S*gsx,by=y1+low[1]*S;
+  const dx=sx-bx,dy=sy-by,dl=Math.hypot(dx,dy)||1;
+  bigStick(g,bx,by,sx-dx/dl*26,sy-dy/dl*26,60,58,"#d8d8d8",false);
+  bigGlove(g,bx,by,O.glove,0.9);bigGlove(g,hx,hy,O.glove,0.9);
   return{x0,x1,y0,y1,yL,yR};
 }
 function drawShotView(){const k=G.sm,W=VW*SCALE,H=VH*SCALE,g=sc;
   drawNetScene(k,lookFor("O"),goalie("O").p.num);
   // ball in flight
   if(k.stage===2){const u=Math.min(1,k.t2/0.45),r=k.res,bx=W/2+(netX(r.u)-W/2)*u,by=H+20+(netY(r.v,r.u)-H-20)*u,sz=Math.round(22-14*u);
-    g.fillStyle="#fffbe8";g.fillRect(bx-sz/2,by-sz/2,sz,sz);if(u>=1)txt(r.saved?"SAVE!":Math.abs(r.u)>1||r.v>1?(Math.abs(r.u)<1.08&&r.v<1.08?"PIPE!":"WIDE!"):"GOAL!",W/2,70,26,r.saved||Math.abs(r.u)>1||r.v>1?"#ffffff":"#ffd640","center")}
+    bigBall(g,bx,by,sz/2+2);if(u>=1)txt(r.saved?"SAVE!":Math.abs(r.u)>1||r.v>1?(Math.abs(r.u)<1.08&&r.v<1.08?"PIPE!":"WIDE!"):"GOAL!",W/2,70,26,r.saved||Math.abs(r.u)>1||r.v>1?"#ffffff":"#ffd640","center")}
   // reticle
   if(k.stage===1){const w=swayAt(k),rx=netX(k.ru+w.u),ry=netY(k.rv+w.v,k.ru+w.u),R_=14+k.sway*60;
     g.strokeStyle="#ffd640";g.lineWidth=3;g.beginPath();g.arc(rx,ry,R_,0,Math.PI*2);g.stroke();
@@ -1219,8 +1312,8 @@ function drawGKView(){const m=G.gm,k=m.k,W=VW*SCALE,H=VH*SCALE,g=sc;
   g.fillStyle=O.helmet;g.beginPath();g.ellipse(bx+tw*1.4,by-156,40,40,0,0,Math.PI*2);g.fill();
   g.fillStyle="rgba(255,255,255,.35)";g.fillRect(bx+tw*1.4-4,by-196,8,62);g.fillStyle="rgba(255,255,255,.25)";g.beginPath();g.ellipse(bx+tw*1.4-16,by-176,8,12,-.4,0,Math.PI*2);g.fill();
   const ang=-0.6-wind*1.6*side,sx=bx+side*60+tw,sy=by-110,ex=sx+Math.cos(ang*side)*160*side,ey=sy-Math.sin(Math.abs(ang))*170;
-  g.strokeStyle="#e4e4e4";g.lineWidth=7;g.beginPath();g.moveTo(sx,sy);g.lineTo(ex,ey);g.stroke();
-  g.fillStyle="#f6f6f0";g.fillRect(ex-14,ey-22,28,30);g.fillStyle="rgba(60,60,60,.5)";g.fillRect(ex-10,ey-18,20,22);g.fillStyle=O.glove;rr(sx-17,sy-17,34,34,8);g.fill();g.lineWidth=3;g.stroke();
+  bigStick(g,sx,sy,ex,ey,40,44,"#e4e4e4",m.state==="wait"||m.state==="aim");
+  bigGlove(g,sx,sy,O.glove,1.2);
   // his eyes: a faint red marker drifting toward where he's looking (it fades as shooters get better)
   if(m.state==="aim"){const rx=netX(k.ru),ry=netY(k.rv,k.ru);g.globalAlpha=Math.max(0.12,k.tell);g.strokeStyle="#ff3b30";g.lineWidth=3;g.beginPath();g.arc(rx,ry,18,0,Math.PI*2);g.stroke();g.globalAlpha=1}
   // the ball
