@@ -1045,7 +1045,7 @@ function startShot(c){
 }
 const swayAt=k=>({u:k.sway*(Math.sin(k.t*3.3)+0.6*Math.sin(k.t*7.1+1)),v:k.sway*0.8*(Math.sin(k.t*2.7+2)+0.5*Math.sin(k.t*6.3))});
 /* What the goalie covers: his body and stick, plus how far he can react. A soft shot from far out gives him time. */
-function gkReach(k){return(0.075+(k.sav-70)/350+clamp(k.D-7,0,16)*0.004+(k.outside?0.1:0)-(k.D<7?0.05:0))*(1.45-k.power*0.7)}
+function gkReach(k){return(0.075+(k.sav-70)/350+clamp(k.D-7,0,16)*0.006+(k.outside?0.1:0)-(k.D<7?0.05:0))*(1.45-k.power*0.7)}
 function gkCovers(k,u,v){const cs=1/(0.5+0.5*(k.sq||1)),m=gkReach(k)*cs,bw=0.30*cs;
   if(Math.abs(u-k.gu)<=bw+m&&v<=0.85+m)return true;                                    // body, pads and helmet
   return Math.hypot((u-k.su)/cs,(v-k.sv)*1.1)<=0.20+m/cs;       // stick head, wherever he's moved it       // stick head up on his stick side
@@ -1062,7 +1062,7 @@ function updateShotMeter(dt){const k=G.sm;if(!k)return;k.t+=dt;
     k.tu=clamp(k.tu+kx*1.6*dt,-1.5,1.5);k.tv=clamp(k.tv+ky*1.4*dt,0,1.45);
     const f=Math.min(1,dt*14);k.ru+=(k.tu-k.ru)*f;k.rv+=(k.tv-k.rv)*f;
     // the goalie reads your eyes: he slides toward wherever you're aiming
-    const far=clamp(k.D-8,0,14),gs=1.7+(k.sav-70)/50+far*0.05;k.gu+=clamp(clamp(k.ru*0.3,-0.8,0.8)+0.06*Math.sin(k.t*3.1)-k.gu,-gs*dt,gs*dt);   // he cheats toward your eyes but stays on his angle
+    const far=clamp(k.D-8,0,14),gs=1.7+(k.sav-70)/50+far*0.05;k.gu+=clamp(clamp(k.ru*0.34,-0.8,0.8)+0.06*Math.sin(k.t*3.1)-k.gu,-gs*dt,gs*dt);   // he cheats toward your eyes but stays on his angle
     // ...and he leans his stick head part of the way toward where you're aiming
     const ss=2.6+(k.sav-70)/40+far*0.065,tsu=k.gu+clamp((k.ru-k.gu)*0.4,-0.62,0.62),tsv=clamp(0.86+(k.rv-0.86)*0.4,0.15,0.92);
     k.su+=clamp(tsu-k.su,-ss*dt,ss*dt);k.sv+=clamp(tsv-k.sv,-ss*dt,ss*dt);
