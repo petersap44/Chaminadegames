@@ -90,6 +90,10 @@ kbd{font-family:var(--body);font-weight:800;background:#6b1616;border-radius:5px
 #touch .pad button.on{background:rgba(255,255,255,.55)}
 #touch.two .pad{gap:6px}
 #touch.two .pad button{width:50px;height:50px;font-size:10px}
+@media (max-width:600px){#touch:not(.two) .pad:last-child{flex-wrap:wrap;justify-content:flex-end;max-width:196px;gap:8px}#touch:not(.two) .pad button{width:54px;height:54px;font-size:11px}}
+.binds{display:grid;grid-template-columns:auto 1fr 1fr;gap:6px 10px;align-items:center;margin:10px 0}
+.binds .bk{font-family:var(--body);font-weight:800;background:#6b1616;color:#fff;border:2px solid #220707;border-radius:8px;padding:8px 10px;cursor:pointer;min-width:0}
+.binds .bk.wait{background:#ffc72c;color:#1a1300}
 #menuBtn{position:fixed;bottom:max(10px,env(safe-area-inset-bottom,0px));left:calc(50% - 34px);transform:translateX(-100%);z-index:4;background:rgba(58,12,12,.8);border:2px solid var(--line);border-radius:10px;color:#fff;font-weight:800;padding:6px 12px}
 #pauseBtn{position:fixed;bottom:max(10px,env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);z-index:4;background:rgba(58,12,12,.8);border:2px solid var(--line);border-radius:10px;color:#fff;font-weight:800;padding:6px 12px}
 @media (prefers-reduced-motion:reduce){.btn{transition:none}}
@@ -506,7 +510,7 @@ function gameBtns(h){document.getElementById('pauseBtn').hidden=h;document.getEl
 function mkPlayer(sel,side,team,cpu){
  const d=sel,s=d.s.slice();
  return{side,data:d,team,look:d.look,s,x:side?W/2+140:W/2-140,y:FLOOR,vx:0,vy:0,ground:true,facing:side?-1:1,speed:225+s[0]*36,jumpV:650+s[1]*44,shot:s[2],bodyH:clamp(42+(d.inch-72)*1.6,36,56),
-  pickupCD:0,swipeT:0,swipeCD:0,in:{l:0,r:0,j:0,s:0,t:0,f:0},prevS:0,prevF:0,fakeT:0,fakeCD:0,fakeId:0,prevT:0,charging:false,charge:0,dashT:0,dashCD:0,dashDir:1,tapDir:0,tapT:-9,prevL:0,prevR:0,landT:0,shotT:0,px:0,py:0,anim:0,mood:0,moodK:'smile',cpu:cpu==null?null:{d:cpu},ai:{t:0,plan:null,gotAt:0,jumped:false}};
+  pickupCD:0,swipeT:0,swipeCD:0,in:{l:0,r:0,j:0,s:0,t:0,f:0,x:0},prevS:0,prevF:0,prevX:0,xT:0,xCD:0,stunT:0,fakeT:0,fakeCD:0,fakeId:0,prevT:0,charging:false,charge:0,dashT:0,dashCD:0,dashDir:1,tapDir:0,tapT:-9,prevL:0,prevR:0,landT:0,shotT:0,px:0,py:0,anim:0,mood:0,moodK:'smile',cpu:cpu==null?null:{d:cpu},ai:{t:0,plan:null,gotAt:0,jumped:false}};
 }
 function start(cfg){
  audio();
@@ -534,7 +538,8 @@ const attack=p=>HOOPS[p.side===0?1:0];
 function updatePlayer(p,dt){
  if(p.dunkT>0){updateDunk(p,dt);if(p.mood>0)p.mood-=dt;return}
  const inp=p.in,g=game,b=g.ball,live=g.state==='play',moving=live||g.state==='scored';
- const pressS=inp.s&&!p.prevS,pressT=inp.t&&!p.prevT,pressF=inp.f&&!p.prevF;p.prevS=inp.s;p.prevT=inp.t;p.prevF=inp.f;p.fakeT-=dt;p.fakeCD-=dt;
+ const pressS=inp.s&&!p.prevS,pressT=inp.t&&!p.prevT,pressF=inp.f&&!p.prevF,pressX=inp.x&&!p.prevX;p.prevS=inp.s;p.prevT=inp.t;p.prevF=inp.f;p.prevX=inp.x;p.fakeT-=dt;p.fakeCD-=dt;p.xT-=dt;p.xCD-=dt;
+ if(p.stunT>0){p.stunT-=dt;inp.l=inp.r=inp.j=inp.t=0}
  p.pickupCD-=dt;p.swipeT-=dt;p.swipeCD-=dt;if(p.mood>0)p.mood-=dt;
  const dir=moving?(inp.r?1:0)-(inp.l?1:0):0;
  const sp=p.speed*(b.holder===p?.9:1);
@@ -557,6 +562,7 @@ function updatePlayer(p,dt){
   else if(pressT&&b.holder===p&&!p.charging&&mates(p).length)pass(p);
   // pump fake: sell the shot without letting it go, defenders nearby may jump at it
   if(pressF&&b.holder===p&&p.ground&&!p.charging&&p.fakeCD<=0){p.shotT=.3;p.fakeT=.4;p.fakeCD=.5;p.fakeId++;p.vx*=.3;sfx.dash()}
+  if(pressX&&b.holder===p&&p.ground&&!p.charging&&p.xCD<=0)crossover(p,dir||p.facing);
   if(b.holder!==p)p.charging=false;
   else if(p.cpu){if(pressS)shoot(p)}
   else{if(pressS&&!p.charging){p.charging=true;p.charge=0}
@@ -565,6 +571,13 @@ function updatePlayer(p,dt){
   if(b.holder===p&&!p.ground){const h=attack(p),hp=headPos(p);if(Math.abs(p.x-h.cx)<95&&hp.y<h.y+50&&Math.sign(h.cx-p.x)===h.toBoard){p.charging=false;dunk(p)}}
  } else p.charging=false;
 }
+// crossover: the ball whips to the other hand with a quick burst. A CPU defender close by may get crossed up and stumble the wrong way.
+// chance by level: Rookie gets crossed most, NBA almost never
+const CROSS_BITE=[.8,.55,.35,.18,.06];
+function crossover(p,d){const g=game;p.xT=.32;p.xCD=.8;p.facing=d;p.dashT=.18;p.dashDir=d;sfx.dash();
+ for(const o of opponents(p)){if(!o.cpu||!o.ground||o.stunT>0||Math.abs(o.x-p.x)>110)continue;
+  const onBall=o.slot===p.slot||opponents(p).length===1;
+  if(Math.random()<CROSS_BITE[o.cpu.d]*(onBall?1:.6)){o.stunT=.75;o.vx=-d*150;o.mood=1;o.moodK='sad';const hp=headPos(o);pop(Math.random()<.5?'ANKLES!':'CROSSED UP!',o.x,hp.y-70,'#ffc72c',24,1);g.hype=Math.max(g.hype,.7)}}}
 function dash(p,d){p.dashT=.26;p.dashCD=.9;p.dashDir=d;p.facing=d;p.tapDir=0;sfx.dash();for(let i=0;i<5;i++)game.dust.push({x:p.x-d*10,y:FLOOR-4,vx:-d*(60+Math.random()*120),vy:-40-Math.random()*60,a:.6})}
 // Is a defender between the shooter and the rim with a hand up?
 // 0 = wide open, up to .7 = a defender right on you in the air with a hand up
@@ -685,7 +698,7 @@ function updateBall(dt){
  if(!isFinite(b.x+b.y+b.vx+b.vy)){Object.assign(b,{x:W/2,y:200,vx:0,vy:0,shot:false,shooter:null,make:false,brick:false,holder:null})}
  if(b.holder&&b.holder.dunkT>0){const p=b.holder,hd=dunkHands(p);b.x=hd.f[0]+p.facing*4;b.y=hd.f[1]-BR*.7;b.vx=b.vy=0;b.rot+=dt*8;return}
  if(b.holder){const p=b.holder;let ox,ty;
-  if(p.charging){ox=p.facing*8;ty=headPos(p).y-HR-BR+2}else if(p.ground){const ph=Math.abs(Math.sin(g.time*9));ox=p.facing*30;ty=FLOOR-BR-ph*40}else{ox=p.facing*22;ty=headPos(p).y-HR-6}
+  if(p.charging){ox=p.facing*8;ty=headPos(p).y-HR-BR+2}else if(p.ground&&p.xT>0){const k=1-p.xT/.32;ox=p.facing*30*Math.cos(Math.PI*2*k);ty=FLOOR-BR-Math.abs(Math.cos(Math.PI*2*k))*30}else if(p.ground){const ph=Math.abs(Math.sin(g.time*9));ox=p.facing*30;ty=FLOOR-BR-ph*40}else{ox=p.facing*22;ty=headPos(p).y-HR-6}
   // glide the ball between hands instead of snapping (turning around, going up for a shot, catching)
   if(b.hp!==p){b.hp=p;b.ox=b.x-p.x}const k=Math.min(1,dt*28);b.ox+=(ox-b.ox)*k;b.x=p.x+b.ox;b.y+=(ty-b.y)*Math.min(1,dt*(p.ground&&!p.charging?40:28));
   b.vx=p.vx;b.vy=p.vy;b.rot+=p.vx*dt/BR;return}
@@ -760,7 +773,7 @@ const FAKE_BITE=[.8,.55,.35,.18,.06];
 function think(p,dt){
  const D=CPU[p.cpu.d],A=p.ai,g=game,b=g.ball,h=attack(p),home=HOOPS[p.side];
  A.t-=dt;if(A.t>0)return;const iv=D.react*(.6+Math.random()*.8);A.t=iv;
- const inp={l:0,r:0,j:0,s:0,t:0,dash:0};
+ const inp={l:0,r:0,j:0,s:0,t:0,f:0,x:0,dash:0};
  const go=(tx,tol=10)=>{if(tx<p.x-tol)inp.l=1;else if(tx>p.x+tol)inp.r=1};
  const courtDir=Math.sign(W/2-h.cx),opp=opponents(p),mate=mates(p)[0],o=other(p);
  if(g.state==='countdown'){p.in=inp;return}
@@ -777,7 +790,8 @@ function think(p,dt){
    if(p.ground&&gap<150&&gap>60)inp.j=1;
    if(!p.ground&&p.vy>-60&&gap<120)inp.s=1;
    if(p.ground&&gap<60&&held>1)inp.s=1;
-   if(front&&Math.random()<.25)A.plan='mid',A.spot=Math.abs(p.x-h.cx);
+   if(front&&p.ground&&p.xCD<=0&&Math.random()<.3)inp.x=1;
+   else if(front&&Math.random()<.25)A.plan='mid',A.spot=Math.abs(p.x-h.cx);
   }else{
    const there=Math.abs(p.x-spotX)<22;
    if(!there&&held<3.2)go(spotX,8);
@@ -832,16 +846,26 @@ function think(p,dt){
 }
 
 // ---------- input ----------
-const keys={};const touch=[{l:0,r:0,j:0,s:0,t:0,f:0},{l:0,r:0,j:0,s:0,t:0,f:0}];
-addEventListener('keydown',e=>{if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space'].includes(e.code)&&game&&game.state!=='over')e.preventDefault();keys[e.code]=true;
+const keys={};const touch=[{l:0,r:0,j:0,s:0,t:0,f:0,x:0},{l:0,r:0,j:0,s:0,t:0,f:0,x:0}];
+// key bindings, changeable on the Controls screen
+const ACTIONS=[['l','Move left'],['r','Move right'],['j','Jump'],['s','Shoot (hold)'],['f','Pump fake'],['x','Crossover'],['t','Steal / pass']];
+const DEF_BINDS=[{l:'KeyA',r:'KeyD',j:'KeyW',s:'Space',f:'KeyS',x:'KeyQ',t:'KeyF'},{l:'ArrowLeft',r:'ArrowRight',j:'ArrowUp',s:'ArrowDown',f:'Period',x:'Comma',t:'ShiftRight'}];
+let binds=(()=>{const b=store.get('fhh_binds',null);return DEF_BINDS.map((d,i)=>Object.assign({},d,b&&b[i]||{}))})();
+const keyName=c=>!c?'none':c.startsWith('Key')?c.slice(3):c.startsWith('Digit')?c.slice(5):({ArrowLeft:'←',ArrowRight:'→',ArrowUp:'↑',ArrowDown:'↓',Space:'Space',ShiftLeft:'Left Shift',ShiftRight:'Right Shift',ControlLeft:'Left Ctrl',ControlRight:'Right Ctrl',AltLeft:'Left Alt',AltRight:'Right Alt',Period:'.',Comma:',',Slash:'/',Semicolon:';',Quote:"'",BracketLeft:'[',BracketRight:']',Backslash:'\\',Minus:'-',Equal:'=',Enter:'Enter',Backquote:'`',Tab:'Tab'})[c]||c.replace(/^Numpad/,'Num ');
+const kb=(i,a)=>`<kbd>${keyName(binds[i][a])}</kbd>`;
+let rebind=null;
+addEventListener('keydown',e=>{
+ if(rebind){e.preventDefault();if(e.code!=='Escape'){const {i,a}=rebind;for(const B of binds)for(const k in B)if(B[k]===e.code)B[k]=null;binds[i][a]=e.code;store.set('fhh_binds',binds)}rebind=null;controlsScreen();return}
+ if(game&&game.state!=='over'&&(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space'].includes(e.code)||binds.some(B=>Object.values(B).includes(e.code))))e.preventDefault();keys[e.code]=true;
  if((e.code==='Escape'||e.code==='KeyP')&&game&&game.state!=='over'&&!ovOpen())togglePause();});
 addEventListener('keyup',e=>{keys[e.code]=false});
 addEventListener('blur',()=>{for(const k in keys)keys[k]=false});
 function readInput(p){
- if(p.ctrl==null)return{l:0,r:0,j:0,s:0,t:0};
- const two=game.humans===2,t=touch[p.ctrl];
- if(p.ctrl===0){return{l:keys.KeyA||(!two&&keys.ArrowLeft)||t.l,r:keys.KeyD||(!two&&keys.ArrowRight)||t.r,j:keys.KeyW||(!two&&keys.ArrowUp)||t.j,s:keys.Space||(!two&&keys.ArrowDown)||t.s,f:keys.KeyS||t.f,t:keys.KeyF||keys.KeyE||(!two&&(keys.ShiftRight||keys.Slash||keys.Enter))||t.t}}
- return{l:keys.ArrowLeft||t.l,r:keys.ArrowRight||t.r,j:keys.ArrowUp||t.j,s:keys.ArrowDown||t.s,f:keys.Period||t.f,t:keys.ShiftRight||keys.Slash||keys.Enter||t.t};
+ if(p.ctrl==null)return{l:0,r:0,j:0,s:0,t:0,f:0,x:0};
+ const two=game.humans===2,t=touch[p.ctrl],me=binds[p.ctrl],alt=p.ctrl===0&&!two?binds[1]:null,o={};
+ // playing the CPU alone, Player 2's keys work for Player 1 too
+ for(const [a] of ACTIONS)o[a]=!!(keys[me[a]]||(alt&&keys[alt[a]])||t[a]);
+ return o;
 }
 const coarse=matchMedia('(pointer:coarse)').matches||('ontouchstart' in window);
 function setTouch(mode){
@@ -849,7 +873,7 @@ function setTouch(mode){
  const pad=(p,arr)=>`<div class="pad">${arr.map(([k,l])=>`<button data-p="${p}" data-k="${k}" class="${k==='s'?'shoot':k==='t'?'steal':''}" aria-label="${l}">${l}</button>`).join('')}</div>`;
  const stl=game&&game.cfg.v2?'PASS STEAL':'STEAL';
  el.className=mode===2?'two':'';
- el.innerHTML=mode===2?pad(0,[['l','◀'],['r','▶'],['j','JUMP'],['f','FAKE'],['t',stl],['s','SHOOT']])+pad(1,[['l','◀'],['r','▶'],['j','JUMP'],['f','FAKE'],['t',stl],['s','SHOOT']]):pad(0,[['l','◀'],['r','▶']])+pad(0,[['t',stl],['f','FAKE'],['j','JUMP'],['s','SHOOT']]);
+ el.innerHTML=mode===2?pad(0,[['l','◀'],['r','▶'],['j','JUMP'],['f','FAKE'],['x','CROSS'],['t',stl],['s','SHOOT']])+pad(1,[['l','◀'],['r','▶'],['j','JUMP'],['f','FAKE'],['x','CROSS'],['t',stl],['s','SHOOT']]):pad(0,[['l','◀'],['r','▶']])+pad(0,[['f','FAKE'],['x','CROSS'],['t',stl],['j','JUMP'],['s','SHOOT']]);
  el.hidden=false;
  el.querySelectorAll('button').forEach(bt=>{const p=+bt.dataset.p,k=bt.dataset.k;
   const on=e=>{e.preventDefault();audio();touch[p][k]=1;bt.classList.add('on');try{bt.setPointerCapture(e.pointerId)}catch(_){}};
@@ -857,7 +881,7 @@ function setTouch(mode){
   bt.addEventListener('pointerdown',on);bt.addEventListener('pointerup',off);bt.addEventListener('pointercancel',off);bt.addEventListener('lostpointercapture',off);
   bt.addEventListener('contextmenu',e=>e.preventDefault());});
 }
-function hideTouch(){document.getElementById('touch').hidden=true;touch.forEach(t=>t.l=t.r=t.j=t.s=t.t=t.f=0)}
+function hideTouch(){document.getElementById('touch').hidden=true;touch.forEach(t=>t.l=t.r=t.j=t.s=t.t=t.f=t.x=0)}
 
 // ---------- loop ----------
 let last=performance.now(),acc=0;const STEP=1/120;
@@ -941,6 +965,7 @@ function mainMenu(){
   <button class="mode" id="m-2v2"><b>2 on 2</b><span>You and a CPU teammate, or two friends, against a rival school's pair.</span></button>
   <button class="mode" id="m-2p"><b>2 Players</b><span>Flyers practice scrimmage on one keyboard or one phone.</span></button>
   <button class="mode" id="m-how"><b>How to Play</b><span>Controls, dunks, steals and the Flyer Shot.</span></button>
+  <button class="mode" id="m-keys"><b>Controls</b><span>Change the keys for Player 1 and Player 2.</span></button>
  </div>
  <div class="btns"><button class="btn gold" id="m-diff">Difficulty: ${CPU[clamp(store.get('fhh_diff',1),0,CPU.length-1)].name}</button><a class="btn ghost" href="index.html" style="text-decoration:none">&#9664; All Chaminade games</a><button class="btn ghost" id="m-snd">Sound: ${muted?'Off':'On'}</button></div>
  <p class="foot">Players are from the 2025-26 Chaminade varsity roster posted by <a href="https://athletics.chaminade-hs.org/sports/mens-basketball/roster" target="_blank" rel="noopener">Chaminade Athletics</a>. Heads are cartoons, not likenesses, and the ratings are made up for the game. Unofficial fan game.</p>`);
@@ -948,22 +973,34 @@ function mainMenu(){
  on('#m-cpu',()=>pickPlayer({mode:'cpu',title:'Pick your Flyer',sel:s.pid,next:pid=>pickOpponent(pid)}));
  on('#m-2p',()=>pickPlayer({mode:'2p',title:'Player 1: pick your Flyer',sel:'c25',next:p1=>pickPlayer({mode:'2p',title:'Player 2: pick your Flyer',sel:'c15',taken:p1,next:p2=>start({p1:findP(p1),p2:findP(p2),t1:CHAM,t2:CHAM_W,cpu:null,mode:'2p',tag:'PRACTICE SCRIMMAGE',vsLine:'Maroon vs. Gold'})})}));
  on('#m-how',()=>howTo());
+ on('#m-keys',()=>controlsScreen());
  on('#m-2v2',()=>twoOnTwo());
  on('#m-diff',el=>{const d=(clamp(store.get('fhh_diff',1),0,CPU.length-1)+1)%CPU.length;store.set('fhh_diff',d);el.textContent='Difficulty: '+CPU[d].name});
  on('#m-snd',el=>{muted=!muted;store.set('fhh_muted',muted);el.textContent='Sound: '+(muted?'Off':'On')});
 }
 
+function controlsScreen(){
+ show(`<div class="eyebrow">Settings</div><h2>Controls</h2><p class="muted">Click a key, then press the new key you want. Esc cancels.</p>
+ <div class="binds"><b></b><b>Player 1</b><b>Player 2</b>
+ ${ACTIONS.map(([a,n])=>`<span>${n}</span>${[0,1].map(i=>`<button class="bk${rebind&&rebind.i===i&&rebind.a===a?' wait':''}" data-i="${i}" data-a="${a}">${rebind&&rebind.i===i&&rebind.a===a?'Press a key…':keyName(binds[i][a])}</button>`).join('')}`).join('')}
+ </div>
+ <p class="muted">On a phone, use the on-screen buttons. Pause is always Esc or P.</p>
+ <div class="btns"><button class="btn" id="back">Back</button><button class="btn ghost" id="reset">Reset to default</button></div>`);
+ on('.bk',el=>{rebind={i:+el.dataset.i,a:el.dataset.a};controlsScreen()});
+ on('#reset',()=>{binds=DEF_BINDS.map(d=>Object.assign({},d));store.set('fhh_binds',binds);rebind=null;controlsScreen()});
+ on('#back',()=>{rebind=null;mainMenu()});
+}
 function howTo(){
  show(`<div class="eyebrow">How to play</div><h2>Get buckets. Get stops.</h2>
  <div class="keys">
-  <div><h3>Player 1</h3><p>Move <kbd>A</kbd> <kbd>D</kbd> · Jump <kbd>W</kbd> · Shoot (hold) <kbd>Space</kbd> · Pump fake <kbd>S</kbd> · Steal <kbd>F</kbd></p><p class="muted">Playing the CPU? Arrows, Shift and / work too.</p></div>
-  <div><h3>Player 2</h3><p>Move <kbd>←</kbd> <kbd>→</kbd> · Jump <kbd>↑</kbd> · Shoot (hold) <kbd>↓</kbd> · Pump fake <kbd>.</kbd> · Steal <kbd>Right Shift</kbd> or <kbd>Enter</kbd></p></div>
+  ${[0,1].map(i=>`<div><h3>Player ${i+1}</h3><p>Move ${kb(i,'l')} ${kb(i,'r')} · Jump ${kb(i,'j')} · Shoot (hold) ${kb(i,'s')} · Pump fake ${kb(i,'f')} · Crossover ${kb(i,'x')} · Steal ${kb(i,'t')}</p>${i?'':`<p class="muted">Playing the CPU? Player 2's keys work too. Change any key under Controls.</p>`}</div>`).join('')}
   <div><h3>On a phone</h3><p>Use the on-screen buttons. Turn your phone sideways for the biggest court.</p></div>
  </div>
  <div class="keys">
   <div><h3>Shoot</h3><p>Grab the ball by touching it. Hold shoot to fill the shot meter and let go while it's in the green. Only a green release goes in; early or late is a miss. The green is biggest at the rim and shrinks the farther out you are. Jump shots and better shooters get a bit more green, and a defender in your face takes some away. Shots from past the 3PT line count for three.</p></div>
   <div><h3>Dunk</h3><p>Drive to the rim with the ball and jump. Get up near the rim and you'll throw down a tomahawk, windmill or two-hand jam, then hang on the rim.</p></div>
   <div><h3>2 on 2</h3><p>Press steal while you have the ball to pass to your teammate. With a CPU teammate you always control whoever has the ball. Defenders can pick off a lazy pass.</p></div>
+  <div><h3>Pump fake and crossover</h3><p>With the ball, pump fake to sell a shot and get a CPU defender to jump. Crossover whips the ball to your other hand with a quick burst and can leave a defender stumbling the wrong way. Both work less and less on the harder levels.</p></div>
   <div><h3>Burst</h3><p>Double-tap left or right to burst for a short sprint. It recharges in about a second.</p></div>
   <div><h3>Defend</h3><p>Press steal next to the ball handler to swipe at the ball. Jump into a shot to block it with your big head.</p></div>
   <div><h3>Flyer Shot</h3><p>Your Flyer Power bar fills over time and when you get scored on. When it glows, your next shot gets a green window twice as big, and a green release becomes a fireball.</p></div>
