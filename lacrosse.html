@@ -1972,7 +1972,7 @@ function renderOffice(){
   document.querySelectorAll("[data-up]").forEach(b=>b.onclick=()=>{const k=b.dataset.up,lv=save.up[k]||0,c=COST[lv];if(save.cc<c||lv>=3)return;save.cc-=c;save.up[k]=lv+1;writeSave();SFX.catch();renderOffice()});
 }
 
-$("#b-quit").onclick=()=>{if(!G)return;const t=G.ctx.type;G=null;showMenu(t==="quick"||t==="goalie"?"title":"season")};
+$("#b-quit").onclick=()=>{if(!G)return;saveOnLeave();const t=G.ctx.type;G=null;showMenu(t==="quick"||t==="goalie"?"title":"season")};
 $("#b-sound").onclick=()=>{save.sound=!save.sound;writeSave();$("#b-sound").textContent=save.sound?"SOUND ON":"SOUND OFF"};
 
 /* ============================================================
@@ -1983,7 +1983,11 @@ function frame(now){const dt=Math.min(0.05,(now-last)/1000);last=now;
   if(G&&!$("#game").hidden){try{const n=Math.max(1,Math.ceil(dt/(1/120)));if(!G.paused)for(let i=0;i<n&&G;i++){update(dt/n);manageCtrl()}if(G){draw();renderBar();const sb=$("#a-subs");if(sb)sb.classList.toggle("tired",anyTired())}}catch(err){console.error(err)}}
   requestAnimationFrame(frame)}
 const fontsReady=document.fonts?Promise.race([document.fonts.load('16px "Press Start 2P"'),new Promise(r=>setTimeout(r,2500))]):Promise.resolve();
-fontsReady.then(()=>{showMenu("title");requestAnimationFrame(frame)});
+/* leaving mid-game (closing the tab, switching games) saves where you are; coming back picks it right up */
+function saveOnLeave(){try{if(G&&G.phase&&G.ents&&G.phase!=="final"&&!G.gm&&G.ctx&&G.ctx.type!=="goalie")saveMid()}catch(e){}}
+addEventListener("pagehide",saveOnLeave);document.addEventListener("visibilitychange",()=>{if(document.hidden)saveOnLeave()});
+fontsReady.then(()=>{let back=false;try{if(save&&save.mid&&TEAMS[save.mid.opp]){resumeMid();back=!!G}}catch(e){G=null}
+  if(!back)showMenu("title");requestAnimationFrame(frame)});
 window.__gsl={fireShot,actDodge,doDodge,dodgeSide,w2s:e=>({x:wx(e.x)*SCALE/(VW*SCALE),y:(wy(e.y)-9)*SCALE/(VH*SCALE)}),startShot,shotTap,aimPoint,get input(){return input},get G(){return G},get save(){return save},stars:p=>stars(p),ROSTER,newGame,update,clamp_,nextPeriod,manageCtrl,draw,actShoot,actPass};
 })();
 </script>

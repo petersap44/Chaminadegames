@@ -1798,7 +1798,7 @@ function renderOffice(){
   document.querySelectorAll("[data-up]").forEach(b=>b.onclick=()=>{const k=b.dataset.up,lv=save.up[k]||0,c=COST[lv];if(save.cc<c||lv>=3)return;save.cc-=c;save.up[k]=lv+1;writeSave();SFX.catch();renderOffice()});
 }
 
-$("#b-quit").onclick=()=>{if(!G)return;const t=G.ctx.type;G=null;showMenu(t==="quick"?"title":"season")};
+$("#b-quit").onclick=()=>{if(!G)return;saveOnLeave();const t=G.ctx.type;G=null;showMenu(t==="quick"?"title":"season")};
 $("#b-sound").onclick=()=>{save.sound=!save.sound;writeSave();$("#b-sound").textContent=save.sound?"SOUND ON":"SOUND OFF"};
 
 /* ============================================================
@@ -1809,7 +1809,11 @@ function frame(now){const dt=Math.min(0.05,(now-last)/1000);last=now;
   if(G&&!$("#game").hidden&&G.phase){try{const n=Math.max(1,Math.ceil(dt/(1/120)));for(let i=0;i<n&&G;i++)update(dt/n);if(G)draw()}catch(err){console.error(err)}}
   requestAnimationFrame(frame)}
 const fontsReady=document.fonts?Promise.race([document.fonts.load('16px "Press Start 2P"'),new Promise(r=>setTimeout(r,2500))]):Promise.resolve();
-fontsReady.then(()=>{showMenu("title");requestAnimationFrame(frame)});
+/* leaving mid-game (closing the tab, switching games) saves where you are; coming back picks it right up */
+function saveOnLeave(){try{if(G&&G.phase&&G.ents&&G.phase!=="final"&&!G.gm&&G.ctx&&G.ctx.type!=="goalie")saveMid()}catch(e){}}
+addEventListener("pagehide",saveOnLeave);document.addEventListener("visibilitychange",()=>{if(document.hidden)saveOnLeave()});
+fontsReady.then(()=>{let back=false;try{if(save&&save.mid&&TEAMS[save.mid.opp]){resumeMid();back=!!G}}catch(e){G=null}
+  if(!back)showMenu("title");requestAnimationFrame(frame)});
 window.__gsg={get G(){return G},setDiff:d=>{save.diff=d},snap,throwBall,newGame,juke,dive,handoff,update,continueAfterDrive,kickTap,kickNow,startKick,tickClock,oppDrive,defAction,switchDefender,w2s:e=>({x:wx(e.x)/VW,y:wy(e.y)/VH})};
 })();
 </script>
