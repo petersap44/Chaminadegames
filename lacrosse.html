@@ -652,7 +652,7 @@ function spotFor(e){
   const onBall=c===mark;
   if(onBall){ // mirror the carrier: stay between him and the cage, matching his feet
     const dx=gx-mark.x,dy=GY-mark.y,dd=Math.hypot(dx,dy)||1;
-    return{x:mark.x+dx/dd*0.95+mark.vx*0.3,y:mark.y+dy/dd*0.95+mark.vy*0.3};
+    return{x:mark.x+dx/dd*0.95+mark.vx*0.4,y:mark.y+dy/dd*0.95+mark.vy*0.4};
   }
   const lead={x:mark.x+mark.vx*0.35,y:mark.y+mark.vy*0.35};
   const dx=gx-lead.x,dy=GY-lead.y,dd=Math.hypot(dx,dy)||1,gap=dd>30?3.5:1.6;
@@ -695,9 +695,12 @@ function updateLive(dt){
   if(b.st==="loose"){for(const t of ["C","O"]){const l=E.filter(e=>e.team===t&&e.role!=="G").sort((a,z)=>dist(a,b)-dist(z,b));chasers.add(l[0]);chasers.add(l[1]);
     const gk=goalie(t);if(Math.hypot(b.x-ownGX(t),b.y-GY)<5)chasers.add(gk)}}
   const ud=G.ctrl?userDir():null;
+  // who's guarding the ball: the nearest defender on the cage side of the carrier
+  const onBallD=c&&c.role!=="G"?nearest(E.filter(x=>x.team!==c.team&&x.role!=="G"&&!(x.down>0)&&(ownGX(x.team)-x.x)*(ownGX(x.team)-c.x)>=0&&Math.abs(ownGX(x.team)-x.x)<=Math.abs(ownGX(x.team)-c.x)+0.6),c):null;
   for(const e of E){
     if(e.cut>0)e.cut-=dt;if(e.mT>0)e.mT-=dt;if(e.ccd>0)e.ccd-=dt;if(e.dcd>0)e.dcd-=dt;
     let spd=ySpd(e)*(e===c?0.93:1);
+    if(e===onBallD&&c.team==="C"&&dist(e,c)<5)spd*=1.25;   // he moves his feet with you
     if(e.role!=="G"){const en=enOf(e.p);spd*=0.68+0.32*en;
       setEn(e.p,en-dt*(0.0036+0.0042*Math.min(1,Math.hypot(e.vx,e.vy)/8)+(e===G.ctrl&&sprinting()?0.006:0)))}
     if(e.hcd>0)e.hcd-=dt;
@@ -724,7 +727,7 @@ function updateLive(dt){
       let s=spotFor(e);
       if(c&&c.team!==e.team&&e.role!=="G"&&e.role!=="A"){
         const gx=ownGX(e.team),dg=Math.hypot(c.x-gx,c.y-GY),onB=nearest(E.filter(x=>x.team===e.team&&x.role!=="G"),c);
-        if(dg<11&&onB===e)s={x:c.x+(gx-c.x)/dg*1,y:c.y+(GY-c.y)/dg*1};
+        if(dg<13&&onB===e)s={x:c.x+(gx-c.x)/dg*1,y:c.y+(GY-c.y)/dg*1};
       }
       moveToward(e,s.x,s.y,spd*(dist(e,s)>4?1:.75),dt);
     }
@@ -734,7 +737,9 @@ function updateLive(dt){
   }
   // keep bodies apart and out of the creases
   for(let i=0;i<E.length;i++)for(let j=i+1;j<E.length;j++){const a=E[i],z=E[j],dx=z.x-a.x,dy=z.y-a.y,d=Math.hypot(dx,dy);
-    if(d<0.75&&d>0.001){const p=(0.75-d)/2,ux=dx/d,uy=dy/d;a.x-=ux*p;a.y-=uy*p;z.x+=ux*p;z.y+=uy*p}}
+    const wall=c&&(a===c&&z===onBallD||z===c&&a===onBallD)&&!(c.dodge>0),R0=wall?0.95:0.75;
+    if(d<R0&&d>0.001){const p=(R0-d),ux=dx/d,uy=dy/d,ka=wall?(a===c?0.9:0.1):0.5;a.x-=ux*p*ka;a.y-=uy*p*ka;z.x+=ux*p*(1-ka);z.y+=uy*p*(1-ka);
+      if(wall){c.vx*=0.7;c.vy*=0.7}}}
   for(const e of E){if(e.role==="G")continue;for(const gx of [GL,GR]){const dx=e.x-gx,dy=e.y-GY,d=Math.hypot(dx,dy);if(d<3&&d>0.001){e.x=gx+dx/d*3;e.y=GY+dy/d*3}}
     if(e!==c)e.y=clamp(e.y,-1,FWD+1)}
   if(!G.sprintOn)G.boost=Math.min(1,G.boost+dt*.2);G.sprintOn=false;
@@ -1062,7 +1067,7 @@ function updateShotMeter(dt){const k=G.sm;if(!k)return;k.t+=dt;
     k.tu=clamp(k.tu+kx*1.6*dt,-1.5,1.5);k.tv=clamp(k.tv+ky*1.4*dt,0,1.45);
     const f=Math.min(1,dt*14);k.ru+=(k.tu-k.ru)*f;k.rv+=(k.tv-k.rv)*f;
     // the goalie reads your eyes: he slides toward wherever you're aiming
-    const far=clamp(k.D-8,0,14),gs=1.7+(k.sav-70)/50+far*0.05;k.gu+=clamp(clamp(k.ru*0.34,-0.8,0.8)+0.06*Math.sin(k.t*3.1)-k.gu,-gs*dt,gs*dt);   // he cheats toward your eyes but stays on his angle
+    const far=clamp(k.D-8,0,14),gs=1.7+(k.sav-70)/50+far*0.05;k.gu+=clamp(clamp(k.ru*0.37,-0.8,0.8)+0.06*Math.sin(k.t*3.1)-k.gu,-gs*dt,gs*dt);   // he cheats toward your eyes but stays on his angle
     // ...and he leans his stick head part of the way toward where you're aiming
     const ss=2.6+(k.sav-70)/40+far*0.065,tsu=k.gu+clamp((k.ru-k.gu)*0.4,-0.62,0.62),tsv=clamp(0.86+(k.rv-0.86)*0.4,0.15,0.92);
     k.su+=clamp(tsu-k.su,-ss*dt,ss*dt);k.sv+=clamp(tsv-k.sv,-ss*dt,ss*dt);
