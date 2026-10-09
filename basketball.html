@@ -121,11 +121,11 @@ const W=1120,H=540,FLOOR=478,G=1900,BR=19,HR=34,THREE=350,MATCH=60;
 const HOOPS=[{x:44,back:52,front:118,y:250},{x:W-44,back:W-52,front:W-118,y:250}];
 HOOPS.forEach(h=>{h.cx=(h.back+h.front)/2;h.lo=Math.min(h.back,h.front);h.hi=Math.max(h.back,h.front);h.toBoard=Math.sign(h.x-h.cx);h.net=0;});
 const CPU=[
-  {name:'Rookie',react:.24,acc:.5,fall:.8,con:1.1,cap:.7,swipe:.7,block:.22,jumpShot:.5},
-  {name:'Varsity',react:.15,acc:.66,fall:.6,con:.9,cap:.82,swipe:1.4,block:.42,jumpShot:.7},
-  {name:'All-State',react:.08,acc:.8,fall:.4,con:.7,cap:.9,swipe:2.2,block:.66,jumpShot:.9},
-  {name:'D1',react:.06,acc:.92,fall:.2,con:.45,cap:.96,swipe:2.8,block:.8,jumpShot:.95},
-  {name:'NBA',react:.04,acc:1,fall:0,con:.08,cap:.995,swipe:3.4,block:.92,jumpShot:1}];
+  {name:'Rookie',react:0.204,acc:.5,fall:.8,con:1.1,cap:.7,swipe:0.84,block:0.29,jumpShot:.5},
+  {name:'Varsity',react:0.128,acc:.66,fall:.6,con:.9,cap:.82,swipe:1.68,block:0.49,jumpShot:.7},
+  {name:'All-State',react:0.068,acc:.8,fall:.4,con:.7,cap:.9,swipe:2.64,block:0.73,jumpShot:.9},
+  {name:'D1',react:0.051,acc:.92,fall:.2,con:.45,cap:.88,swipe:3.36,block:0.87,jumpShot:.95},
+  {name:'NBA',react:0.034,acc:1.11,fall:.27,con:.1,cap:1,swipe:4.08,block:0.97,jumpShot:1}];
 const CHAM={name:'Chaminade',abbr:'CHAM',jersey:'#8f1229',trim:'#ffc72c',num:'#ffc72c',shoe:'#ffc72c'};
 const CHAM_W={name:'Chaminade',abbr:'CHAM',jersey:'#ffc72c',trim:'#8f1229',num:'#8f1229',shoe:'#8f1229'};
 
@@ -526,7 +526,7 @@ function gameBtns(h){document.getElementById('pauseBtn').hidden=h;document.getEl
 function mkPlayer(sel,side,team,cpu){
  const d=sel,s=d.s.slice();
  return{side,data:d,team,look:d.look,s,x:side?W/2+140:W/2-140,y:FLOOR,vx:0,vy:0,ground:true,facing:side?-1:1,speed:225+s[0]*36,jumpV:650+s[1]*44,shot:s[2],bodyH:clamp(42+(d.inch-72)*1.6,36,56),
-  pickupCD:0,swipeT:0,swipeCD:0,in:{l:0,r:0,j:0,s:0,t:0,f:0,x:0},prevS:0,prevF:0,prevX:0,xT:0,xCD:0,stunT:0,fakeT:0,fakeCD:0,fakeId:0,prevT:0,charging:false,charge:0,dashT:0,dashCD:0,dashDir:1,tapDir:0,tapT:-9,prevL:0,prevR:0,landT:0,shotT:0,px:0,py:0,anim:0,mood:0,moodK:'smile',cpu:cpu==null?null:{d:cpu},ai:{t:0,plan:null,gotAt:0,jumped:false}};
+  pickupCD:0,swipeT:0,swipeCD:0,in:{l:0,r:0,j:0,s:0,t:0,f:0,x:0,b:0},prevS:0,prevF:0,prevX:0,prevB:0,sbCD:0,xT:0,xCD:0,stunT:0,fakeT:0,fakeCD:0,fakeId:0,prevT:0,charging:false,charge:0,dashT:0,dashCD:0,dashDir:1,tapDir:0,tapT:-9,prevL:0,prevR:0,landT:0,shotT:0,px:0,py:0,anim:0,mood:0,moodK:'smile',cpu:cpu==null?null:{d:cpu},ai:{t:0,plan:null,gotAt:0,jumped:false}};
 }
 function start(cfg){
  audio();
@@ -554,7 +554,7 @@ const attack=p=>HOOPS[p.side===0?1:0];
 function updatePlayer(p,dt){
  if(p.dunkT>0){updateDunk(p,dt);if(p.mood>0)p.mood-=dt;return}
  const inp=p.in,g=game,b=g.ball,live=g.state==='play',moving=live||g.state==='scored';
- const pressS=inp.s&&!p.prevS,pressT=inp.t&&!p.prevT,pressF=inp.f&&!p.prevF,pressX=inp.x&&!p.prevX;p.prevS=inp.s;p.prevT=inp.t;p.prevF=inp.f;p.prevX=inp.x;p.fakeT-=dt;p.fakeCD-=dt;p.xT-=dt;p.xCD-=dt;
+ const pressS=inp.s&&!p.prevS,pressT=inp.t&&!p.prevT,pressF=inp.f&&!p.prevF,pressX=inp.x&&!p.prevX,pressB=inp.b&&!p.prevB;p.prevB=inp.b;p.sbCD-=dt;p.prevS=inp.s;p.prevT=inp.t;p.prevF=inp.f;p.prevX=inp.x;p.fakeT-=dt;p.fakeCD-=dt;p.xT-=dt;p.xCD-=dt;
  if(p.stunT>0){p.stunT-=dt;inp.l=inp.r=inp.j=inp.t=0}
  p.pickupCD-=dt;p.swipeT-=dt;p.swipeCD-=dt;if(p.mood>0)p.mood-=dt;
  const dir=moving?(inp.r?1:0)-(inp.l?1:0):0;
@@ -579,9 +579,10 @@ function updatePlayer(p,dt){
   // pump fake: sell the shot without letting it go, defenders nearby may jump at it
   if(pressF&&b.holder===p&&p.ground&&!p.charging&&p.fakeCD<=0){p.shotT=.3;p.fakeT=.4;p.fakeCD=.5;p.fakeId++;p.vx*=.3;sfx.dash()}
   if(pressX&&b.holder===p&&p.ground&&!p.charging&&p.xCD<=0)crossover(p,dir||p.facing);
+  if(pressB&&b.holder===p&&p.ground&&!p.charging&&p.sbCD<=0)stepback(p);
   if(b.holder!==p)p.charging=false;
   else if(p.cpu){if(pressS)shoot(p)}
-  else{if(pressS&&!p.charging){p.charging=true;p.charge=0}
+  else{if(pressS&&!p.charging&&!g.buzz){p.charging=true;p.charge=0}
    if(p.charging){p.charge+=dt/.5;if(!inp.s||p.charge>=1.08)release(p)}}
   // auto dunk
   if(b.holder===p&&!p.ground){const h=attack(p),hp=headPos(p);if(Math.abs(p.x-h.cx)<95&&hp.y<h.y+50&&Math.sign(h.cx-p.x)===h.toBoard){p.charging=false;dunk(p)}}
@@ -594,6 +595,10 @@ function crossover(p,d){const g=game;p.xT=.32;p.xCD=.8;p.facing=d;p.dashT=.18;p.
  for(const o of opponents(p)){if(!o.cpu||!o.ground||o.stunT>0||Math.abs(o.x-p.x)>110)continue;
   const onBall=o.slot===p.slot||opponents(p).length===1;
   if(Math.random()<CROSS_BITE[o.cpu.d]*(onBall?1:.6)){o.stunT=.75;o.vx=-d*150;o.mood=1;o.moodK='sad';const hp=headPos(o);pop(Math.random()<.5?'ANKLES!':'CROSSED UP!',o.x,hp.y-70,'#ffc72c',24,1);g.hype=Math.max(g.hype,.7)}}}
+// stepback: hop away from the rim to open up room for a jumper, still facing the hoop. A CPU defender may be slow to close out.
+function stepback(p){const g=game,h=attack(p),toR=Math.sign(h.cx-p.x)||p.facing;p.facing=toR;p.dashT=.2;p.dashDir=-toR;p.sbCD=.9;p.vy=-160;p.ground=false;sfx.dash();
+ for(const o of opponents(p)){if(!o.cpu||!o.ground||o.stunT>0||Math.abs(o.x-p.x)>110)continue;
+  if(Math.random()<CROSS_BITE[o.cpu.d]*.6){o.stunT=.45;o.vx=0;const hp=headPos(o);pop('STEPBACK!',p.x,headPos(p).y-80,'#ffc72c',22,.9)}}}
 function dash(p,d){p.dashT=.26;p.dashCD=.9;p.dashDir=d;p.facing=d;p.tapDir=0;sfx.dash();for(let i=0;i<5;i++)game.dust.push({x:p.x-d*10,y:FLOOR-4,vx:-d*(60+Math.random()*120),vy:-40-Math.random()*60,a:.6})}
 // Is a defender between the shooter and the rim with a hand up?
 // 0 = wide open, up to .7 = a defender right on you in the air with a hand up
@@ -605,7 +610,7 @@ function contested(p){return contestAmt(p)>.2}
 // Green window on the shot meter. Only a release inside it goes in. It is widest at the rim and shrinks with distance;
 // better shooters and jump shots get a little more, a hand in your face takes some away.
 function distK(p){return clamp(1.15-Math.abs(p.x-attack(p).cx)/700,.35,1.15)}
-const zone=p=>({c:.78,w:1.2*(.075+p.shot*.012)*distK(p)*(p.ground?1:1.1)*(1-contestAmt(p))*(p.meter>=1?2:1)});
+const zone=p=>({c:.78,w:1.2*(.075+p.shot*.012)*distK(p)*(p.ground?1:1.1)*(1-contestAmt(p))*(p.meter>=1?2.6:1)});
 function release(p){const z=zone(p),d=Math.abs(p.charge-z.c),hp=headPos(p);p.charging=false;let res;
  if(d<=z.w){res='make';pop(d<=z.w*.35?'PERFECT!':'GREEN!',p.x,hp.y-95,'#3ddc84',20,.8)}else{res=p.charge<z.c?'short':'long';pop(p.charge<z.c?'EARLY':'LATE',p.x,hp.y-95,'#ffb199',16,.7)}
  shoot(p,res)}
@@ -789,13 +794,13 @@ const FAKE_BITE=[.8,.55,.35,.18,.06];
 function think(p,dt){
  const D=CPU[p.cpu.d],A=p.ai,g=game,b=g.ball,h=attack(p),home=HOOPS[p.side];
  A.t-=dt;if(A.t>0)return;const iv=D.react*(.6+Math.random()*.8);A.t=iv;
- const inp={l:0,r:0,j:0,s:0,t:0,f:0,x:0,dash:0};
+ const inp={l:0,r:0,j:0,s:0,t:0,f:0,x:0,b:0,dash:0};
  const go=(tx,tol=10)=>{if(tx<p.x-tol)inp.l=1;else if(tx>p.x+tol)inp.r=1};
  const courtDir=Math.sign(W/2-h.cx),opp=opponents(p),mate=mates(p)[0],o=other(p);
  if(g.state==='countdown'){p.in=inp;return}
  if(p.dunkT>0){p.in=inp;return}
  if(b.holder===p){
-  if(!A.plan){const r=Math.random(),three=p.s[2]>=4?.42:.24;A.plan=r<three?'three':r<three+.36?'mid':'drive';A.spot=A.plan==='three'?THREE+20+Math.random()*60:A.plan==='mid'?140+Math.random()*130:30;A.jumped=false;A.gotAt=g.time}
+  if(!A.plan){const r=Math.random(),three=p.s[2]>=4?.42:.24;A.plan=r<three?'three':r<three+.36?'mid':'drive';A.spot=A.plan==='three'?THREE+20+Math.random()*60:A.plan==='mid'?140+Math.random()*130:30;A.jumped=false;A.stepped=false;A.gotAt=g.time}
   const held=g.time-A.gotAt,spotX=h.cx+courtDir*A.spot;
   // defender between me and the rim
   const front=opp.find(q=>Math.sign(q.x-p.x)===-courtDir&&Math.abs(q.x-p.x)<60);
@@ -812,7 +817,8 @@ function think(p,dt){
    const there=Math.abs(p.x-spotX)<22;
    if(!there&&held<3.2)go(spotX,8);
    if(there||held>3.2){
-    if(p.ground&&!A.jumped){A.jumped=true;if(Math.random()<D.jumpShot)inp.j=1;else inp.s=1}
+    if(p.ground&&!A.jumped&&front&&p.sbCD<=0&&!A.stepped&&Math.random()<.4){A.stepped=true;inp.b=1}
+    else if(p.ground&&!A.jumped){A.jumped=true;if(Math.random()<D.jumpShot)inp.j=1;else inp.s=1}
     else if(!p.ground&&p.vy>-140)inp.s=1;
     else if(p.ground&&A.jumped)inp.s=1;
    }
@@ -832,7 +838,7 @@ function think(p,dt){
   // my man: same slot on the other team (in 1-on-1 that's just the ball handler)
   const man=opp.find(q=>q.slot===p.slot)||opp[0],hd=b.holder;
   if(man===hd||opp.length===1){
-   const guardX=hd.x+Math.sign(home.cx-hd.x)*44;go(guardX,8);
+   const guardX=hd.x+Math.sign(home.cx-hd.x)*38;go(guardX,8);
    if(Math.abs(guardX-p.x)>260&&p.dashCD<=0&&Math.random()<.3*D.swipe)inp.dash=1;
    if(Math.abs(hd.x-p.x)<70&&Math.random()<D.swipe*iv*1.6)inp.t=1;
    if(!hd.ground&&hd.vy<0&&Math.abs(hd.x-p.x)<110&&Math.random()<D.block)inp.j=1;
@@ -862,11 +868,13 @@ function think(p,dt){
 }
 
 // ---------- input ----------
-const keys={};const touch=[{l:0,r:0,j:0,s:0,t:0,f:0,x:0},{l:0,r:0,j:0,s:0,t:0,f:0,x:0}];
+const keys={};const touch=[{l:0,r:0,j:0,s:0,t:0,f:0,x:0,b:0},{l:0,r:0,j:0,s:0,t:0,f:0,x:0,b:0}];
 // key bindings, changeable on the Controls screen
-const ACTIONS=[['l','Move left'],['r','Move right'],['j','Jump'],['s','Shoot (hold)'],['f','Pump fake'],['x','Crossover'],['t','Steal / pass']];
-const DEF_BINDS=[{l:'KeyA',r:'KeyD',j:'KeyW',s:'Space',f:'KeyS',x:'KeyQ',t:'KeyF'},{l:'ArrowLeft',r:'ArrowRight',j:'ArrowUp',s:'ArrowDown',f:'Period',x:'Comma',t:'ShiftRight'}];
-let binds=(()=>{const b=store.get('fhh_binds',null);return DEF_BINDS.map((d,i)=>Object.assign({},d,b&&b[i]||{}))})();
+const ACTIONS=[['l','Move left'],['r','Move right'],['j','Jump'],['s','Shoot (hold)'],['f','Pump fake'],['x','Crossover'],['b','Stepback'],['t','Steal / pass']];
+const DEF_BINDS=[{l:'KeyA',r:'KeyD',j:'KeyW',s:'Space',f:'KeyS',x:'KeyQ',b:'KeyE',t:'KeyF'},{l:'ArrowLeft',r:'ArrowRight',j:'ArrowUp',s:'ArrowDown',f:'Period',x:'Comma',b:'Slash',t:'ShiftRight'}];
+let binds=(()=>{const b=store.get('fhh_binds',null);return DEF_BINDS.map((d,i)=>{const sv=b&&b[i]||{},o=Object.assign({},d,sv);
+ // a newer action's default key may already be taken by a saved binding: leave it unbound instead of doubling up
+ for(const k in d)if(!(k in sv)&&Object.keys(sv).some(q=>sv[q]===d[k]))o[k]=null;return o})})();
 const keyName=c=>!c?'none':c.startsWith('Key')?c.slice(3):c.startsWith('Digit')?c.slice(5):({ArrowLeft:'←',ArrowRight:'→',ArrowUp:'↑',ArrowDown:'↓',Space:'Space',ShiftLeft:'Left Shift',ShiftRight:'Right Shift',ControlLeft:'Left Ctrl',ControlRight:'Right Ctrl',AltLeft:'Left Alt',AltRight:'Right Alt',Period:'.',Comma:',',Slash:'/',Semicolon:';',Quote:"'",BracketLeft:'[',BracketRight:']',Backslash:'\\',Minus:'-',Equal:'=',Enter:'Enter',Backquote:'`',Tab:'Tab'})[c]||c.replace(/^Numpad/,'Num ');
 const kb=(i,a)=>`<kbd>${keyName(binds[i][a])}</kbd>`;
 let rebind=null;
@@ -877,7 +885,7 @@ addEventListener('keydown',e=>{
 addEventListener('keyup',e=>{keys[e.code]=false});
 addEventListener('blur',()=>{for(const k in keys)keys[k]=false});
 function readInput(p){
- if(p.ctrl==null)return{l:0,r:0,j:0,s:0,t:0,f:0,x:0};
+ if(p.ctrl==null)return{l:0,r:0,j:0,s:0,t:0,f:0,x:0,b:0};
  const two=game.humans===2,t=touch[p.ctrl],me=binds[p.ctrl],alt=p.ctrl===0&&!two?binds[1]:null,o={};
  // playing the CPU alone, Player 2's keys work for Player 1 too
  for(const [a] of ACTIONS)o[a]=!!(keys[me[a]]||(alt&&keys[alt[a]])||t[a]);
@@ -889,7 +897,7 @@ function setTouch(mode){
  const pad=(p,arr)=>`<div class="pad">${arr.map(([k,l])=>`<button data-p="${p}" data-k="${k}" class="${k==='s'?'shoot':k==='t'?'steal':''}" aria-label="${l}">${l}</button>`).join('')}</div>`;
  const stl=game&&game.cfg.v2?'PASS STEAL':'STEAL';
  el.className=mode===2?'two':'';
- el.innerHTML=mode===2?pad(0,[['l','◀'],['r','▶'],['j','JUMP'],['f','FAKE'],['x','CROSS'],['t',stl],['s','SHOOT']])+pad(1,[['l','◀'],['r','▶'],['j','JUMP'],['f','FAKE'],['x','CROSS'],['t',stl],['s','SHOOT']]):pad(0,[['l','◀'],['r','▶']])+pad(0,[['f','FAKE'],['x','CROSS'],['t',stl],['j','JUMP'],['s','SHOOT']]);
+ el.innerHTML=mode===2?pad(0,[['l','◀'],['r','▶'],['j','JUMP'],['f','FAKE'],['x','CROSS'],['b','STEP'],['t',stl],['s','SHOOT']])+pad(1,[['l','◀'],['r','▶'],['j','JUMP'],['f','FAKE'],['x','CROSS'],['b','STEP'],['t',stl],['s','SHOOT']]):pad(0,[['l','◀'],['r','▶']])+pad(0,[['f','FAKE'],['x','CROSS'],['b','STEP'],['t',stl],['j','JUMP'],['s','SHOOT']]);
  el.hidden=false;
  el.querySelectorAll('button').forEach(bt=>{const p=+bt.dataset.p,k=bt.dataset.k;
   const on=e=>{e.preventDefault();audio();touch[p][k]=1;bt.classList.add('on');try{bt.setPointerCapture(e.pointerId)}catch(_){}};
@@ -897,7 +905,7 @@ function setTouch(mode){
   bt.addEventListener('pointerdown',on);bt.addEventListener('pointerup',off);bt.addEventListener('pointercancel',off);bt.addEventListener('lostpointercapture',off);
   bt.addEventListener('contextmenu',e=>e.preventDefault());});
 }
-function hideTouch(){document.getElementById('touch').hidden=true;touch.forEach(t=>t.l=t.r=t.j=t.s=t.t=t.f=t.x=0)}
+function hideTouch(){document.getElementById('touch').hidden=true;touch.forEach(t=>t.l=t.r=t.j=t.s=t.t=t.f=t.x=t.b=0)}
 
 // ---------- loop ----------
 let last=performance.now(),acc=0;const STEP=1/120;
@@ -919,8 +927,12 @@ function step(dt){
  for(const q of g.dust){q.x+=q.vx*dt;q.y+=q.vy*dt;q.vy+=300*dt;q.a-=dt*1.8}g.dust=g.dust.filter(q=>q.a>0);
  if(g.state==='countdown'){g.stT-=dt;if(g.stT<=0){g.state='play';g.ball.frozen=false;g.ball.vy=-260;sfx.whistle();pop('TIP-OFF!',W/2,130,'#ffc72c',28)}}
  else if(g.state==='play'){
-  if(!g.ot){g.t-=dt;if(g.t<=0){g.t=0;if(g.score[0]===g.score[1]){g.ot=true;sfx.buzzer();pop('OVERTIME',W/2,150,'#ffc72c',40,2);pop('Next bucket wins',W/2,190,'#ffffff',20,2)}else{endGame();return}}}
- }else if(g.state==='scored'){g.stT-=dt;if(g.stT<=0){if(g.ending||(!g.ot&&g.t<=0)){if(g.score[0]===g.score[1]){g.ot=true;resetAfterScore();pop('OVERTIME',W/2,150,'#ffc72c',40,2)}else endGame()}else resetAfterScore()}}
+  // at 0:00 a shot already in the air (or a shot or dunk already started) plays out before the horn ends it
+  if(!g.ot&&g.t>0)g.t-=dt;
+  if(!g.ot&&g.t<=0){g.t=0;const b=g.ball,live=(b.shot&&!b.holder)||g.players.some(p=>p.charging||p.dunkT>0);
+   if(!g.buzz){g.buzz=true;sfx.buzzer();if(live)pop('BEAT THE BUZZER?',W/2,150,'#ffc72c',30,1.6)}
+   if(live){}else if(g.score[0]===g.score[1]){g.ot=true;g.buzz=false;sfx.buzzer();pop('OVERTIME',W/2,150,'#ffc72c',40,2);pop('Next bucket wins',W/2,190,'#ffffff',20,2)}else{endGame();return}}
+ }else if(g.state==='scored'){g.stT-=dt;if(g.stT<=0){if(g.ending||(!g.ot&&g.t<=0)){if(g.score[0]===g.score[1]){g.ot=true;g.buzz=false;resetAfterScore();pop('OVERTIME',W/2,150,'#ffc72c',40,2)}else endGame()}else resetAfterScore()}}
  if(g.state==='over')return;
  for(const p of g.players){if(p.cpu)think(p,dt);else p.in=readInput(p);updatePlayer(p,dt)}
  // player vs player
@@ -1009,17 +1021,17 @@ function controlsScreen(){
 function howTo(){
  show(`<div class="eyebrow">How to play</div><h2>Get buckets. Get stops.</h2>
  <div class="keys">
-  ${[0,1].map(i=>`<div><h3>Player ${i+1}</h3><p>Move ${kb(i,'l')} ${kb(i,'r')} · Jump ${kb(i,'j')} · Shoot (hold) ${kb(i,'s')} · Pump fake ${kb(i,'f')} · Crossover ${kb(i,'x')} · Steal ${kb(i,'t')}</p>${i?'':`<p class="muted">Playing the CPU? Player 2's keys work too. Change any key under Controls.</p>`}</div>`).join('')}
+  ${[0,1].map(i=>`<div><h3>Player ${i+1}</h3><p>Move ${kb(i,'l')} ${kb(i,'r')} · Jump ${kb(i,'j')} · Shoot (hold) ${kb(i,'s')} · Pump fake ${kb(i,'f')} · Crossover ${kb(i,'x')} · Stepback ${kb(i,'b')} · Steal ${kb(i,'t')}</p>${i?'':`<p class="muted">Playing the CPU? Player 2's keys work too. Change any key under Controls.</p>`}</div>`).join('')}
   <div><h3>On a phone</h3><p>Use the on-screen buttons. Turn your phone sideways for the biggest court.</p></div>
  </div>
  <div class="keys">
   <div><h3>Shoot</h3><p>Grab the ball by touching it. Hold shoot to fill the shot meter and let go while it's in the green. Only a green release goes in; early or late is a miss. The green is biggest at the rim and shrinks the farther out you are. Jump shots and better shooters get a bit more green, and a defender in your face takes some away. Shots from past the 3PT line count for three.</p></div>
   <div><h3>Dunk</h3><p>Drive to the rim with the ball and jump. Get up near the rim and you'll throw down a tomahawk, windmill or two-hand jam, then hang on the rim.</p></div>
   <div><h3>2 on 2</h3><p>Press steal while you have the ball to pass to your teammate. With a CPU teammate you always control whoever has the ball. Defenders can pick off a lazy pass.</p></div>
-  <div><h3>Pump fake and crossover</h3><p>With the ball, pump fake to sell a shot and get a CPU defender to jump. Crossover whips the ball to your other hand with a quick burst and can leave a defender stumbling the wrong way. Both work less and less on the harder levels.</p></div>
+  <div><h3>Pump fake, crossover and stepback</h3><p>With the ball, pump fake to sell a shot and get a CPU defender to jump. Crossover whips the ball to your other hand with a quick burst and can leave a defender stumbling the wrong way. Stepback hops you away from your defender for room to shoot. They all work less and less on the harder levels.</p></div>
   <div><h3>Burst</h3><p>Double-tap left or right to burst for a short sprint. It recharges in about a second.</p></div>
   <div><h3>Defend</h3><p>Press steal next to the ball handler to swipe at the ball. Jump into a shot to block it with your big head.</p></div>
-  <div><h3>Flyer Shot</h3><p>Your Flyer Power bar fills over time and when you get scored on. When it glows, your next shot gets a green window twice as big, and a green release becomes a fireball.</p></div>
+  <div><h3>Flyer Shot</h3><p>Your Flyer Power bar fills over time and when you get scored on. When it glows, your next shot gets a huge green window, and a green release becomes a fireball. It only lasts for that one shot, made or missed, then the bar starts over.</p></div>
  </div>
  <div class="btns"><button class="btn" id="back">Back</button></div>`);
  on('#back',()=>mainMenu());
