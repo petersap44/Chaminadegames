@@ -90,6 +90,7 @@ kbd{font-family:var(--body);font-weight:800;background:#6b1616;border-radius:5px
 #touch .pad button.on{background:rgba(255,255,255,.55)}
 #touch.two .pad{gap:6px}
 #touch.two .pad button{width:50px;height:50px;font-size:10px}
+#menuBtn{position:fixed;bottom:max(10px,env(safe-area-inset-bottom,0px));left:calc(50% - 34px);transform:translateX(-100%);z-index:4;background:rgba(58,12,12,.8);border:2px solid var(--line);border-radius:10px;color:#fff;font-weight:800;padding:6px 12px}
 #pauseBtn{position:fixed;bottom:max(10px,env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);z-index:4;background:rgba(58,12,12,.8);border:2px solid var(--line);border-radius:10px;color:#fff;font-weight:800;padding:6px 12px}
 @media (prefers-reduced-motion:reduce){.btn{transition:none}}
 </style>
@@ -97,6 +98,7 @@ kbd{font-family:var(--body);font-weight:800;background:#6b1616;border-radius:5px
 <body>
 <div id="wrap"><canvas id="cv" aria-label="Basketball court"></canvas></div>
 <button id="pauseBtn" hidden aria-label="Pause">II</button>
+<button id="menuBtn" hidden aria-label="Back to main menu">&#9664; Menu</button>
 <div id="touch" hidden></div>
 <div id="ov" class="overlay"></div>
 
@@ -494,6 +496,7 @@ function hudPops(){
 
 // ---------- game ----------
 let game=null,paused=false,champCache=false;
+function gameBtns(h){document.getElementById('pauseBtn').hidden=h;document.getElementById('menuBtn').hidden=h}
 function mkPlayer(sel,side,team,cpu){
  const d=sel,s=d.s.slice();
  return{side,data:d,team,look:d.look,s,x:side?W/2+140:W/2-140,y:FLOOR,vx:0,vy:0,ground:true,facing:side?-1:1,speed:225+s[0]*36,jumpV:650+s[1]*44,shot:s[2],bodyH:clamp(42+(d.inch-72)*1.6,36,56),
@@ -510,7 +513,7 @@ function start(cfg){
  game={cfg,humans,players:P,t:MATCH,score:[0,0],state:'countdown',stT:3.2,ot:false,ending:false,ball:{x:W/2,y:170,vx:0,vy:0,rot:0,holder:null,shot:false,shooter:null,value:2,fire:false,ignoreP:null,ignoreT:0,frozen:true,rimTouch:false,dunk:false},
   pops:[],trail:[],dust:[],fx:[],slowT:0,time:0,hype:0,shake:0,st:[{pts:0,threes:0,dunks:0,blocks:0,steals:0,fga:0,fgm:0},{pts:0,threes:0,dunks:0,blocks:0,steals:0,fga:0,fgm:0}]};
  placeAll(80);
- paused=false;hideOverlay();setTouch(humans);document.getElementById('pauseBtn').hidden=false;
+ paused=false;hideOverlay();setTouch(humans);gameBtns(false);
  sfx.whistle();
 }
 function pop(text,x,y,col='#fff',size=26,life=1.1){game.pops.push({text,x,y,col,size,t:life,life})}
@@ -549,7 +552,7 @@ function updatePlayer(p,dt){
   if(b.holder!==p)p.charging=false;
   else if(p.cpu){if(pressS)shoot(p)}
   else{if(pressS&&!p.charging){p.charging=true;p.charge=0}
-   if(p.charging){p.charge+=dt/.8;if(!inp.s||p.charge>=1.08)release(p)}}
+   if(p.charging){p.charge+=dt/.5;if(!inp.s||p.charge>=1.08)release(p)}}
   // auto dunk
   if(b.holder===p&&!p.ground){const h=attack(p),hp=headPos(p);if(Math.abs(p.x-h.cx)<95&&hp.y<h.y+50&&Math.sign(h.cx-p.x)===h.toBoard){p.charging=false;dunk(p)}}
  } else p.charging=false;
@@ -561,7 +564,7 @@ function contested(p){const h=attack(p),hp=headPos(p),dirH=Math.sign(h.cx-p.x)||
 // Green window on the shot meter. Only a release inside it goes in. It is widest at the rim and shrinks with distance;
 // better shooters and jump shots get a little more, a hand in your face takes some away.
 function distK(p){return clamp(1.15-Math.abs(p.x-attack(p).cx)/700,.35,1.15)}
-const zone=p=>({c:.78,w:(.075+p.shot*.012)*distK(p)*(p.ground?1:1.1)*(contested(p)?.65:1)});
+const zone=p=>({c:.78,w:1.2*(.075+p.shot*.012)*distK(p)*(p.ground?1:1.1)*(contested(p)?.65:1)});
 function release(p){const z=zone(p),d=Math.abs(p.charge-z.c),hp=headPos(p);p.charging=false;let res;
  if(d<=z.w){res='make';pop(d<=z.w*.35?'PERFECT!':'GREEN!',p.x,hp.y-95,'#3ddc84',20,.8)}else{res=p.charge<z.c?'short':'long';pop(p.charge<z.c?'EARLY':'LATE',p.x,hp.y-95,'#ffb199',16,.7)}
  shoot(p,res)}
@@ -886,7 +889,7 @@ function render(t){
 // ---------- menus ----------
 const ov=document.getElementById('ov');
 const ovOpen=()=>!ov.hidden;
-function show(html){ov.innerHTML=`<div class="panel">${html}</div>`;ov.hidden=false;ov.scrollTop=0;hideTouch();document.getElementById('pauseBtn').hidden=true;
+function show(html){ov.innerHTML=`<div class="panel">${html}</div>`;ov.hidden=false;ov.scrollTop=0;hideTouch();gameBtns(true);
  ov.querySelectorAll('canvas[data-head]').forEach(c=>{const p=findP(c.dataset.head),d=Math.min(2,devicePixelRatio||1),sz=c.width;c.width=sz*d;c.height=sz*d;const x=c.getContext('2d');x.scale(d,d);drawHead(x,sz/2,sz/2+2,sz*.4,p.look,{pid:p.id,facing:1,ldx:.4,ldy:.1})});}
 function hideOverlay(){ov.hidden=true;ov.innerHTML=''}
 const findP=id=>{const m=/^r(\d*)_(.+)$/.exec(id);return ROSTER.find(p=>p.id===id)||rivalPlayer(m[2],m[1]?m[1]-1:0)};
@@ -1012,7 +1015,7 @@ function showResult(){
  const g=game,cfg=g.cfg,a=lead(0),c=lead(1),st=g.st,win=g.score[0]>g.score[1];
  const who=p=>{const tm=g.players.filter(q=>q.side===p.side);return tm.length>1?(p.data.first===p.data.last?p.data.last:tm.map(q=>q.data.last).join(' & ')):`${p.data.n} ${p.data.first===p.data.last?p.data.last:p.data.name}`};
  const line=(p,s)=>`${who(p)}: ${s.pts} pts${s.threes?`, ${s.threes} three${s.threes>1?'s':''}`:''}${s.dunks?`, ${s.dunks} dunk${s.dunks>1?'s':''}`:''}${s.steals?`, ${s.steals} steal${s.steals>1?'s':''}`:''}${s.blocks?`, ${s.blocks} block${s.blocks>1?'s':''}`:''}`;
- hideTouch();document.getElementById('pauseBtn').hidden=true;
+ hideTouch();gameBtns(true);
  let head,msg,btns='';
  if(cfg.mode==='2p'){head=g.score[0]>g.score[1]?'Red wins!':'Gold wins!';msg='Practice is over. Bring that energy to the next game.';btns=`<button class="btn gold" id="again">Rematch</button>`}
  else if(cfg.mode==='cpu'){head=win?'Flyers win!':`${c.team.name} wins`;msg=win?'Mineola is loud tonight.':'Shake it off. Run it back.';btns=`<button class="btn gold" id="again">Rematch</button>`}
@@ -1040,9 +1043,10 @@ function togglePause(){
  if(!game)return;paused=!paused;
  if(paused){show(`<div class="hero"><div class="eyebrow">Timeout</div><h1>Paused</h1><p class="muted">${game.score[0]} – ${game.score[1]} · ${game.ot?'Overtime':Math.ceil(game.t)+'s left'}</p></div><div class="btns"><button class="btn gold" id="res">Resume</button><button class="btn ghost" id="snd">Sound: ${muted?'Off':'On'}</button><button class="btn ghost" id="quit">Quit game</button></div>`);
   on('#res',()=>togglePause());on('#snd',el=>{muted=!muted;store.set('fhh_muted',muted);el.textContent='Sound: '+(muted?'Off':'On')});on('#quit',()=>{paused=false;mainMenu()})}
- else{hideOverlay();setTouch(game.humans);document.getElementById('pauseBtn').hidden=false}
+ else{hideOverlay();setTouch(game.humans);gameBtns(false)}
 }
 document.getElementById('pauseBtn').addEventListener('click',()=>togglePause());
+document.getElementById('menuBtn').addEventListener('click',()=>{audio();paused=false;mainMenu()});
 function confetti(){const cols=['#d62828','#ffffff','#ffc629'];const L=[];for(let i=0;i<160;i++)L.push({x:Math.random()*innerWidth,y:-Math.random()*innerHeight,v:2+Math.random()*3,c:cols[i%3],s:5+Math.random()*6,r:Math.random()*6});
  const k=document.createElement('canvas');k.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:9';k.width=innerWidth;k.height=innerHeight;document.body.appendChild(k);const x=k.getContext('2d');let n=0;
  (function f(){x.clearRect(0,0,k.width,k.height);for(const p of L){p.y+=p.v;p.x+=Math.sin(p.y/30);p.r+=.1;x.fillStyle=p.c;x.save();x.translate(p.x,p.y);x.rotate(p.r);x.fillRect(-p.s/2,-p.s/4,p.s,p.s/2);x.restore()}if(++n<360)requestAnimationFrame(f);else k.remove()})();}
