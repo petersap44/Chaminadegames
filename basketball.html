@@ -755,6 +755,8 @@ function endGame(){
 }
 
 // ---------- AI ----------
+// chance a CPU defender jumps at a pump fake, by level: Rookie bites most, NBA almost never
+const FAKE_BITE=[.8,.55,.35,.18,.06];
 function think(p,dt){
  const D=CPU[p.cpu.d],A=p.ai,g=game,b=g.ball,h=attack(p),home=HOOPS[p.side];
  A.t-=dt;if(A.t>0)return;const iv=D.react*(.6+Math.random()*.8);A.t=iv;
@@ -804,12 +806,12 @@ function think(p,dt){
    if(Math.abs(guardX-p.x)>260&&p.dashCD<=0&&Math.random()<.3*D.swipe)inp.dash=1;
    if(Math.abs(hd.x-p.x)<70&&Math.random()<D.swipe*iv*1.6)inp.t=1;
    if(!hd.ground&&hd.vy<0&&Math.abs(hd.x-p.x)<110&&Math.random()<D.block)inp.j=1;
-   if(hd.fakeT>0&&A.fake!==hd.fakeId&&p.ground&&Math.abs(hd.x-p.x)<120){A.fake=hd.fakeId;if(Math.random()<.75-p.cpu.d*.1)inp.j=1}
+   if(hd.fakeT>0&&A.fake!==hd.fakeId&&p.ground&&Math.abs(hd.x-p.x)<120){A.fake=hd.fakeId;if(Math.random()<FAKE_BITE[p.cpu.d])inp.j=1}
   }else{
    // off the ball: stay between my man and the rim, sagging toward the ball
    const gx=man.x+Math.sign(home.cx-man.x)*55;go(gx+(hd.x-gx)*.25,10);
    if(!hd.ground&&hd.vy<0&&Math.abs(hd.x-p.x)<100&&Math.random()<D.block*.7)inp.j=1;
-   if(hd.fakeT>0&&A.fake!==hd.fakeId&&p.ground&&Math.abs(hd.x-p.x)<110){A.fake=hd.fakeId;if(Math.random()<.5-p.cpu.d*.07)inp.j=1}
+   if(hd.fakeT>0&&A.fake!==hd.fakeId&&p.ground&&Math.abs(hd.x-p.x)<110){A.fake=hd.fakeId;if(Math.random()<FAKE_BITE[p.cpu.d]*.6)inp.j=1}
    if(Math.abs(hd.x-p.x)<50&&Math.random()<D.swipe*iv*.4)inp.t=1;
   }
  }else{
