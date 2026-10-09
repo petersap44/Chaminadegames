@@ -744,7 +744,8 @@ function updateLive(dt){
     if(e.route){const w=e.route[e.wp],sp=ySpd(e.p);
       if(w){
         // run the stem at full speed and plant hard at each break instead of rounding it off
-        const dx=w.x-e.x,dy=w.y-e.y,d=Math.hypot(dx,dy)||1,v=sp*(e.role==="RB"&&e.wp===0?0.62:1);
+        // never run a break past the back of the end zone
+        const dx=Math.min(w.x,117)-e.x,dy=w.y-e.y,d=Math.hypot(dx,dy)||1,v=sp*(e.role==="RB"&&e.wp===0?0.62:1);
         const k=Math.min(1,dt*(e.cut>0?22:11));e.vx+=(dx/d*v-e.vx)*k;e.vy+=(dy/d*v-e.vy)*k;e.x+=e.vx*dt;e.y+=e.vy*dt;
         if(e.cut>0)e.cut-=dt;
         if(d<0.7){e.wp++;const n=e.route[e.wp];if(n){const nd=Math.hypot(n.x-e.x,n.y-e.y)||1;e.vx=e.vx*0.35+(n.x-e.x)/nd*v*0.45;e.vy=e.vy*0.35+(n.y-e.y)/nd*v*0.45;e.cut=0.18}}
@@ -755,6 +756,9 @@ function updateLive(dt){
         moveToward(e,Math.max(G.lx+3,e.x-0.5),clamp(e.y+away*2,2,FW-2),away?sp*0.45:1.6,dt)}
       else{const last=e.route[e.route.length-1],prev=e.route[e.route.length-2]||{x:G.lx,y:e.y};
         let dx=last.x-prev.x,dy=last.y-prev.y;const n=Math.hypot(dx,dy)||1;dx/=n;dy/=n;
+        // deep in the end zone: stay in bounds and work across the back line instead of running out
+        if(e.x>111){if(!e.ezd)e.ezd=Math.sign(dy)||(e.y<FW/2?1:-1);if(e.y<4)e.ezd=1;if(e.y>FW-4)e.ezd=-1;
+          moveToward(e,Math.min(e.x,115.5),clamp(e.y+e.ezd*3,3,FW-3),sp*0.6,dt);e.x=Math.min(e.x,118);continue}
         // finish the route: crossers and outs bend upfield instead of running into the sideline
         const nearSide=(e.y<6&&dy<0)||(e.y>FW-6&&dy>0),crossed=Math.abs(e.y-G.sy)>12&&Math.sign(e.y-G.sy)===Math.sign(dy);
         if(nearSide||crossed){e.bend=Math.min(1,(e.bend||0)+dt*2.5)}
