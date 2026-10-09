@@ -953,20 +953,18 @@ function drawDodgeView(){const v=G.dv,W=VW*SCALE,H=VH*SCALE,g=sc,L=lookFor(v.d.t
   // the defender: leaning one way, showing his tell
   const r=v.stage===1?Math.min(1,v.t2/0.45):0,slide=v.stage===1&&v.ok?-v.side*r*300:0,grow=v.stage===1&&!v.ok?1+r*0.3:1;
   const cx=W/2+v.lean*40+slide,base=408,pole=!!d.p.pole,S=1.0*grow;
-  const pose=v.act==="check"?{crouch:0.12,l:[-26,-196],r:[46,-262],st0:[-26,-196],st1:[150,pole?-400:-350]}
-            :v.act==="push"?{crouch:0.3,l:[-60,-178],r:[60,-178],st0:[-120,-180],st1:[pole?200:160,-180]}
-            :{crouch:0.5,l:[-38,-140],r:[30,-128],st0:[-38,-140],st1:[pole?160:130,-40]};
+  // check: stick cocked up over his shoulder; push: both hands out in front; sit: low and wide, stick out at you
+  const pose=v.act==="check"?{crouch:0.18,l:[8,-206],r:[54,-268],over:pole?120:62,under:30}
+            :v.act==="push"?{crouch:0.3,l:[-54,-186],r:[46,-182],over:pole?110:60,under:34}
+            :{crouch:0.55,l:[-34,-150],r:[22,-126],over:pole?100:56,under:36};
   g.save();g.translate(cx,base);g.rotate(v.lean*0.05);g.scale(S,S);g.globalAlpha=v.stage===1&&v.ok?1-r*0.6:1;
-  bigPlayer(g,L,{num:d.p.num,hands:{l:pose.l,r:pose.r},crouch:pose.crouch});
-  const[a0,a1]=[pose.st0,pose.st1],dl=Math.hypot(a1[0]-a0[0],a1[1]-a0[1]);
-  bigStick(g,a0[0],a0[1],a1[0],a1[1],pole?40:44,46,pole?"#9aa0a8":"#e4e4e4",false);
-  bigGlove(g,pose.l[0],pose.l[1],L.glove);bigGlove(g,pose.r[0],pose.r[1],L.glove);
+  bigPlayer(g,L,{num:d.p.num,hands:{l:pose.l,r:pose.r},crouch:pose.crouch,stick:{top:"r",over:pose.over,under:pose.under,hw:pole?40:44,hl:46,shaft:pole?"#9aa0a8":"#e4e4e4"}});
   g.restore();g.globalAlpha=1;
   // your stick and gloves, first person (cradling the ball)
   const hand=v.c.hand||1,ME=lookFor(v.c.team),sw=v.stage===1?v.side*Math.min(1,v.t2/0.3)*140:0,bob=Math.sin(G.time*9)*6;
   const hx=W/2+hand*250+sw,hy=H-150+bob;
   bigStick(g,W/2+hand*190+sw,H-40,hx+hand*26,H-280+bob,58,62,"#e4e4e4",true);
-  bigGlove(g,W/2+hand*196+sw,H-84,ME.glove,1.5);bigGlove(g,hx,hy,ME.glove,1.5);
+  bigGlove(g,W/2+hand*196+sw,H-84,ME.helmet,1.5,-Math.PI/2-hand*0.25,ME.glove);bigGlove(g,hx,hy,ME.helmet,1.5,-Math.PI/2-hand*0.15,ME.glove);
   // header, tell, timer
   g.fillStyle="rgba(0,0,0,.8)";g.fillRect(0,0,W,58);
   txt("BEAT #"+d.p.num+" "+d.p.last.toUpperCase().slice(0,12),16,10,12,"#ffd640");
@@ -1133,9 +1131,9 @@ function limbPath(g,pts,ws){ // a smooth tapered limb through points with widths
   for(let i=0;i<pts.length;i++){const p=pts[i],q=pts[Math.min(pts.length-1,i+1)],o=pts[Math.max(0,i-1)];
     let dx=q[0]-o[0],dy=q[1]-o[1];const d=Math.hypot(dx,dy)||1;dx/=d;dy/=d;const w=ws[i]/2;L.push([p[0]-dy*w,p[1]+dx*w]);R.push([p[0]+dy*w,p[1]-dx*w])}
   g.beginPath();g.moveTo(L[0][0],L[0][1]);for(let i=1;i<L.length;i++)g.lineTo(L[i][0],L[i][1]);
-  const e=pts[pts.length-1],we=ws[ws.length-1]/2;g.arc(e[0],e[1],we,Math.atan2(L[L.length-1][1]-e[1],L[L.length-1][0]-e[0]),Math.atan2(R[R.length-1][1]-e[1],R[R.length-1][0]-e[0]),false);
+  const e=pts[pts.length-1],we=ws[ws.length-1]/2;g.arc(e[0],e[1],we,Math.atan2(L[L.length-1][1]-e[1],L[L.length-1][0]-e[0]),Math.atan2(R[R.length-1][1]-e[1],R[R.length-1][0]-e[0]),true);
   for(let i=R.length-1;i>=0;i--)g.lineTo(R[i][0],R[i][1]);
-  const s=pts[0],ws0=ws[0]/2;g.arc(s[0],s[1],ws0,Math.atan2(R[0][1]-s[1],R[0][0]-s[0]),Math.atan2(L[0][1]-s[1],L[0][0]-s[0]),false);g.closePath();
+  const s=pts[0],ws0=ws[0]/2;g.arc(s[0],s[1],ws0,Math.atan2(R[0][1]-s[1],R[0][0]-s[0]),Math.atan2(L[0][1]-s[1],L[0][0]-s[0]),true);g.closePath();
 }
 function fillLimb(g,pts,ws,col,shadeSide){limbPath(g,pts,ws);const a=pts[0],b=pts[pts.length-1],gr=g.createLinearGradient(a[0]-20,0,a[0]+20,0);
   gr.addColorStop(0,shade(col,shadeSide<0?-.22:.06));gr.addColorStop(1,shade(col,shadeSide<0?.04:-.2));g.fillStyle=gr;g.fill();g.lineWidth=2.5;g.strokeStyle=INK;g.stroke()}
@@ -1172,21 +1170,33 @@ function bigPlayer(g,L,o){
   if(o.num!=null&&o.num!==""){const ny=back?shY+70:shY+62;g.textAlign="center";g.textBaseline="middle";
     if(back&&o.name){g.font='11px "Press Start 2P", monospace';g.lineWidth=4;g.strokeStyle=INK;g.strokeText(o.name,0,shY+28);g.fillStyle=L.num;g.fillText(o.name,0,shY+28)}
     g.font=(back?34:gk?20:26)+'px "Press Start 2P", monospace';g.lineWidth=5;g.strokeStyle=INK;g.strokeText(String(o.num),0,ny);g.fillStyle=L.num;g.fillText(String(o.num),0,ny)}
-  // ---- arms: sleeve, arm pad, elbow pad, gloves come later (drawn by the caller over the stick)
-  const arm=(s,h)=>{const sx=s*(sw-8),sy=shY+12,U=58,F=56;let dx=h[0]-sx,dy=h[1]-sy,d=Math.hypot(dx,dy);if(d>U+F-2){h=[sx+dx/d*(U+F-2),sy+dy/d*(U+F-2)];dx=h[0]-sx;dy=h[1]-sy;d=U+F-2}
+  // ---- arms: shoulder pad under the sleeve, bare biceps, padded elbow and forearm (team color)
+  const pad=L.helmet,hand={};
+  const arm=(s,h)=>{const sx=s*(sw-10),sy=shY+12,U=60,F=58;let dx=h[0]-sx,dy=h[1]-sy,d=Math.hypot(dx,dy);if(d>U+F-2){h=[sx+dx/d*(U+F-2),sy+dy/d*(U+F-2)];dx=h[0]-sx;dy=h[1]-sy;d=U+F-2}
+    if(d<30){h=[sx+(dx||s)/(d||1)*30,sy+dy/(d||1)*30];dx=h[0]-sx;dy=h[1]-sy;d=30}
     const a=Math.atan2(dy,dx),cA=Math.acos(Math.max(-1,Math.min(1,(U*U+d*d-F*F)/(2*U*d))));
     const e1=[sx+Math.cos(a+cA)*U,sy+Math.sin(a+cA)*U],e2=[sx+Math.cos(a-cA)*U,sy+Math.sin(a-cA)*U];
-    const sc_=e=>e[1]+s*e[0]*0.2,[ex,ey]=sc_(e1)>=sc_(e2)?e1:e2;   // elbows hang down and out
-    fillLimb(g,[[sx,sy],[ex,ey]],[22,17],skin,s);
-    fillLimb(g,[[sx,sy],[sx+(ex-sx)*0.42,sy+(ey-sy)*0.42]],[30,26],L.jersey,s);              // short sleeve
-    fillLimb(g,[[ex,ey],[h[0],h[1]]],[17,14],"#2a2a30",s);                                  // arm guard
-    g.fillStyle="#34343c";g.beginPath();g.ellipse(ex,ey,9,8,0,0,Math.PI*2);g.fill();g.lineWidth=2.5;g.strokeStyle=INK;g.stroke();
-    g.fillStyle="rgba(255,255,255,.18)";g.fillRect(ex-6,ey-7,8,3)};
-  arm(-1,o.hands.l);arm(1,o.hands.r);
-  // shoulder pad caps under the jersey
+    const sc_=e=>e[1]+s*e[0]*0.35,[ex,ey]=sc_(e1)>=sc_(e2)?e1:e2;   // elbows tuck down and out, like a real grip
+    fillLimb(g,[[sx,sy],[ex,ey]],[24,20],skin,s);                                                   // biceps
+    fillLimb(g,[[sx-s*3,sy-2],[sx+(ex-sx)*0.36,sy+(ey-sy)*0.36]],[32,27],L.jersey,s);                   // sleeve over the shoulder pad
+    g.strokeStyle=L.num;g.lineWidth=3;const mx=sx+(ex-sx)*0.36,my=sy+(ey-sy)*0.36,ua=Math.atan2(ey-sy,ex-sx);
+    g.beginPath();g.moveTo(mx-Math.sin(ua)*13,my+Math.cos(ua)*13);g.lineTo(mx+Math.sin(ua)*13,my-Math.cos(ua)*13);g.stroke();   // sleeve trim
+    fillLimb(g,[[ex,ey],[ex+(h[0]-ex)*0.55,ey+(h[1]-ey)*0.55],[h[0],h[1]]],[24,22,20],pad,s);      // arm guard
+    g.strokeStyle=shade(pad,-.35);g.lineWidth=1.6;const fa=Math.atan2(h[1]-ey,h[0]-ex);
+    for(const t of[0.3,0.55]){const px=ex+(h[0]-ex)*t,py=ey+(h[1]-ey)*t;g.beginPath();g.moveTo(px-Math.sin(fa)*10,py+Math.cos(fa)*10);g.lineTo(px+Math.sin(fa)*10,py-Math.cos(fa)*10);g.stroke()}
+    g.save();g.translate(ex,ey);g.rotate(fa);const eg=g.createRadialGradient(-3,-4,1,0,0,15);eg.addColorStop(0,shade(pad,.45));eg.addColorStop(1,shade(pad,-.15));
+    g.fillStyle=eg;g.beginPath();g.ellipse(1,0,11,12.5,0,0,Math.PI*2);g.fill();g.lineWidth=2.5;g.strokeStyle=INK;g.stroke();g.restore();   // elbow cap
+    return{x:h[0],y:h[1],a:fa}};
+  hand.l=arm(-1,o.hands.l);hand.r=arm(1,o.hands.r);
+  // ---- the stick runs through both hands; gloves wrap over it
+  let head=null;
+  if(o.stick){const k=o.stick,T=hand[k.top||"r"],B=hand[k.top==="l"?"r":"l"];let ux=T.x-B.x,uy=T.y-B.y;const ul=Math.hypot(ux,uy)||1;ux/=ul;uy/=ul;
+    const x1=T.x+ux*k.over,y1=T.y+uy*k.over;bigStick(g,B.x-ux*k.under,B.y-uy*k.under,x1,y1,k.hw,k.hl,k.shaft||"#e4e4e4",k.ball);head=[x1+ux*k.hl*0.5,y1+uy*k.hl*0.5]}
+  for(const h of[hand.l,hand.r])bigGlove(g,h.x,h.y,pad,1,h.a,L.glove);
   // ---- neck and helmet
   g.fillStyle=shade(skin,-.12);g.fillRect(-10,headY+22,20,16);
   bigHelmet(g,L,headY,skin,back,gk);
+  return{head,hand};
 }
 function bigHelmet(g,L,y,skin,back,gk){
   const sh=L.helmet;
@@ -1214,14 +1224,19 @@ function bigHelmet(g,L,y,skin,back,gk){
   g.strokeStyle=L.cage;g.lineWidth=2.6;
   for(const x of[-15,-7.5,0,7.5,15]){g.beginPath();g.moveTo(x*1.25,y-6);g.quadraticCurveTo(x*1.15,y+16,x*0.55,y+32);g.stroke()}
   for(const [yy,w] of [[y+9,22],[y+22,17]]){g.beginPath();g.moveTo(-w,yy);g.quadraticCurveTo(0,yy+3,w,yy);g.stroke()}
-  g.fillStyle="#1d1d22";g.beginPath();g.ellipse(0,y+32,10,5,0,0,Math.PI*2);g.fill();          // chin cup
-  if(gk){g.fillStyle="rgba(230,235,240,.75)";g.beginPath();g.moveTo(-12,y+36);g.lineTo(12,y+36);g.lineTo(9,y+56);g.quadraticCurveTo(0,y+60,-9,y+56);g.closePath();g.fill();g.lineWidth=2;g.strokeStyle=INK;g.stroke()}   // throat guard
+  g.fillStyle=shade(sh,-.35);g.beginPath();g.ellipse(0,y+31,7,3.5,0,0,Math.PI*2);g.fill();          // chin cup
+  if(gk){g.fillStyle="rgba(225,235,245,.45)";g.beginPath();g.moveTo(-9,y+34);g.lineTo(9,y+34);g.lineTo(7,y+46);g.quadraticCurveTo(0,y+49,-7,y+46);g.closePath();g.fill();g.lineWidth=1.5;g.strokeStyle="rgba(20,15,24,.6)";g.stroke()}   // clear throat guard
 }
-function bigGlove(g,x,y,col,s=1){g.save();g.translate(x,y);g.scale(s,s);
-  g.fillStyle=shade(col,-.18);rrect(g,-12,4,24,16,5);g.fill();g.lineWidth=2.5;g.strokeStyle=INK;g.stroke();       // cuff
-  const gr=g.createLinearGradient(0,-14,0,10);gr.addColorStop(0,shade(col,.25));gr.addColorStop(1,shade(col,-.12));
-  g.fillStyle=gr;rrect(g,-14,-14,28,22,9);g.fill();g.stroke();
-  g.strokeStyle=shade(col,-.3);g.lineWidth=1.5;for(const x2 of[-6,0,6]){g.beginPath();g.moveTo(x2,-12);g.lineTo(x2,-4);g.stroke()}
+function bigGlove(g,x,y,col,s=1,a=-Math.PI/2,trim){g.save();g.translate(x,y);g.rotate(a);g.scale(s,s);
+  g.lineWidth=2.5;g.strokeStyle=INK;g.lineJoin="round";
+  g.fillStyle=shade(col,-.12);g.beginPath();g.moveTo(-40,-14);g.lineTo(-14,-12);g.lineTo(-14,12);g.lineTo(-40,14);g.quadraticCurveTo(-44,0,-40,-14);g.closePath();g.fill();g.stroke();   // cuff
+  if(trim){g.fillStyle=trim;g.fillRect(-24,-12.5,5,25)}
+  const gr=g.createLinearGradient(0,-14,0,14);gr.addColorStop(0,shade(col,.3));gr.addColorStop(1,shade(col,-.15));
+  g.fillStyle=gr;rrect(g,-18,-14,20,28,7);g.fill();g.stroke();                                       // back of the hand
+  g.fillStyle=shade(col,.12);rrect(g,-3,-13,13,26,6);g.fill();g.stroke();                            // fingers, curled over the shaft
+  g.strokeStyle=shade(col,-.35);g.lineWidth=1.5;for(const yy of[-6.5,0,6.5]){g.beginPath();g.moveTo(-1,yy);g.lineTo(8,yy);g.stroke()}
+  g.fillStyle=shade(col,-.05);g.beginPath();g.ellipse(-8,13,7,5,0.3,0,Math.PI*2);g.fill();g.lineWidth=2.2;g.strokeStyle=INK;g.stroke();   // thumb
+  g.fillStyle="rgba(255,255,255,.25)";g.fillRect(-15,-10,9,3);
   g.restore()}
 /* A stick: shaft from (x0,y0) to the head at (x1,y1); the head is drawn square to the shaft. */
 function bigStick(g,x0,y0,x1,y1,hw,hl,shaft,ball){
@@ -1266,15 +1281,15 @@ function drawNetScene(k,O,gnum){const W=VW*SCALE,H=VH*SCALE,g=sc;
   pipe(x0-5,y1,x0-5,yL-5);pipe(x1+5,y1,x1+5,yR-5);pipe(x0-5,yL-5,x1+5,yR-5);
   // goalie
   const gx=netX(k.gu),gsx=0.35+0.65*NV.sq,S=0.82;
-  const sx=netX(k.su),sy=netY(k.sv,k.su),stickRight=sx>=gx;
-  const top=[(stickRight?44:-44),-212],low=[(stickRight?-16:16),-156];   // local units: top hand by the stick side, bottom hand across the body
+  const sx=netX(k.su),sy=netY(k.sv,k.su);
+  // in his own units: the stick head goes where the stick should be, and he sinks lower for low shots
+  const tx=clamp((sx-gx)/(S*gsx),-150,170),ty=clamp((sy-y1)/S,-310,-40),cr=0.3+0.4*clamp((ty+170)/130,0,1);
+  const px=-4,py=-150+cr*36-14;let ux=tx-px,uy=ty-py;const ul=Math.hypot(ux,uy)||1;ux/=ul;uy/=ul;
+  const ex=tx-ux*34,ey=ty-uy*34;   // throat of the head
   g.save();g.translate(gx,y1);g.scale(S*gsx,S);
-  bigPlayer(g,O,{goalie:true,num:gnum,hands:{l:stickRight?low:top,r:stickRight?top:low},crouch:0.25});
+  bigPlayer(g,O,{goalie:true,num:gnum,crouch:cr,hands:{r:[ex-ux*16,ey-uy*16],l:[ex-ux*92,ey-uy*92]},
+    stick:{top:"r",over:16,under:uy>0.3?18:50,hw:62,hl:62,shaft:"#d8d8d8"}});
   g.restore();
-  const hx=gx+top[0]*S*gsx,hy=y1+top[1]*S,bx=gx+low[0]*S*gsx,by=y1+low[1]*S;
-  const dx=sx-bx,dy=sy-by,dl=Math.hypot(dx,dy)||1;
-  bigStick(g,bx,by,sx-dx/dl*26,sy-dy/dl*26,60,58,"#d8d8d8",false);
-  bigGlove(g,bx,by,O.glove,0.9);bigGlove(g,hx,hy,O.glove,0.9);
   return{x0,x1,y0,y1,yL,yR};
 }
 function drawShotView(){const k=G.sm,W=VW*SCALE,H=VH*SCALE,g=sc;
@@ -1354,12 +1369,11 @@ function drawGKView(){const m=G.gm,k=m.k,W=VW*SCALE,H=VH*SCALE,g=sc;
   const SS=1.3,sw_=Math.min(1.25,wind);
   const top=[side*(70-sw_*20),-300+sw_*40],low=[side*(10+sw_*30),-236+sw_*20];
   g.save();g.translate(bx,by+150);g.scale(SS,SS);g.rotate(side*sw_*0.08);
-  bigPlayer(g,O,{back:true,num:k.sh.p.num||"",name:"",hands:{l:side<0?top:low,r:side<0?low:top},crouch:0.2});
+  const bp=bigPlayer(g,O,{back:true,num:k.sh.p.num||"",name:"",hands:{l:side<0?top:low,r:side<0?low:top},crouch:0.2,
+    stick:{top:side<0?"l":"r",over:70,under:24,hw:40,hl:44,ball:m.state==="wait"||m.state==="aim"}});
   g.restore();
   const T=p=>[bx+(p[0]*Math.cos(side*sw_*0.08)-p[1]*Math.sin(side*sw_*0.08))*SS,by+150+(p[0]*Math.sin(side*sw_*0.08)+p[1]*Math.cos(side*sw_*0.08))*SS];
-  const [tx_,ty_]=T(top),[lx_,ly_]=T(low),ang=-1.9+sw_*1.5,ex=tx_+Math.cos(ang)*side*150,ey=ty_+Math.sin(ang)*150-40,sx=lx_,sy=ly_;
-  bigStick(g,lx_,ly_,ex,ey,40,44,"#e4e4e4",m.state==="wait"||m.state==="aim");
-  bigGlove(g,lx_,ly_,O.glove,SS);bigGlove(g,tx_,ty_,O.glove,SS);
+  const [ex,ey]=T(bp.head);
   // his eyes: a faint red marker drifting toward where he's looking (it fades as shooters get better)
   if(m.state==="aim"){const rx=netX(k.ru),ry=netY(k.rv,k.ru);g.globalAlpha=Math.max(0.12,k.tell);g.strokeStyle="#ff3b30";g.lineWidth=3;g.beginPath();g.arc(rx,ry,18,0,Math.PI*2);g.stroke();g.globalAlpha=1}
   // the ball
