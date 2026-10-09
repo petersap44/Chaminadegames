@@ -121,11 +121,11 @@ const W=1120,H=540,FLOOR=478,G=1900,BR=19,HR=34,THREE=350,MATCH=60;
 const HOOPS=[{x:44,back:52,front:118,y:250},{x:W-44,back:W-52,front:W-118,y:250}];
 HOOPS.forEach(h=>{h.cx=(h.back+h.front)/2;h.lo=Math.min(h.back,h.front);h.hi=Math.max(h.back,h.front);h.toBoard=Math.sign(h.x-h.cx);h.net=0;});
 const CPU=[
-  {name:'Rookie',react:.24,acc:.5,swipe:.7,block:.22,jumpShot:.5},
-  {name:'Varsity',react:.15,acc:.62,swipe:1.4,block:.42,jumpShot:.7},
-  {name:'All-State',react:.08,acc:.74,swipe:2.2,block:.66,jumpShot:.9},
-  {name:'D1',react:.06,acc:.82,swipe:2.8,block:.8,jumpShot:.95},
-  {name:'NBA',react:.04,acc:.9,swipe:3.4,block:.92,jumpShot:1}];
+  {name:'Rookie',react:.24,acc:.5,fall:.8,con:1.1,cap:.7,swipe:.7,block:.22,jumpShot:.5},
+  {name:'Varsity',react:.15,acc:.66,fall:.6,con:.9,cap:.82,swipe:1.4,block:.42,jumpShot:.7},
+  {name:'All-State',react:.08,acc:.8,fall:.4,con:.7,cap:.9,swipe:2.2,block:.66,jumpShot:.9},
+  {name:'D1',react:.06,acc:.92,fall:.2,con:.45,cap:.96,swipe:2.8,block:.8,jumpShot:.95},
+  {name:'NBA',react:.04,acc:1,fall:0,con:.08,cap:.995,swipe:3.4,block:.92,jumpShot:1}];
 const CHAM={name:'Chaminade',abbr:'CHAM',jersey:'#8f1229',trim:'#ffc72c',num:'#ffc72c',shoe:'#ffc72c'};
 const CHAM_W={name:'Chaminade',abbr:'CHAM',jersey:'#ffc72c',trim:'#8f1229',num:'#8f1229',shoe:'#8f1229'};
 
@@ -617,8 +617,8 @@ function shoot(p,res){
  if(Math.abs(p.x-h.cx)<130)b.x=h.front-h.toBoard*(BR+44);
  const dist=Math.abs(p.x-h.cx),ca=contestAmt(p),con=ca>.2;
  if(con)pop(ca>.45?'SMOTHERED':'CONTESTED',p.x,hp.y-60,'#ff9b8e',16,.8);
- // the CPU has no meter: it "hits the green" with a chance set by its level, the distance and the defense
- if(!res){const D=CPU[p.cpu?p.cpu.d:1];res=Math.random()<clamp(D.acc*distK(p)*(.85+p.shot*.05)*(p.ground?1:1.05)*(1-ca*1.1)*(p.meter>=1?1.35:1),.03,.88)?'make':Math.random()<.5?'short':'long'}
+ // the CPU has no meter: it "hits the green" with a chance set by its level, the distance and the defense. NBA almost never misses.
+ if(!res){const D=CPU[p.cpu?p.cpu.d:1];const dk=1-(1-distK(p)/1.15)*D.fall,sk=D.fall?(.85+p.shot*.05):1;res=Math.random()<clamp(D.acc*dk*sk*(p.ground?1:1.05)*(1-ca*D.con)*(p.meter>=1?1.35:1),.03,D.cap)?'make':Math.random()<.5?'short':'long'}
  const fire=p.meter>=1&&res==='make';if(p.meter>=1){p.meter=0;if(fire){sfx.fire();pop('FLYER SHOT!',p.x,hp.y-70,'#ffc72c',24)}}
  let tx=h.cx+h.toBoard*3,ty=h.y-3;
  // a miss is aimed to clank off the front rim (early) or the back rim (late)
