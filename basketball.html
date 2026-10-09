@@ -923,6 +923,7 @@ const statBars=s=>`<div class="bars">${['Speed','Hops','Shooting'].map((l,i)=>`<
 function seasonState(){return store.get('fhh_season',{i:0,res:[],scores:[],pid:'c25',champ:false})}
 function saveSeason(s){store.set('fhh_season',s);if(champCache!==!!s.champ)layers=null;champCache=!!s.champ}
 
+const seasonLvl=nx=>clamp(Math.min(2,RIVALS[nx.opp].d+(nx.boost||0))+clamp(store.get('fhh_diff',1),0,CPU.length-1)-1,0,CPU.length-1);
 function mainMenu(){
  game=null;
  const s=seasonState();
@@ -939,13 +940,14 @@ function mainMenu(){
   <button class="mode" id="m-2p"><b>2 Players</b><span>Flyers practice scrimmage on one keyboard or one phone.</span></button>
   <button class="mode" id="m-how"><b>How to Play</b><span>Controls, dunks, steals and the Flyer Shot.</span></button>
  </div>
- <div class="btns"><a class="btn ghost" href="index.html" style="text-decoration:none">&#9664; All Chaminade games</a><button class="btn ghost" id="m-snd">Sound: ${muted?'Off':'On'}</button></div>
+ <div class="btns"><button class="btn gold" id="m-diff">Difficulty: ${CPU[clamp(store.get('fhh_diff',1),0,CPU.length-1)].name}</button><a class="btn ghost" href="index.html" style="text-decoration:none">&#9664; All Chaminade games</a><button class="btn ghost" id="m-snd">Sound: ${muted?'Off':'On'}</button></div>
  <p class="foot">Players are from the 2025-26 Chaminade varsity roster posted by <a href="https://athletics.chaminade-hs.org/sports/mens-basketball/roster" target="_blank" rel="noopener">Chaminade Athletics</a>. Heads are cartoons, not likenesses, and the ratings are made up for the game. Unofficial fan game.</p>`);
  on('#m-season',()=>seasonHub());
  on('#m-cpu',()=>pickPlayer({mode:'cpu',title:'Pick your Flyer',sel:s.pid,next:pid=>pickOpponent(pid)}));
  on('#m-2p',()=>pickPlayer({mode:'2p',title:'Player 1: pick your Flyer',sel:'c25',next:p1=>pickPlayer({mode:'2p',title:'Player 2: pick your Flyer',sel:'c15',taken:p1,next:p2=>start({p1:findP(p1),p2:findP(p2),t1:CHAM,t2:CHAM_W,cpu:null,mode:'2p',tag:'PRACTICE SCRIMMAGE',vsLine:'Maroon vs. Gold'})})}));
  on('#m-how',()=>howTo());
  on('#m-2v2',()=>twoOnTwo());
+ on('#m-diff',el=>{const d=(clamp(store.get('fhh_diff',1),0,CPU.length-1)+1)%CPU.length;store.set('fhh_diff',d);el.textContent='Difficulty: '+CPU[d].name});
  on('#m-snd',el=>{muted=!muted;store.set('fhh_muted',muted);el.textContent='Sound: '+(muted?'Off':'On')});
 }
 
@@ -1021,11 +1023,11 @@ function seasonHub(){
  const nx=SEASON[Math.min(s.i,SEASON.length-1)];
  show(`<div class="eyebrow">Road to the Crown</div><h2>Flyers season · ${w}-${l}</h2>
  ${done?`<div class="story"><h3>${s.champ?'CHSAA CHAMPIONS':'Season complete'}</h3><p>${s.champ?`The banner is going up in Mineola. ${p.name} and the Flyers finished ${w}-${l} and won it all.`:'The season is over.'}</p></div>`:
- `<div class="story"><div class="eyebrow" style="color:#ffe9c2">${nx.tag}</div><h3>vs. ${RIVALS[nx.opp].name}</h3><p>${nx.blurb}</p><p style="color:#ffe9c2">CPU level: ${CPU[Math.min(2,RIVALS[nx.opp].d+(nx.boost||0))].name}</p></div>`}
+ `<div class="story"><div class="eyebrow" style="color:#ffe9c2">${nx.tag}</div><h3>vs. ${RIVALS[nx.opp].name}</h3><p>${nx.blurb}</p><p style="color:#ffe9c2">CPU level: ${CPU[seasonLvl(nx)].name}</p></div>`}
  <div class="btns">${done?`<button class="btn gold" id="reset">Start a new season</button>`:`<button class="btn gold" id="play">Play as ${p.name}</button><button class="btn ghost" id="swap">Change Flyer</button>`}<button class="btn ghost" id="back">Main menu</button></div>
  <div class="sched">${SEASON.map((g,i)=>{const r=s.res[i],sc=s.scores[i];return`<div class="game${i===s.i?' next':''}"><div class="res ${r||''}">${r||(i===s.i?'▶':'·')}</div><div style="min-width:0"><div class="tag">${g.tag}</div><div class="who">vs. ${RIVALS[g.opp].name}</div></div><div class="sc">${sc?sc.join('-'):''}</div></div>`}).join('')}</div>
  ${!done&&s.i>0?'<div class="btns"><button class="btn ghost" id="reset">Restart season</button></div>':''}`);
- on('#play',()=>{const t=RIVALS[nx.opp];start({p1:p,p2:rivalPlayer(nx.opp),t1:nx.opp==='kell'?CHAM_W:CHAM,t2:t,cpu:Math.min(2,t.d+(nx.boost||0)),mode:'season',tag:nx.tag.toUpperCase(),vsLine:`${nx.tag} · vs. ${t.name}`,oppKey:nx.opp,si:s.i})});
+ on('#play',()=>{const t=RIVALS[nx.opp];start({p1:p,p2:rivalPlayer(nx.opp),t1:nx.opp==='kell'?CHAM_W:CHAM,t2:t,cpu:seasonLvl(nx),mode:'season',tag:nx.tag.toUpperCase(),vsLine:`${nx.tag} · vs. ${t.name}`,oppKey:nx.opp,si:s.i})});
  on('#swap',()=>pickPlayer({title:'Who leads the Flyers?',sel:s.pid,next:pid=>{const q=seasonState();q.pid=pid;saveSeason(q);seasonHub()},back:()=>seasonHub()}));
  on('#reset',el=>{if(el.dataset.c){saveSeason({i:0,res:[],scores:[],pid:s.pid,champ:false});seasonHub()}else{el.dataset.c=1;el.textContent='Tap again to wipe the season'}});
  on('#back',()=>mainMenu());
