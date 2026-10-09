@@ -84,9 +84,13 @@ td.note{white-space:normal;min-width:200px;color:var(--gold);font-size:14px}
 
 /* Game */
 #game{display:flex;flex-direction:column;gap:10px;max-width:1100px;margin:0 auto}
-.stage{position:relative;width:100%;aspect-ratio:16/9;max-width:100%;max-height:calc(100vh - 170px);margin:0 auto;background:#000;border:3px solid var(--line);touch-action:none;user-select:none;-webkit-user-select:none}
+.sbar{display:flex;flex-wrap:wrap;align-items:stretch;gap:6px;margin:0 auto 6px;font-family:"Press Start 2P",monospace;font-size:12px;line-height:1}
+.sbar>span{display:flex;align-items:center;gap:10px;padding:8px 10px;background:#000;border:2px solid #000;color:#fff;white-space:nowrap}
+.sbar .sc{color:#ffd640}.sbar .dd{color:#ffd640}.sbar .yl{color:#fff;font-size:10px}.sbar .tos{display:inline-flex;gap:3px}.sbar .tos i{display:block;width:8px;height:4px;background:#444}.sbar .tos i.on{background:#ffd640}
+@media (max-width:560px){.sbar{font-size:9px}.sbar>span{padding:6px 7px;gap:6px}.sbar .yl{font-size:8px}}
+.stage{position:relative;width:100%;aspect-ratio:16/9;max-width:100%;max-height:calc(100vh - 210px);margin:0 auto;background:#000;border:3px solid var(--line);touch-action:none;user-select:none;-webkit-user-select:none}
 .stage canvas{display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges;touch-action:none}
-@media (max-height:520px){.stage{max-height:calc(100vh - 96px)}}
+@media (max-height:520px){.stage{max-height:calc(100vh - 136px)}}
 .bar{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:center;min-height:56px;padding:4px 0}
 .playbook{display:flex;flex-wrap:wrap;gap:6px;width:100%;justify-content:center}
 .pbtn{font-family:var(--f-display);font-size:9px;line-height:1.2;padding:9px 10px;background:var(--night-2);border:2px solid var(--line);color:var(--chalk);cursor:pointer;display:flex;gap:6px;align-items:center}
@@ -127,6 +131,7 @@ td.note{white-space:normal;min-width:200px;color:var(--gold);font-size:14px}
       <button class="iconbtn" id="b-quit" type="button">SAVE &amp; QUIT</button>
     </span>
   </div>
+  <div class="sbar" id="sbar" aria-live="polite"></div>
   <div class="stage" id="stage"><canvas id="screen" width="640" height="360" aria-label="Football field"></canvas></div>
   <div class="bar" id="bar"></div>
 </div>
@@ -1355,23 +1360,19 @@ function txt(s,x,y,size,col,align="left"){
   sc.fillStyle="#000";for(const[ox,oy]of[[-2,0],[2,0],[0,-2],[0,2],[2,2]])sc.fillText(s,x+ox,y+oy);
   sc.fillStyle=col;sc.fillText(s,x,y);
 }
+function setScorebar(O,tg,yl){
+  const oc=O.c1==="#161616"?"#2a2a2a":O.c1,key=[G.us,G.them,G.q,G.ot,Math.ceil(G.clock),G.tos,tg,yl,O.short].join("|");if(key===setScorebar.k)return;setScorebar.k=key;
+  $("#sbar").innerHTML=`<span style="background:${TEAMS.CHAM.c1}">CHA <b class="sc">${G.us}</b></span><span style="background:${oc}">${esc(O.short.slice(0,4))} <b class="sc">${G.them}</b></span>`+
+    `<span>${G.ot?"OT":"Q"+Math.min(G.q,4)}${G.ot?"":" "+fmtClock(G.clock)}${G.ot?"":`<span class="tos">${[0,1,2].map(i=>`<i class="${i<G.tos?"on":""}"></i>`).join("")}</span>`}</span>`+
+    (tg?`<span><b class="dd">${tg}</b><span class="yl">${esc(yl)}</span></span>`:"");
+}
 function drawHUD(){
   const O=G.O,W=VW*SCALE,H=VH*SCALE;
+  // scoreboard and down & distance live in the strip above the field, so they never cover players
+  const tg=(G.phase==="presnap"||G.phase==="live"||G.phase==="result")?(G.conv?"2PT TRY":ord(G.down).toUpperCase()+" & "+(G.ballOn+G.togo>=100?"GOAL":G.togo)):"";
+  const yl=tg?(onD()?(G.ballOn<50?O.short.slice(0,4)+" "+G.ballOn:G.ballOn===50?"MIDFIELD":"CHA "+(100-G.ballOn)):G.ballOn<50?"OWN "+G.ballOn:G.ballOn===50?"MIDFIELD":O.short.slice(0,4)+" "+(100-G.ballOn)):"";
+  setScorebar(O,tg,yl);
   if(G.introT>0){if(G.msgT>0)txt(G.msg,W/2,H-60,14,"#ffd640","center");return}
-  // scoreboard, top left
-  const box=(x,w,c)=>{sc.fillStyle="#000";sc.fillRect(x-3,9,w+6,40);sc.fillStyle=c;sc.fillRect(x,12,w,34)};
-  box(12,126,TEAMS.CHAM.c1);txt("CHA",22,23,14,"#ffffff");txt(String(G.us),126,23,14,"#ffd640","right");
-  box(150,126,O.c1==="#161616"?"#2a2a2a":O.c1);txt(O.short.slice(0,4),160,23,14,"#ffffff");txt(String(G.them),264,23,14,"#ffd640","right");
-  sc.fillStyle="#000";sc.fillRect(285,9,120,40);
-  txt(G.ot?"OT":"Q"+Math.min(G.q,4),296,23,12,"#ffffff");if(!G.ot)txt(fmtClock(G.clock),396,23,12,"#ffffff","right");
-  // timeouts pips
-  if(!G.ot)for(let i=0;i<3;i++){sc.fillStyle=i<G.tos?"#ffd640":"#444";sc.fillRect(296+i*12,40,8,4)}
-  // down and distance, bottom left
-  if(G.phase==="presnap"||G.phase==="live"||G.phase==="result"){
-    const tg=G.conv?"2PT TRY":ord(G.down).toUpperCase()+" & "+(G.ballOn+G.togo>=100?"GOAL":G.togo);
-    const yl=onD()?(G.ballOn<50?O.short.slice(0,4)+" "+G.ballOn:G.ballOn===50?"MIDFIELD":"CHA "+(100-G.ballOn)):G.ballOn<50?"OWN "+G.ballOn:G.ballOn===50?"MIDFIELD":O.short.slice(0,4)+" "+(100-G.ballOn);
-    sc.fillStyle="#000";sc.fillRect(9,H-50,300,40);txt(tg,20,H-42,12,"#ffd640");txt(yl,20,H-24,10,"#ffffff");
-  }
   // names over receivers before the throw, and over the carrier
   if(onD()&&(G.phase==="presnap"||G.phase==="live"||G.phase==="result")){for(const e of G.ents){if(e.team!=="D"||!e.p||(e!==G.ctrl&&(G.phase!=="presnap"||e.role==="DL")))continue;const x=wx(e.x)*SCALE,y=wy(e.y)*SCALE-(e===G.ctrl?62:50);if(x>0&&x<W)txt(e.p.last.toUpperCase(),x,y,e===G.ctrl?9:7,e===G.ctrl?"#ffd640":"#ffffff","center")}}
   if(G.phase==="live"&&G.qb.hasBall&&!onD()){for(const e of G.ents){if(!e.rec)continue;const x=wx(e.x)*SCALE,y=wy(e.y)*SCALE-50;if(x>0&&x<W)txt(e.p.last.toUpperCase(),x,y,8,"#ffffff","center")}}
