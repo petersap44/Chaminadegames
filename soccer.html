@@ -128,16 +128,16 @@ const TEAMS=[
 ];
 // Difficulty: how fast the power bar moves, how well their shooters and players play, and how quick your own keeper is.
 const DIFFS=[
- {name:'JV',meter:1.7,scatter:.75,cpuAcc:1.35,reachUs:1.25,keepSpd:2.2,tellShow:.85,tellTrue:.9,smart:.25,cpuSpd:.9,tackle:-.08,think:.55},
- {name:'Varsity',meter:1.3,scatter:1,cpuAcc:1,reachUs:1.1,keepSpd:1.75,tellShow:.55,tellTrue:.72,smart:.5,cpuSpd:1,tackle:0,think:.75},
- {name:'All-State',meter:.95,scatter:1.25,cpuAcc:.8,reachUs:1,keepSpd:1.45,tellShow:.35,tellTrue:.55,smart:.75,cpuSpd:1.08,tackle:.08,think:.95},
+ {name:'JV',meter:1.35,sway:.05,scatter:.75,cpuAcc:1.35,reachUs:1.25,keepSpd:2.2,tellShow:.85,tellTrue:.9,smart:.25,cpuSpd:.9,tackle:-.08,think:.55},
+ {name:'Varsity',meter:1.0,sway:.09,scatter:1,cpuAcc:1,reachUs:1.1,keepSpd:1.75,tellShow:.55,tellTrue:.72,smart:.5,cpuSpd:1,tackle:0,think:.75},
+ {name:'All-State',meter:.75,sway:.13,scatter:1.25,cpuAcc:.8,reachUs:1,keepSpd:1.45,tellShow:.35,tellTrue:.55,smart:.75,cpuSpd:1.08,tackle:.08,think:.95},
 ];
 // The keeper you shoot against. Each one looks and plays differently.
 const GOALIES=[
- {id:'rookie',name:'Rookie',desc:'A freshman call-up. Slow to dive, short arms, guesses wrong a lot.',read:.03,reach:.75,size:.86,dive:.42,kit:'#7fc8f0',gloves:'#f2f2f2'},
- {id:'varsity',name:'Varsity',desc:'A solid starter. Reads the shooter now and then.',read:.15,reach:1,size:1,dive:.3,kit:null,gloves:'#f2f2f2'},
- {id:'allstate',name:'All-State',desc:'Quick, long arms, and often guesses the right way.',read:.3,reach:1.18,size:1.08,dive:.24,kit:null,gloves:'#ffc72c',cap:true},
- {id:'wall',name:'The Wall',desc:'Almost impossible. Huge, lightning fast, and usually knows where you are going.',read:.55,reach:1.5,size:1.26,dive:.18,kit:'#151515',gloves:'#ffc72c',band:true},
+ {id:'rookie',name:'Rookie',desc:'A freshman call-up. Slow to dive, short arms, guesses wrong a lot.',read:.1,reach:.75,size:.86,dive:.42,kit:'#7fc8f0',gloves:'#f2f2f2'},
+ {id:'varsity',name:'Varsity',desc:'A solid starter. Reads the shooter now and then.',read:.27,reach:1,size:1,dive:.3,kit:null,gloves:'#f2f2f2'},
+ {id:'allstate',name:'All-State',desc:'Quick, long arms, and often guesses the right way.',read:.42,reach:1.18,size:1.08,dive:.24,kit:null,gloves:'#ffc72c',cap:true},
+ {id:'wall',name:'The Wall',desc:'Almost impossible. Huge, lightning fast, and usually knows where you are going.',read:.65,reach:1.5,size:1.26,dive:.18,kit:'#151515',gloves:'#ffc72c',band:true},
 ];
 const ROUNDS=['Quarterfinal','Semifinal','CHSAA Final'];
 const MLENS=[3,5,8];
@@ -222,7 +222,7 @@ function decided(){const {a,b,na,nb}=counts();
  if(na===nb&&a!==b)return a>b?'us':'them';return null}
 
 function nextKick(){
- G.aim=null;G.shot=null;G.keeper=null;G.tell=null;G.pow=0;G.powT=0;G.ball={...SPOT,r:8};G.msg='';G.t=0;G.cursor=null;G.drag=false;
+ G.aim=null;G.sway=null;G.shot=null;G.keeper=null;G.tell=null;G.pow=0;G.powT=0;G.ball={...SPOT,r:8};G.msg='';G.t=0;G.cursor=null;G.drag=false;
  if(G.turn==='us'){const ids=usOrder();G.shooter=byId(ids[G.usIdx%ids.length]);G.usIdx++;G.phase='aim'}
  else{G.cpu=G.cpuShooters[G.themIdx%G.cpuShooters.length];G.themIdx++;
   // Your keeper: drag to move. kx/ky are where he is, tx/ty where your finger wants him.
@@ -237,10 +237,10 @@ function nextKick(){
 function launch(){
  const d=G.diff;
  if(G.turn==='us'){
-  const p=G.pow,sh=G.shooter.shot/100,sweet=p>=.62&&p<=.86,gk=G.goalie;
-  let sc=(.06+(1-sh)*.28)*d.scatter*(sweet?1:1.7);
+  const p=G.pow,sh=G.shooter.shot/100,sweet=p>=.66&&p<=.84,gk=G.goalie;
+  let sc=(.1+(1-sh)*.32)*d.scatter*(sweet?1:1.7);
   let gx=G.aim.gx+gauss()*sc,gy=G.aim.gy+gauss()*sc*.75;
-  if(p>.86)gy+=(p-.86)*3.2;
+  if(p>.84)gy+=(p-.84)*3.4;
   if(p<.4)gy-=(.4-p)*.6;
   gy=Math.max(gy,.03);
   const fl=.36+(1-p)*.62;
@@ -273,7 +273,7 @@ function resolve(){
  else if(Math.abs(s.gx)>1||s.gy>1)res=s.gy>1?'over':'wide';
  else if(G.turn==='us'){
   const k=G.keeper,t=diveTarget(k),gk=G.goalie;
-  let reach=38*s.reach*gk.size*Math.pow(s.fl/.52,.6);
+  let reach=44*s.reach*gk.size*Math.pow(s.fl/.52,.6);
   if(k.col===0)reach*=.85;
   const dist=hyp((s.gx-t.gx)*GW,(s.gy-t.gy)*GH*1.15);
   res=dist<reach||(dist<reach*1.22&&Math.random()<.4)?'save':'goal';
@@ -318,12 +318,18 @@ function finish(){
 }
 
 // ---------- shootout input ----------
-function spt(e){return{x:(e.clientX-S.ox)/S.s,y:(e.clientY-S.oy)/S.s}}
+// First-person view when the Flyers shoot: the world is zoomed toward the goal around FP.c.
+const FP={k:1.3,cx:180,cy:190};
+const fpOn=()=>G&&G.turn==='us'&&G.phase!=='intro';
+const fpScreen=p=>({x:FP.cx+(p.x-FP.cx)*FP.k,y:FP.cy+(p.y-FP.cy)*FP.k});
+function spt(e){const p={x:(e.clientX-S.ox)/S.s,y:(e.clientY-S.oy)/S.s};return fpOn()?{x:FP.cx+(p.x-FP.cx)/FP.k,y:FP.cy+(p.y-FP.cy)/FP.k}:p}
 function inGoalArea(p){return p.x>GX-GW-26&&p.x<GX+GW+26&&p.y>GL-GH-28&&p.y<GL+20}
 function keeperTarget(p){const g=fromPx(p.x,p.y);G.kp.tx=clamp(g.gx,-1,1);G.kp.ty=clamp(g.gy,.3,1)}
+const effAim=()=>G.aim&&G.sway?{gx:G.aim.gx+G.sway.x,gy:G.aim.gy+G.sway.y}:G.aim;
+function strike(){G.aim=effAim();G.sway=null;G.phase='runup';G.t=0}
 function shootoutDown(e){const p=spt(e);
- if(G.phase==='aim'){if(inGoalArea(p)){const g=fromPx(p.x,p.y);G.aim={gx:clamp(g.gx,-1.15,1.15),gy:clamp(g.gy,0,1.18)};G.phase='power';G.powT=0;sfx.tick()}}
- else if(G.phase==='power'){if(inGoalArea(p)){const g=fromPx(p.x,p.y);G.aim={gx:clamp(g.gx,-1.15,1.15),gy:clamp(g.gy,0,1.18)};sfx.tick()}else G.phase='runup',G.t=0}
+ if(G.phase==='aim'){if(inGoalArea(p)){const g=fromPx(p.x,p.y);G.aim={gx:clamp(g.gx,-1.15,1.15),gy:clamp(g.gy,0,1.18)};G.phase='power';G.powT=0;G.swayP=Math.random()*6;sfx.tick()}}
+ else if(G.phase==='power'){if(inGoalArea(p)){const g=fromPx(p.x,p.y);G.aim={gx:clamp(g.gx,-1.15,1.15),gy:clamp(g.gy,0,1.18)};sfx.tick()}else strike()}
  else if(G.turn==='them'&&(G.phase==='cpurun'||G.phase==='flight')){G.drag=true;keeperTarget(p)}
 }
 function shootoutMove(e){const p=spt(e);G.cursor=inGoalArea(p)?fromPx(p.x,p.y):null;if(G.drag&&G.turn==='them'&&G.kp)keeperTarget(p)}
@@ -334,7 +340,7 @@ function shootoutKey(k,e){
   const st=.08;
   if(k==='ArrowLeft')G.aim.gx=clamp(G.aim.gx-st,-1.15,1.15);else if(k==='ArrowRight')G.aim.gx=clamp(G.aim.gx+st,-1.15,1.15);
   else if(k==='ArrowUp')G.aim.gy=clamp(G.aim.gy+st,0,1.18);else if(k==='ArrowDown')G.aim.gy=clamp(G.aim.gy-st,0,1.18);
-  else if(k===' '||k==='Enter'){if(G.phase==='aim'){G.phase='power';G.powT=0}else{G.phase='runup';G.t=0}}
+  else if(k===' '||k==='Enter'){if(G.phase==='aim'){G.phase='power';G.powT=0;G.swayP=Math.random()*6}else strike()}
   else return;
   e.preventDefault();
  }else if(G.turn==='them'&&G.kp&&(G.phase==='cpurun'||G.phase==='flight')){
@@ -349,7 +355,9 @@ function shootoutKey(k,e){
 function updateShootout(dt){
  G.t+=dt;
  if(G.phase==='intro'&&G.t>1.6)nextKick();
- else if(G.phase==='power'){G.powT+=dt;const ph=(G.powT/G.diff.meter)%2;G.pow=ph<1?ph:2-ph}
+ else if(G.phase==='power'){G.powT+=dt;const ph=(G.powT/G.diff.meter)%2;G.pow=ph<1?ph:2-ph;
+  // Nerves: the aim drifts while you wait on the power bar.
+  const a=G.diff.sway*(1.6-G.shooter.shot/100),t=G.powT;G.sway={x:(Math.sin(t*2.3+G.swayP)+Math.sin(t*3.7)*.5)*a,y:(Math.cos(t*2.9+G.swayP)*.7)*a}}
  else if(G.phase==='runup'&&G.t>.42)launch();
  else if(G.phase==='cpurun'&&G.t>1.8)launch();
  else if(G.phase==='flight'){
@@ -480,13 +488,13 @@ function drawHUD(){
  if(na>5||nb>5||(na===5&&nb===5))text('SD',sx,y0+30,6,'#fff8e8');
 }
 function drawAim(){
- const ar=G.aim||(G.cursor&&G.phase==='aim'?{gx:clamp(G.cursor.gx,-1.15,1.15),gy:clamp(G.cursor.gy,0,1.18)}:null);
+ const ar=effAim()||(G.cursor&&G.phase==='aim'?{gx:clamp(G.cursor.gx,-1.15,1.15),gy:clamp(G.cursor.gy,0,1.18)}:null);
  if(!ar)return;const p=toPx(ar.gx,ar.gy);const pulse=G.aim?1:.5;
  ctx.strokeStyle=`rgba(255,199,44,${pulse})`;ctx.lineWidth=2;ctx.beginPath();ctx.arc(p.x,p.y,10,0,Math.PI*2);ctx.moveTo(p.x-15,p.y);ctx.lineTo(p.x-5,p.y);ctx.moveTo(p.x+5,p.y);ctx.lineTo(p.x+15,p.y);ctx.moveTo(p.x,p.y-15);ctx.lineTo(p.x,p.y-5);ctx.moveTo(p.x,p.y+5);ctx.lineTo(p.x,p.y+15);ctx.stroke();
 }
 function drawMeter(){
  const x=50,y=526,w=260,h=16;rect(x-3,y-3,w+6,h+6,'#4a0612');rect(x,y,w,h,'#2a0510');
- rect(x+w*.62,y,w*.24,h,'#3fa34a');rect(x+w*.86,y,w*.14,h,'#c23a2a');rect(x,y,w*.4,h,'#6b5a2a');
+ rect(x+w*.66,y,w*.18,h,'#3fa34a');rect(x+w*.84,y,w*.16,h,'#c23a2a');rect(x,y,w*.4,h,'#6b5a2a');
  const mx=x+G.pow*w;rect(mx-2,y-5,4,h+10,'#ffc72c');
 }
 function drawKeeperTarget(){
@@ -502,21 +510,46 @@ function bottomText(){
  if(G.phase==='intro'){a=G.label;b=(G.first==='us'?'FLYERS':G.opp.name.toUpperCase())+' SHOOT FIRST'}
  else if(G.turn==='us'&&(G.phase==='aim'||G.phase==='power'||G.phase==='runup')){a=`#${G.shooter.n} ${G.shooter.name.toUpperCase()}`;b=G.phase==='aim'?'TAP THE GOAL TO AIM':G.phase==='power'?'TAP IN THE GREEN TO KICK':''}
  else if(G.turn==='them'&&G.phase==='cpurun'){a=`${G.opp.short} #${G.cpu.n} STEPS UP`;b='DRAG YOUR KEEPER. HE DIVES ON THE KICK'}
- if(a)text(a,W/2,G.phase==='power'?484:500,8,'#ffc72c');
- if(b)text(b,W/2,G.phase==='power'?504:520,7,'#fff8e8');
- if(G.turn==='us'&&G.phase==='aim')text(`THEIR KEEPER: ${G.goalie.name.toUpperCase()}`,W/2,544,6,'#ffe2a8');
+ if(fpOn()){const y=S.y0+54;if(a)text(a,W/2,y,8,'#ffc72c');if(b)text(b,W/2,y+18,7,'#fff8e8')}
+ else{if(a)text(a,W/2,G.phase==='power'?484:500,8,'#ffc72c');if(b)text(b,W/2,G.phase==='power'?504:520,7,'#fff8e8')}
+ if(G.turn==='us'&&G.phase==='aim')text(`THEIR KEEPER: ${G.goalie.name.toUpperCase()}`,W/2,S.y0+88,6,'#ffe2a8');
  if(G.turn==='them'&&G.phase==='cpurun')text(`KEEPER: ${byId(keeperId).name.toUpperCase()}`,W/2,544,6,'#ffe2a8');
 }
+function drawFPForeground(){
+ // Your boots and the ball at your feet, seen from the shooter's eyes.
+ const run=G.phase==='runup'?clamp(G.t/.42,0,1):G.phase==='aim'||G.phase==='power'?0:1;
+ const bob=G.phase==='runup'?Math.sin(G.t*30)*3:0;
+ const sock='#ffc72c',boot='#111';
+ // plant foot (left)
+ ctx.save();ctx.translate(120-run*6,560+bob-run*30);ctx.rotate(-.12);rect(-14,-10,28,90,sock);rect(-16,-26,32,22,boot);rect(-12,-30,24,6,'#2a2a2a');ctx.restore();
+ // kicking foot (right) swings up to the ball
+ const kx=lerp(250,200,run),ky=lerp(600,505,run)+bob;
+ ctx.save();ctx.translate(kx,ky);ctx.rotate(lerp(.2,-.35,run));rect(-15,-8,30,100,sock);rect(-17,-26,34,22,boot);rect(-13,-30,26,6,'#2a2a2a');ctx.restore();
+ const showBall=G.phase==='aim'||G.phase==='power'||G.phase==='runup'||G.phase==='flight';
+ if(!showBall)return;
+ let x=180,y=478,r=24;
+ if(G.phase==='flight'){const s=G.shot,k=Math.min(1,G.t/s.fl);const e=fpScreen(toPx(s.gx,s.gy));
+  x=lerp(180,e.x,k);y=lerp(478,e.y,k)-Math.sin(k*Math.PI)*(30+s.gy*40);r=lerp(24,5*FP.k,Math.pow(k,.55))}
+ if(G.phase!=='flight'){ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.ellipse(x+4,y+r*.8,r*1.05,r*.35,0,0,Math.PI*2);ctx.fill()}
+ ctx.fillStyle='#fff8e8';ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+ ctx.fillStyle='#1a1a1a';const sp=G.phase==='flight'?clock*14:0;for(let i=0;i<3;i++){const a=sp+i*2.1;ctx.beginPath();ctx.arc(x+Math.cos(a)*r*.45,y+Math.sin(a)*r*.45,r*.28,0,Math.PI*2);ctx.fill()}
+ ctx.beginPath();ctx.arc(x,y,r*.22,0,Math.PI*2);ctx.fill();
+}
 function drawShootout(){
+ const fp=fpOn();
  ctx.setTransform(DPR*S.s,0,0,DPR*S.s,DPR*S.ox,DPR*S.oy);ctx.imageSmoothingEnabled=false;
+ if(fp){ctx.translate(FP.cx,FP.cy);ctx.scale(FP.k,FP.k);ctx.translate(-FP.cx,-FP.cy)}
  drawPitch();
  drawGoalBack();
  const ballBehindKeeper=G.phase==='result'&&G.bounce.net;
+ const worldBall=!fp||G.phase==='result'||G.phase==='over';
  if(ballBehindKeeper)drawBall();
  drawKeeper();drawGoalFront();drawKeeperTarget();
- if(!ballBehindKeeper)drawBall();
- drawShooter();drawTell();
+ if(!ballBehindKeeper&&worldBall)drawBall();
+ if(!fp){drawShooter();drawTell()}
  if(G.turn==='us'&&(G.phase==='aim'||G.phase==='power'))drawAim();
+ ctx.setTransform(DPR*S.s,0,0,DPR*S.s,DPR*S.ox,DPR*S.oy);
+ if(fp)drawFPForeground();
  if(G.phase==='power')drawMeter();
  drawHUD();bottomText();
  if(G.phase==='result'||G.phase==='over'){const r=G.phase==='over'?1:clamp(G.t*4,0,1);ctx.save();ctx.globalAlpha=r;text(G.msg,W/2,330,G.msg.length>8?16:24,G.good?'#ffc72c':'#ff9a9a');ctx.restore()}
