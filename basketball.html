@@ -611,8 +611,9 @@ function contested(p){return contestAmt(p)>.2}
 // better shooters and jump shots get a little more, a hand in your face takes some away.
 function distK(p){return clamp(1.15-Math.abs(p.x-attack(p).cx)/700,.35,1.15)}
 // Custom difficulty: when a Custom defender contests you, the green shrinks hard (Defense 99: a tenth of its size)
-const customSqueeze=p=>!p.cpu&&contestAmt(p)>.2&&opponents(p).some(q=>q.cpu&&q.cpu.d===5)?1-.9*(clamp(CPU[5].d,1,99)-1)/98:1;
-const zone=p=>({c:.78,w:customSqueeze(p)*.8*(.075+p.shot*.012)*distK(p)*(p.ground?1:1.1)*(1-contestAmt(p))*(p.meter>=1?2.6:1)*(!p.cpu&&game&&game.cfg.cpu===5?(CPU[5].green||100)/100:1)});
+// Aidan Mode (level 7) works the same way with its ratings locked at 99 / 99 and a 25% green.
+const customSqueeze=p=>{if(p.cpu||contestAmt(p)<=.2)return 1;const q=opponents(p).find(q=>q.cpu&&q.cpu.d>=5);return q?1-.9*(clamp(CPU[q.cpu.d].d,1,99)-1)/98:1};
+const zone=p=>({c:.78,w:customSqueeze(p)*.8*(.075+p.shot*.012)*distK(p)*(p.ground?1:1.1)*(1-contestAmt(p))*(p.meter>=1?2.6:1)*(!p.cpu&&game&&game.cfg.cpu>=5?(CPU[game.cfg.cpu].green||100)/100:1)});
 function release(p){const z=zone(p),d=Math.abs(p.charge-z.c),hp=headPos(p);p.charging=false;let res;
  if(d<=z.w){res='make';pop(d<=z.w*.35?'PERFECT!':'GREEN!',p.x,hp.y-95,'#3ddc84',20,.8)}else{res=p.charge<z.c?'short':'long';pop(p.charge<z.c?'EARLY':'LATE',p.x,hp.y-95,'#ffb199',16,.7)}
  shoot(p,res)}
@@ -794,10 +795,13 @@ function endGame(){
 // chance a CPU defender jumps at a pump fake, by level: Rookie bites most, NBA almost never
 const FAKE_BITE=[.8,.55,.35,.18,.06];
 // Custom difficulty (level 6): Offense and Defense ratings from 1 to 99 set the CPU's numbers. 99 / 99 makes every open shot and is very hard to beat.
-function applyCustom(){const c=store.get('fhh_custom_lvl',{o:75,d:75}),o=(clamp(c.o,1,99)-1)/98,d=(clamp(c.d,1,99)-1)/98,L=(a,b,k)=>a+(b-a)*k;
- CPU[5]={name:'Custom',o:c.o,d:c.d,green:clamp(c.g||100,25,250),acc:L(.4,1.25,o),fall:L(.9,0,o),con:L(1.2,0,o),cap:L(.6,1,o),jumpShot:L(.4,1,o),react:L(.3,.02,d),swipe:L(.5,5,d),block:L(.15,1,d),spd:L(.9,1.2,d),guard:L(48,26,d)};
- FAKE_BITE[5]=L(.85,0,d);CROSS_BITE[5]=L(.85,0,d)}
+function setRated(i,name,ro,rd,g){const o=(clamp(ro,1,99)-1)/98,d=(clamp(rd,1,99)-1)/98,L=(a,b,k)=>a+(b-a)*k;
+ CPU[i]={name,o:ro,d:rd,green:clamp(g||100,25,250),acc:L(.4,1.25,o),fall:L(.9,0,o),con:L(1.2,0,o),cap:L(.6,1,o),jumpShot:L(.4,1,o),react:L(.3,.02,d),swipe:L(.5,5,d),block:L(.15,1,d),spd:L(.9,1.2,d),guard:L(48,26,d)};
+ FAKE_BITE[i]=L(.85,0,d);CROSS_BITE[i]=L(.85,0,d)}
+function applyCustom(){const c=store.get('fhh_custom_lvl',{o:75,d:75});setRated(5,'Custom',c.o,c.d,c.g)}
 applyCustom();
+// Aidan Mode: the hardest level. CPU offense 99, defense 99, and your green is 25% of normal.
+setRated(6,'Aidan Mode',99,99,25);
 function think(p,dt){
  const D=CPU[p.cpu.d],A=p.ai,g=game,b=g.ball,h=attack(p),home=HOOPS[p.side];
  A.t-=dt;if(A.t>0)return;const iv=D.react*(.6+Math.random()*.8);A.t=iv;
@@ -984,7 +988,7 @@ const statBars=s=>`<div class="bars">${['Speed','Hops','Shooting'].map((l,i)=>`<
 function seasonState(){return store.get('fhh_season',{i:0,res:[],scores:[],pid:'c25',champ:false})}
 function saveSeason(s){store.set('fhh_season',s);if(champCache!==!!s.champ)layers=null;champCache=!!s.champ}
 
-const seasonLvl=nx=>store.get('fhh_diff',1)===5?5:clamp(Math.min(2,RIVALS[nx.opp].d+(nx.boost||0))+clamp(store.get('fhh_diff',1),0,CPU.length-1)-1,0,CPU.length-1);
+const seasonLvl=nx=>store.get('fhh_diff',1)>=5?store.get('fhh_diff',1):clamp(Math.min(2,RIVALS[nx.opp].d+(nx.boost||0))+clamp(store.get('fhh_diff',1),0,CPU.length-1)-1,0,4);
 function mainMenu(){
  game=null;
  const s=seasonState();
@@ -1002,6 +1006,7 @@ function mainMenu(){
   <button class="mode" id="m-how"><b>How to Play</b><span>Controls, dunks, steals and the Flyer Shot.</span></button>
   <button class="mode" id="m-keys"><b>Controls</b><span>Change the keys for Player 1 and Player 2.</span></button>
   <button class="mode" id="m-cust"><b>Custom Difficulty</b><span>Set the CPU's offense and defense from 1 to 99 and how big your green is. Both at 99 is close to impossible.</span></button>
+  <button class="mode" id="m-aidan"><b>Aidan Mode</b><span>The hardest level. CPU offense 99, defense 99, and your green is 25% of normal.${store.get('fhh_diff',1)===6?' Selected.':''}</span></button>
  </div>
  <div class="btns"><button class="btn gold" id="m-diff">Difficulty: ${CPU[clamp(store.get('fhh_diff',1),0,CPU.length-1)].name}</button><a class="btn ghost" href="index.html" style="text-decoration:none">&#9664; All Chaminade games</a><button class="btn ghost" id="m-snd">Sound: ${muted?'Off':'On'}</button></div>
  <p class="foot">Players are from the 2025-26 Chaminade varsity roster posted by <a href="https://athletics.chaminade-hs.org/sports/mens-basketball/roster" target="_blank" rel="noopener">Chaminade Athletics</a>. Heads are cartoons, not likenesses, and the ratings are made up for the game. Unofficial fan game.</p>`);
@@ -1012,6 +1017,7 @@ function mainMenu(){
  on('#m-keys',()=>controlsScreen());
  on('#m-2v2',()=>twoOnTwo());
  on('#m-cust',()=>customDiff(()=>mainMenu()));
+ on('#m-aidan',()=>{store.set('fhh_diff',6);mainMenu()});
  on('#m-diff',el=>{const d=(clamp(store.get('fhh_diff',1),0,CPU.length-1)+1)%CPU.length;store.set('fhh_diff',d);el.textContent='Difficulty: '+CPU[d].name});
  on('#m-snd',el=>{muted=!muted;store.set('fhh_muted',muted);el.textContent='Sound: '+(muted?'Off':'On')});
 }
@@ -1142,7 +1148,7 @@ function pickOpponent(pid,v2){
   show(`<div class="eyebrow">Quick Game</div><h2>Who are the Flyers playing?</h2>
   <div class="opts">${Object.entries(RIVALS).map(([k,t])=>`<button class="opt${k===opp?' sel':''}" data-o="${k}"><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${t.jersey};margin-right:6px"></span>${t.name}</button>`).join('')}</div>
   <h3>CPU level</h3>
-  <div class="opts">${CPU.map((c,i)=>`<button class="opt${i===d?' sel':''}" data-d="${i}">${c.name}<small>${['Learning the game','A real test','Playoff mode','College-level defense','Good luck',`Offense ${c.o} · Defense ${c.d}`][i]}</small></button>`).join('')}</div>
+  <div class="opts">${CPU.map((c,i)=>`<button class="opt${i===d?' sel':''}" data-d="${i}">${c.name}<small>${['Learning the game','A real test','Playoff mode','College-level defense','Good luck',`Offense ${c.o} · Defense ${c.d}`,'99 O · 99 D · 25% green'][i]}</small></button>`).join('')}</div>
   <div class="btns"><button class="btn gold" id="go">Tip off</button><button class="btn ghost" id="back">Back</button></div>`);
   on('[data-o]',el=>{opp=el.dataset.o;render()});on('[data-d]',el=>{d=+el.dataset.d;render()});
   on('#back',()=>v2?twoOnTwo():pickPlayer({title:'Pick your Flyer',sel:pid,next:p=>pickOpponent(p)}));
