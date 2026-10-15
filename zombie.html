@@ -3,7 +3,6 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Last Stop: a 3D zombie shooter. Hold the gas station wave after wave.">
 <title>Last Stop: Zombie Gas Station</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -209,6 +208,9 @@
   #perkRow:not(:empty){margin-top:7px}
   .perk{width:24px;height:24px;border-radius:4px;background:var(--pc);color:#111;font-weight:700;font-size:15px;display:grid;place-items:center;line-height:1;transition:opacity .2s}
   .perk.cool{opacity:.3}
+  #codeIn{width:100%;font:600 20px 'Barlow Condensed','Arial Narrow',sans-serif;padding:10px 12px;margin:0 0 14px;border-radius:4px;
+    border:2px solid rgba(255,255,255,.2);background:#0e1013;color:var(--paper);-webkit-user-select:text;user-select:text}
+  #codeIn:focus{outline:none;border-color:var(--sodium)}
 </style>
 </head>
 <body class="desk">
@@ -311,7 +313,7 @@
   <div class="shopWrap">
     <div class="shopHead">
       <div><div class="sign small">Food Mart</div><p class="tag" id="shopTitle">Wave cleared.</p></div>
-      <div class="cashBox"><div class="lbl">Cash</div><div class="cashBig" id="shopCash">$0</div></div>
+      <div class="cashBox"><div class="lbl">Cash</div><div class="cashBig" id="shopCash" role="presentation">$0</div></div>
     </div>
     <h3>Your loadout</h3>
     <p class="shopNote">Upgrade the gun in your hand at the glowing Pump-a-Punch machine behind the store. Perk vending machines line the front of the store, and you can hold 4 perks.</p>
@@ -319,6 +321,13 @@
     <h3>Behind the counter</h3>
     <div class="board" id="board"></div>
     <div class="shopFoot"><button class="btn" id="nextWaveBtn">Start next wave</button></div>
+  </div>
+  <div id="codeDlg" class="dlg" hidden>
+    <div class="dlgCard" role="dialog" aria-modal="true" aria-labelledby="codeLbl">
+      <p id="codeLbl">Enter code</p>
+      <input id="codeIn" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-labelledby="codeLbl">
+      <div class="dlgBtns"><button class="sbtn" id="codeOk">Enter</button><button class="sbtn ghost" id="codeCancel">Cancel</button></div>
+    </div>
   </div>
   <div id="swapDlg" class="dlg" hidden>
     <div class="dlgCard" role="dialog" aria-modal="true" aria-labelledby="swapText">
@@ -579,14 +588,15 @@ const flTarget=new THREE.Object3D(); flTarget.position.set(0,-0.15,-5); camera.a
 const WEAPONS={
   pistol:{name:'Pistol',price:0,dmg:34,rate:0.2,mag:12,reserve:Infinity,reload:1.2,spread:0.006,adsSpread:0.4,pellets:1,recoil:0.02,kick:0.05,adsFov:62,sound:'pistol',bars:[3,4,2],desc:'Your trusty sidearm. Never runs out of ammo.'},
   smg:{name:'SMG',price:900,dmg:20,rate:0.065,mag:32,reserve:224,reload:1.5,spread:0.011,adsSpread:0.5,pellets:1,recoil:0.007,kick:0.025,adsFov:60,sound:'smg',bars:[2,9,5],desc:'Sprays fast. Great against runners.'},
-  shotgun:{name:'Shotgun',price:1200,dmg:18,rate:0.8,mag:6,reserve:42,reload:2.0,spread:0.035,adsSpread:0.75,pellets:9,recoil:0.045,kick:0.11,adsFov:65,sound:'shotgun',falloff:true,bars:[8,2,2],desc:'Nine pellets. Devastating up close, weak far away.'},
+  shotgun:{name:'Shotgun',price:1200,dmg:26,rate:0.6,mag:8,reserve:64,reload:1.7,spread:0.025,adsSpread:0.5,pellets:9,recoil:0.045,kick:0.11,adsFov:65,sound:'shotgun',falloff:true,falloffR:12,falloffMin:0.6,stagger:0.35,bars:[9,3,3],desc:'Nine heavy pellets. Brutal up close and still solid at mid range.'},
   rifle:{name:'Assault Rifle',price:1600,dmg:26,rate:0.1,mag:30,reserve:210,reload:1.6,spread:0.007,adsSpread:0.35,pellets:1,recoil:0.010,kick:0.035,adsFov:55,sound:'rifle',bars:[4,8,5],desc:'Accurate and steady at any range.'},
   sniper:{name:'Sniper',price:2400,dmg:240,rate:1.1,mag:5,reserve:35,reload:2.6,spread:0.0025,adsSpread:0,pellets:1,recoil:0.06,kick:0.15,adsFov:22,sound:'sniper',pierce:4,scope:true,bars:[10,1,1],desc:'Scoped. Each shot punches through up to four zombies.'},
   lmg:{name:'LMG',price:3000,dmg:30,rate:0.08,mag:100,reserve:300,reload:4.2,spread:0.012,adsSpread:0.45,pellets:1,recoil:0.008,kick:0.03,adsFov:58,sound:'lmg',heavy:0.85,bars:[4,8,10],desc:'A 100-round belt. Slows you down and takes ages to reload.'},
   raygun:{name:'Ray Gun',price:5000,dmg:150,splash:90,splashR:3.2,rate:0.3,mag:20,reserve:160,reload:2.0,spread:0.006,adsSpread:0.5,pellets:1,recoil:0.015,kick:0.05,adsFov:60,sound:'ray',projectile:true,flash:0x7dff6a,bars:[9,5,4],desc:'Fires plasma bolts that burst and splash nearby zombies.'},
+  flamer:{name:'Pump Nozzle',price:7500,dmg:6,rate:0.05,mag:100,reserve:400,reload:2.5,spread:0.02,adsSpread:0.6,pellets:1,recoil:0.0012,kick:0.008,adsFov:64,sound:'flame',flame:true,flameV:21,poolT:5,poolR:1.5,flash:0xff8a2a,bars:[6,10,6],desc:'Lobs a long stream of liquid fire that leaves burning pools on the ground.'},
   tesla:{name:'Tesla Cannon',price:10000,dmg:420,chain:10,chainR:11,rate:0.45,mag:12,reserve:84,reload:2.2,spread:0,adsSpread:1,pellets:1,recoil:0.03,kick:0.08,adsFov:62,sound:'zap',tesla:true,flash:0x8fd0ff,bars:[10,5,3],desc:'Lightning that jumps between up to ten zombies and stuns them.'}
 };
-const SHOP_ORDER=['smg','shotgun','rifle','sniper','lmg','raygun','tesla'];
+const SHOP_ORDER=['smg','shotgun','rifle','sniper','lmg','raygun','flamer','tesla'];
 const CASH={walker:50,runner:60,spitter:90,bloater:90,brute:175,riot:120,screamer:160,stalker:150,spider:300,butcher:1500,mother:1500,leaper:1500,torch:1500};
 const ARMOR_PRICE=2500;
 const BOSSES=['butcher','mother','leaper','torch'];
@@ -646,6 +656,12 @@ const MODELS={
     add(new THREE.ConeGeometry(0.055,0.07,14),gRed,0,0,-0.39,P2); add(new THREE.SphereGeometry(0.02,10,8),gGreenGlow,0,0,-0.39);
     add(BX(0.006,0.07,0.09),gRed,0,0.06,-0.05); add(BX(0.04,0.11,0.05),gRed,0,-0.08,0.02,-0.3); add(BX(0.07,0.006,0.06),gRed,0,-0.03,0.08);
     return finish([0,0,-0.43],[0.2,-0.19,-0.34],[0,-0.075,-0.3],0.3,0x7dff6a); },
+  flamer(){ const {add,finish}=gunKit(); const yel=new THREE.MeshLambertMaterial({color:0xd9a62a});
+    add(BX(0.06,0.13,0.05),gDark,0,-0.08,0.06,-0.25); add(BX(0.07,0.065,0.26),yel,0,0,-0.04); add(BX(0.05,0.02,0.18),gDark,0,-0.045,-0.02);
+    add(CY(0.022,0.026,0.3),gMetal,0,0,-0.3,P2); add(CY(0.016,0.02,0.14),gMetal,0,-0.03,-0.5,P2+0.35);
+    add(CY(0.035,0.035,0.18,12),gRed,0.065,-0.02,0,P2); add(CY(0.02,0.02,0.35),gDark,0,-0.05,0.25,P2-0.3);
+    add(new THREE.SphereGeometry(0.012,8,6),gBlueGlow,0,-0.06,-0.57);
+    return finish([0,-0.05,-0.6],[0.2,-0.2,-0.34],[0,-0.06,-0.3],0.3,0xff8a2a); },
   tesla(){ const {add,finish}=gunKit();
     add(BX(0.08,0.1,0.32),gDark,0,0,-0.04); const tg=new THREE.TorusGeometry(0.05,0.012,6,16);
     for(let z=-0.22;z>=-0.37;z-=0.05) add(tg,gCopper,0,0,z);
@@ -662,11 +678,12 @@ const PAP_DMG=[1,2,3,4.5], PAP_MAG=[1,1.5,2,2.5], PAP_RELOAD=[1,1,0.8,0.65], PAP
 const PAP={
   pistol:[{name:'Hot Rod',d:'Double damage, bigger magazine'},{name:'Twin Exhaust',pellets:2,spread:0.01,d:'Fires two shots per pull'},{name:'Afterburner',boomR:2,boomMul:0.6,d:'Explosive rounds'}],
   smg:[{name:'Hornet',d:'Double damage, bigger magazine'},{name:'Swarm',ricochet:true,d:'Bullets ricochet into a nearby zombie'},{name:'Killer Bees',poison:true,d:'Poison that spreads when zombies die'}],
-  shotgun:[{name:'Boomstick',d:'Double damage, bigger magazine'},{name:"Dragon's Breath",burn:true,d:'Pellets set zombies on fire'},{name:'Hellfire',rate:0.28,mag:20,knock:true,d:'Full-auto 20-shell drum with knockback'}],
+  shotgun:[{name:'Boomstick',falloffR:16,falloffMin:0.65,spread:0.0213,d:'Double damage, bigger magazine, longer range'},{name:"Dragon's Breath",burn:true,falloffR:20,falloffMin:0.7,spread:0.0175,d:'Pellets set zombies on fire, longer range'},{name:'Hellfire',rate:0.3,mag:20,knock:true,burnSlow:true,falloffR:25,falloffMin:0.75,spread:0.015,d:'Full-auto 20-shell drum, knockback, and burning zombies are slowed'}],
   rifle:[{name:'Patriot',d:'Double damage, bigger magazine'},{name:'Overdrive',rateMul:1/1.3,ap:true,d:'Faster fire, cuts through armor'},{name:'Thunderclap',every5:true,d:'Every 5th bullet explodes'}],
   sniper:[{name:'Longshot',d:'Double damage, bigger magazine'},{name:'Rail Gun',pierce:99,wallPierce:true,d:'Pierces every zombie and wall'},{name:'Judgment',rateMul:0.6,headBoom:true,d:'Headshot kills explode, faster fire'}],
   lmg:[{name:'Belt Fed',d:'Double damage, 150-round belt'},{name:'Grinder',heavy:1,reloadMul:0.5,d:'No slowdown, much faster reload'},{name:'Meat Grinder',spin:true,pierce:2,d:'Spins up faster the longer you fire, pierces'}],
   raygun:[{name:'Ray Gun X',red:true,flash:0xff4a2a,d:'Red bolts, double damage and splash'},{name:'Ray Gun XX',burst:3,d:'Fires a 3-bolt burst'},{name:'Ray Gun Omega',homing:true,pool:true,d:'Homing bolts that leave plasma pools'}],
+  flamer:[{name:'Full Service',flameV:24,poolT:7,d:'Double damage, longer range, longer-lasting pools'},{name:'Sticky Fire',sticky:true,d:'Burning zombies drip trails of fire'},{name:'Premium Inferno',inferno:true,blue:true,slow:true,flash:0x4ab0ff,d:'Blue fire that slows zombies, and burning kills explode'}],
   tesla:[{name:'Storm Bringer',chain:14,d:'More damage, chains to 14 zombies'},{name:'Thunderhead',chain:18,freeze:true,d:'Freezes zombies, chains to 18'},{name:'Zeus',zeus:true,d:'Calls lightning strikes from the sky'}]
 };
 const _ws={};
@@ -745,11 +762,52 @@ function plasmaPool(pt,dps){
 function updatePools(dt){
   for(let i=pools.length-1;i>=0;i--){ const p=pools[i]; p.t-=dt;
     p.m.material.opacity=0.5*Math.min(1,p.t)*(0.8+0.2*Math.sin(gameTime*12));
-    for(const z of zombies){ if(z.dead) continue; if(Math.hypot(z.root.position.x-p.x,z.root.position.z-p.z)<p.r+z.d.radius*0.5) dotDmg(z,p.dps*dt); }
-    if(Math.random()<dt*8) burst(new THREE.Vector3(p.x+rand(-2,2),0.2,p.z+rand(-2,2)),1,'fire',0.5,1.5,0.4,0.1);
+    for(const z of zombies){ if(z.dead) continue; if(Math.hypot(z.root.position.x-p.x,z.root.position.z-p.z)<p.r+z.d.radius*0.5){
+      dotDmg(z,p.dps*dt); if(p.fire&&!z.dead){ igniteZ(z,p.w,false); if(p.w.slow) z.slowT=0.3; } } }
+    if(Math.random()<dt*(p.fire?3:8)){ const rr=p.fire?p.r:2; burst(new THREE.Vector3(p.x+rand(-rr,rr)*0.7,0.2,p.z+rand(-rr,rr)*0.7),1,p.fire&&p.w.blue?'bluefire':'fire',0.5,1.5,0.4,0.1); }
     if(p.t<=0){ scene.remove(p.m); p.m.material.dispose(); pools.splice(i,1); }
   }
 }
+
+/* pump nozzle flamethrower */
+const globs=[], globGeo=new THREE.SphereGeometry(0.13,8,6);
+const globMat=new THREE.MeshBasicMaterial({color:0xff8a2a,transparent:true,opacity:0.85,blending:THREE.AdditiveBlending,depthWrite:false});
+const globMatB=new THREE.MeshBasicMaterial({color:0x4ab0ff,transparent:true,opacity:0.85,blending:THREE.AdditiveBlending,depthWrite:false});
+const _fd=new THREE.Vector3();
+let lastInfSfx=-9;
+function flameShot(w){
+  _fd.set((Math.random()-0.5)*0.035,(Math.random()-0.5)*0.035+0.1,-1).normalize().applyQuaternion(camera.quaternion);
+  const m=new THREE.Mesh(globGeo,w.blue?globMatB:globMat); m.position.copy(_muz); m.scale.setScalar(rand(0.7,1.2)); scene.add(m);
+  globs.push({m,vel:_fd.clone().multiplyScalar(w.flameV),life:3,w});
+}
+function igniteZ(z,w,direct){
+  if(z.dead) return;
+  z.burnT=3; z.burnDps=Math.max(z.burnDps,w.dmg*3);
+  if(direct&&w.sticky){ z.stickyT=2; z.stickyW=w; }
+  if(direct&&w.inferno){ z.infernoT=3; z.infW=w; }
+}
+function firePool(pt,w,sc){
+  const r=w.poolR*(sc||1);
+  for(const p of pools){ if(p.fire&&Math.hypot(p.x-pt.x,p.z-pt.z)<Math.max(r,p.r)*0.75){ p.t=Math.max(p.t,w.poolT); p.dps=Math.max(p.dps,w.dmg*4); if(w.tier>(p.w.tier||0)) p.w=w; return; } }
+  let fireCount=0, oldest=-1; for(let i=0;i<pools.length;i++) if(pools[i].fire){ fireCount++; if(oldest<0) oldest=i; }
+  if(fireCount>=50&&oldest>=0){ const o=pools[oldest]; scene.remove(o.m); o.m.material.dispose(); pools.splice(oldest,1); }
+  const m=new THREE.Mesh(poolGeo,new THREE.MeshBasicMaterial({color:w.blue?0x3a8aff:0xff6a1a,transparent:true,opacity:0.55,blending:THREE.AdditiveBlending,depthWrite:false}));
+  m.rotation.x=-Math.PI/2; m.position.set(pt.x,0.06+Math.random()*0.02,pt.z); m.scale.setScalar(r); scene.add(m);
+  pools.push({m,x:pt.x,z:pt.z,r,t:w.poolT,dps:w.dmg*4,fire:true,w});
+}
+function updateGlobs(dt){
+  for(let i=globs.length-1;i>=0;i--){
+    const g=globs[i]; g.vel.y-=18*dt; g.m.position.addScaledVector(g.vel,dt); g.life-=dt; g.m.scale.multiplyScalar(1+dt*0.9);
+    const q=g.m.position; let hit=null, done=false;
+    for(const z of zombies){ if(z.dead) continue; const dx=z.root.position.x-q.x, dz=z.root.position.z-q.z, r=z.d.radius+0.25;
+      if(dx*dx+dz*dz<r*r&&q.y>0&&q.y<2.1*z.d.scale){ hit=z; break; } }
+    if(hit){ damageZombie(hit,g.w.dmg,false,null,false); igniteZ(hit,g.w,true); firePool(new THREE.Vector3(hit.root.position.x,0,hit.root.position.z),g.w,0.8); done=true; }
+    else if(q.y<=0.05){ firePool(q,g.w,1); done=true; }
+    else{ for(const c of colliders){ if(q.x>c.minX&&q.x<c.maxX&&q.z>c.minZ&&q.z<c.maxZ&&q.y<c.h){ done=true; break; } } }
+    if(done||g.life<=0){ scene.remove(g.m); globs.splice(i,1); }
+  }
+}
+
 const _tm={};
 function tracerC(a,b,color){
   if(!color) return tracer(a,b);
@@ -760,7 +818,7 @@ function tracerC(a,b,color){
 /* run saving */
 const SAVE_KEY='laststop-run-v1';
 function saveRun(){
-  try{ localStorage.setItem(SAVE_KEY,JSON.stringify({v:1,wave,score,kills,cash,bossCount,cur,armor,perks,hp:Math.ceil(player.hp),nades,
+  try{ localStorage.setItem(SAVE_KEY,JSON.stringify({v:1,wave,score,kills,cash,bossCount,cur,armor,perks,cheat,cheatUsed,hp:Math.ceil(player.hp),nades,
     inv:inv.map(s=>s&&{id:s.id,mag:s.mag,res:s.res===Infinity?-1:s.res,tier:s.tier||0})})); }catch(e){}
 }
 function loadRun(){
@@ -903,6 +961,7 @@ const sfx={
   lmg(){ nz(0.16,1500,0.6); tn(120,40,0.1,'square',0.18); },
   sniper(){ nz(0.55,1300,1.0); tn(90,30,0.45,'square',0.32); },
   ray(){ tn(1500,180,0.26,'sine',0.25); tn(760,120,0.2,'square',0.05); },
+  flame(){ if(Math.random()<0.5) nz(0.18,650,0.16,'bandpass',0.7); },
   zap(){ nz(0.35,3200,0.45,'highpass'); tn(80,55,0.32,'sawtooth',0.22); setTimeout(()=>nz(0.15,4000,0.25,'highpass'),60); },
   scream(){ tn(900,1700,0.65,'sawtooth',0.12); tn(1300,650,0.65,'square',0.05); nz(0.65,3000,0.22,'bandpass',3); },
   pop(){ nz(0.14,900,0.32); tn(160,60,0.1,'sine',0.2); },
@@ -945,7 +1004,7 @@ function showHit(kill){ hitT=0.1; $('hit').classList.toggle('kill',!!kill); }
 
 /* particles & effects */
 const pGeo=new THREE.BoxGeometry(1,1,1);
-const pMats={fire:new THREE.MeshBasicMaterial({color:0xff7a1a}),blood:new THREE.MeshBasicMaterial({color:0x6e0b0b}),acid:new THREE.MeshBasicMaterial({color:0x9cff3a}),
+const pMats={bluefire:new THREE.MeshBasicMaterial({color:0x4ab0ff}),fire:new THREE.MeshBasicMaterial({color:0xff7a1a}),blood:new THREE.MeshBasicMaterial({color:0x6e0b0b}),acid:new THREE.MeshBasicMaterial({color:0x9cff3a}),
   spark:new THREE.MeshBasicMaterial({color:0xffd27a}),dust:new THREE.MeshLambertMaterial({color:0x6f6a60})};
 function burst(pos,n,type,spd,up,life,size){
   spd=spd||3; up=up||2; life=life||0.6; size=size||0.09;
@@ -1102,7 +1161,7 @@ function makeZombie(type,x,z){
     hp:d.hp*hpMul,maxHp:d.hp*hpMul,speed:d.speed*(1+Math.min(0.35,wave*0.012))*rand(0.9,1.1),
     cd:0,t:Math.random()*10,dead:false,deadT:0,flash:0,lit:false,side:Math.random()<0.5?-1:1,
     spitCd:rand(1,2.5),sumCd:4,chargeCd:4,mode:'walk',modeT:0,cdir:new THREE.Vector3(),hitDone:false,
-    stuck:0,detour:0,bestD:1e9,noProg:0,ddir:new THREE.Vector3(),pendingHit:0,atkAnim:0,stagger:0,fuse:0,wander:null,burnT:0,burnDps:0,poisT:0,poisDps:0,frozen:0,kbv:new THREE.Vector3(),buffT:0,screamCd:rand(3,5),dodgeCd:0,dodgeT:0,dd:new THREE.Vector3(),fade:1};
+    stuck:0,detour:0,bestD:1e9,noProg:0,ddir:new THREE.Vector3(),pendingHit:0,atkAnim:0,stagger:0,fuse:0,wander:null,burnT:0,burnDps:0,stickyT:0,infernoT:0,slowT:0,dripT:0,stickyW:null,infW:null,poisT:0,poisDps:0,frozen:0,kbv:new THREE.Vector3(),buffT:0,screamCd:rand(3,5),dodgeCd:0,dodgeT:0,dd:new THREE.Vector3(),fade:1};
   zb.spiderLegs=spiderLegs;
   parts.forEach(p=>p.userData.z=zb);
   zombies.push(zb);
@@ -1123,7 +1182,10 @@ function kill(z,head,noScore){
   if(z.type==='stalker') z.mats.forEach(m=>m.opacity=0.9);
   if(z.poisT>0){ for(const o of zombies){ if(o.dead||o===z) continue; if(Math.hypot(o.root.position.x-z.root.position.x,o.root.position.z-z.root.position.z)<5){ o.poisT=3; o.poisDps=Math.max(o.poisDps,z.poisDps); } }
     burst(new THREE.Vector3(z.root.position.x,1.2,z.root.position.z),14,'acid',4,3,0.6,0.08); }
-  z.burnT=0; z.poisT=0; z.frozen=0;
+  if(z.infernoT>0&&z.burnT>0&&z.infW){ const w2=z.infW, pt=new THREE.Vector3(z.root.position.x,1,z.root.position.z); z.infernoT=0;
+    const loud=gameTime-lastInfSfx>0.25; if(loud) lastInfSfx=gameTime;
+    papBoom(pt,3.5,w2.dmg*6,w2.blue?0x4ab0ff:0xff6a1a,loud); firePool(pt,w2,1.2); }
+  z.burnT=0; z.poisT=0; z.frozen=0; z.stickyT=0;
   const p=z.root.position;
   if(!noScore){
     const pts=Math.round(z.d.pts*(head?1.5:1)*(1+Math.max(0,wave-1)*0.05)); score+=pts; kills++;
@@ -1201,6 +1263,7 @@ function updateZombies(dt){
     z.buffT=Math.max(0,z.buffT-dt);
     const lit=(z.flash>0||(z.fuse>0&&Math.sin(z.t*40)>0))?1:((z.mode==='wind'||z.mode==='scream')?2:(z.frozen>0?6:(z.burnT>0?5:(z.poisT>0?4:(z.buffT>0?3:0)))));
     if(lit!==z.lit){ z.lit=lit; const c=GLOW[lit]; for(const m of z.mats) m.emissive.setRGB(c[0],c[1],c[2]); }
+    if(z.stickyT>0&&z.burnT>0&&z.stickyW){ z.stickyT-=dt; z.dripT-=dt; if(z.dripT<=0){ z.dripT=0.6; firePool(new THREE.Vector3(p.x,0,p.z),z.stickyW,0.6); } }
     if(z.burnT>0){ z.burnT-=dt; dotDmg(z,z.burnDps*dt); if(Math.random()<dt*10) burst(new THREE.Vector3(p.x+rand(-0.3,0.3),rand(0.5,1.8)*d.scale,p.z+rand(-0.3,0.3)),1,'fire',0.4,1.2,0.5,0.12); if(z.dead) continue; }
     if(z.poisT>0){ z.poisT-=dt; dotDmg(z,z.poisDps*dt); if(Math.random()<dt*6) burst(new THREE.Vector3(p.x+rand(-0.3,0.3),rand(0.6,1.8)*d.scale,p.z+rand(-0.3,0.3)),1,'acid',0.3,1,0.5,0.08); if(z.dead) continue; }
     if(z.frozen>0&&z.mode!=='air'){ z.frozen-=dt; continue; }
@@ -1211,6 +1274,7 @@ function updateZombies(dt){
     const dx=tx-p.x, dz=tz-p.z, dist=Math.hypot(dx,dz)||0.001, nx=dx/dist, nzz=dz/dist;
     let speed=z.speed*(title?0.45:1); if(z.stagger>0){ z.stagger-=dt; speed*=0.4; }
     if(z.buffT>0) speed*=d.boss?1.25:1.55;
+    if(z.slowT>0){ z.slowT-=dt; speed*=d.boss?0.8:0.6; }
     let mx=nx, mz=nzz, move=1, face=true;
 
     switch(z.type){
@@ -1616,6 +1680,8 @@ function fire(){
     const target=hits.length&&hits[0].distance>1.5?hits[0].point.clone():camera.position.clone().addScaledVector(_dir,100);
     const bd=target.sub(_muz).normalize(), n=w.burst||1;
     for(let k=0;k<n;k++){ const d2=bd.clone(); const ang=(k-(n-1)/2)*0.045; if(ang) d2.applyAxisAngle(_up,ang); fireBolt(_muz.clone(),d2,w); }
+  }else if(w.flame){
+    flameShot(w);
   }else if(w.tesla){
     teslaShot(w);
   }else{
@@ -1634,7 +1700,7 @@ function fire(){
         if(z.dead||seen.has(z)) continue; seen.add(z);
         const head=h.object.userData.head;
         let dmg=w.dmg*(head?(z.d.boss?1.5:2.2)*(hasPerk('dead')?1.5:1):1)*Math.pow(0.8,pierced);
-        if(w.falloff) dmg*=clamp(1.2-h.distance/30,0.35,1);
+        if(w.falloff){ const fr=w.falloffR||6, fm=w.falloffMin||0.35; if(h.distance>fr) dmg*=Math.max(fm,1-(h.distance-fr)/18*(1-fm)); }
         const armored=z.d.armor&&!head&&!w.ap; if(armored) dmg*=z.d.armor;
         const rec=hitsPer.get(z)||{dmg:0,head:false}; rec.dmg+=dmg; rec.head=rec.head||head; rec.pt=h.point.clone(); hitsPer.set(z,rec); if(!impact) impact=h.point.clone();
         if(armored){ burst(h.point,4,'spark',3,2.5,0.25,0.06); pinged=true; } else burst(h.point,5,'blood',3,2,0.5);
@@ -1648,7 +1714,8 @@ function fire(){
     }
     hitsPer.forEach((rec,z)=>{
       damageZombie(z,rec.dmg,rec.head,null,true);
-      if(w.burn&&!z.dead){ z.burnT=3; z.burnDps=Math.max(z.burnDps,w.dmg*1.1); }
+      if(w.burn&&!z.dead){ z.burnT=3; z.burnDps=Math.max(z.burnDps,w.dmg*1.1); if(w.burnSlow) z.slowT=3; }
+      if(w.stagger&&!z.dead&&!z.d.boss) z.stagger=Math.max(z.stagger,w.stagger);
       if(w.poison&&!z.dead){ z.poisT=3; z.poisDps=Math.max(z.poisDps,w.dmg*0.6); }
       if(w.knock&&!z.d.boss){ const kx=z.root.position.x-player.pos.x, kz=z.root.position.z-player.pos.z, kl=Math.hypot(kx,kz)||1; z.kbv.set(kx/kl*10,0,kz/kl*10); }
       if(w.ricochet&&rec.pt){ let nb=null, nd=8; for(const o of zombies){ if(o.dead||o===z) continue; const d2=o.root.position.distanceTo(z.root.position); if(d2<nd){ nd=d2; nb=o; } }
@@ -1808,6 +1875,7 @@ function clearWorld(){
   for(let i=zombies.length-1;i>=0;i--) removeZombie(i);
   projectiles.forEach(p=>{ scene.remove(p.m); p.m.geometry.dispose(); }); projectiles.length=0;
   bolts.forEach(b=>scene.remove(b.m)); bolts.length=0;
+  globs.forEach(g=>scene.remove(g.m)); globs.length=0;
   grenades.forEach(g=>scene.remove(g.m)); grenades.length=0;
   hazards.forEach(h=>{ scene.remove(h.m); h.m.material.dispose(); }); hazards.length=0;
   pools.forEach(p=>{ scene.remove(p.m); p.m.material.dispose(); }); pools.length=0;
@@ -1818,7 +1886,7 @@ function resetGame(){
   player.maxHp=100; armor=false; nades=1; nadeCd=0; player.burnT=0;
   player.pos.set(0,0,4); player.vy=0; player.hp=player.maxHp; player.kb.set(0,0,0); player.onGround=true;
   yaw=Math.PI; pitch=0; wave=0; score=0; kills=0; bossCount=0; phase='intermission'; interT=3.5; queue=0; bossPending=false;
-  papT=0; papSlot=null; spinT=0; perks=[]; lastHurtT=-99; wireReadyT=0; dropArm={id:null,t:0}; renderPerks();
+  papT=0; papSlot=null; spinT=0; cheat=false; cheatUsed=false; perks=[]; lastHurtT=-99; wireReadyT=0; dropArm={id:null,t:0}; renderPerks();
   inv=[newSlot('pistol'),null]; cur=0; cash=500; pendingBuy=null; reloading=false; fireCd=0; swapT=0; adsT=0; ads=false; mouseDown=false;
   hurtFlash=0; shake=0; gameTime=0; aliveN=0;
   scopeEl.hidden=true;
@@ -1837,6 +1905,7 @@ function continueRun(){
   if(!inv[0]){ inv[0]=inv[1]; inv[1]=null; } if(!inv[0]) inv[0]=newSlot('pistol');
   cur=(d.cur===1&&inv[1])?1:0; syncCamo();
   perks=(Array.isArray(d.perks)?d.perks:[]).filter(id=>PERKS[id]).slice(0,PERK_MAX); renderPerks();
+  cheat=!!d.cheat; cheatUsed=!!d.cheatUsed||cheat;
   $('titleScreen').hidden=true; $('overScreen').hidden=true; $('pauseScreen').hidden=true;
   state='playing'; openShop(true);
 }
@@ -1877,14 +1946,14 @@ function die(){
   if(document.pointerLockElement) document.exitPointerLock();
   document.body.classList.remove('playing'); $('touchUI').hidden=true;
   clearRun();
-  const isBest=score>best.score; if(isBest){ best={score,wave}; saveBest(); }
+  const isBest=!cheatUsed&&score>best.score; if(isBest){ best={score,wave}; saveBest(); }
   sfx.roar(0.35);
   setTimeout(()=>{
     $('hud').hidden=true;
     const st=$('overStats'); st.textContent='';
     [['You held the station until wave ',String(wave)],['Score ',score.toLocaleString()],['Zombies dropped ',kills.toLocaleString()]].forEach(([a,b])=>{
       const d=document.createElement('div'); d.append(a); const s=document.createElement('strong'); s.textContent=b; d.append(s); st.appendChild(d); });
-    $('overBest').textContent=isBest?'New best run.':bestText();
+    $('overBest').textContent=isBest?'New best run.':(cheatUsed?'Unlimited cash was on, so this run doesn\'t count toward your best.':bestText());
     $('overScreen').hidden=false; $('againBtn').focus();
   },1600);
 }
@@ -1971,6 +2040,29 @@ shopEl.addEventListener('click',e=>{
 });
 $('nextWaveBtn').addEventListener('click',closeShop);
 addEventListener('keydown',e=>{ if(state==='shop'&&e.code==='Escape'&&!swapDlg.hidden){ pendingBuy=null; swapDlg.hidden=true; } });
+/* tester code */
+const CHEAT_HASH='5781258a', CHEAT_LEN=8, CHEAT_CASH=9999999;
+let cheat=false, cheatUsed=false, codeBuf='', cashTaps=[];
+function codeHash(t){ let h=0x811c9dc5; for(const c of t){ h^=c.charCodeAt(0); h=Math.imul(h,0x01000193)>>>0; } return h.toString(16); }
+function tryCode(t){
+  t=(t||'').trim().toLowerCase(); if(codeHash(t)!==CHEAT_HASH) return false;
+  cheat=!cheat; if(cheat){ cheatUsed=true; cash=Math.max(cash,CHEAT_CASH); }
+  sfx.papDone(); banner(cheat?'Unlimited cash on':'Unlimited cash off',cheat?'This run won\'t count toward your best':'');
+  if(state==='shop') renderShop();
+  return true;
+}
+const codeDlg=$('codeDlg'), codeIn=$('codeIn');
+function openCode(){ codeIn.value=''; codeDlg.hidden=false; setTimeout(()=>codeIn.focus(),30); }
+function closeCode(){ codeDlg.hidden=true; codeIn.blur(); }
+$('codeOk').addEventListener('click',()=>{ const ok=tryCode(codeIn.value); if(!ok) sfx.deny(); closeCode(); });
+$('codeCancel').addEventListener('click',closeCode);
+codeIn.addEventListener('keydown',e=>{ e.stopPropagation(); if(e.key==='Enter'){ e.preventDefault(); $('codeOk').click(); } if(e.key==='Escape') closeCode(); });
+$('shopCash').addEventListener('click',()=>{ const t=Date.now(); cashTaps=cashTaps.filter(x=>t-x<3000); cashTaps.push(t); if(cashTaps.length>=5){ cashTaps=[]; openCode(); } });
+addEventListener('keydown',e=>{
+  if(state!=='shop'||!codeDlg.hidden||e.key.length!==1) return;
+  codeBuf=(codeBuf+e.key.toLowerCase()).slice(-CHEAT_LEN);
+  if(codeBuf.length===CHEAT_LEN&&tryCode(codeBuf)) codeBuf='';
+});
 
 /* input */
 addEventListener('keydown',e=>{
@@ -2059,7 +2151,7 @@ function loop(){
   if(state==='playing'){
     gameTime+=dt;
     updatePlayer(dt); updateWeapon(dt); updateZombies(dt); updateWaves(dt);
-    updateProjectiles(dt); updateBolts(dt); updateGrenades(dt); updateHazards(dt); updatePools(dt); updatePickups(dt); updateCamera(dt); updateHud(); drawRadar();
+    updateProjectiles(dt); updateBolts(dt); updateGlobs(dt); updateGrenades(dt); updateHazards(dt); updatePools(dt); updatePickups(dt); updateCamera(dt); updateHud(); drawRadar();
     hitT=Math.max(0,hitT-dt);
     groanT-=dt;
     if(groanT<=0){ groanT=rand(1.2,3);
@@ -2075,6 +2167,7 @@ function loop(){
     for(const id in guns) guns[id].g.visible=false;
   }
   if(state!=='paused'){ updateParticles(dt); updateEffects(dt); papAnim(dt); }
+  if(cheat&&cash<CHEAT_CASH) cash=CHEAT_CASH;
   hurtFlash=Math.max(0,hurtFlash-dt*1.6);
   let v=hurtFlash; if(state==='playing'&&player.hp<30) v=Math.max(v,0.28+0.14*Math.sin(gameTime*6));
   if(state==='dead') v=0.85;
