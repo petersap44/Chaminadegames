@@ -1154,7 +1154,7 @@ buildArmor(-22,-16,Math.PI/2);
 endMap('station');
 
 /* map 2: Dead Engine, a frozen research site built around a humming machine */
-beginMap('engine',{note:'Buy doors and clear debris to push out from the courtyard. Perk machines are spread through every area, Pump-a-Punch waits inside the lab, and the areas hold ammo crates, the armor locker and the Mystery Crate.',name:'Dead Engine',sub:'A frozen research site with a machine that hums',sky:0x161021,fog:0.024,hemi:[0x6a5a8a,0x1a1418,0.6],moon:[0xb8a8e0,0.42],start:[0,15],yaw:0,cam:[14,9],tag:'Cold, dark, and humming. So are they.',
+beginMap('engine',{note:'Buy doors and clear debris to push out from the courtyard. Perk machines are spread through every area, Pump-a-Punch sits at the far end of the Rail Yard, the deepest point of the site, and the areas hold ammo crates, the armor locker and the Mystery Crate.',name:'Dead Engine',sub:'A frozen research site with a machine that hums',sky:0x161021,fog:0.024,hemi:[0x6a5a8a,0x1a1418,0.6],moon:[0xb8a8e0,0.42],start:[0,15],yaw:0,cam:[14,9],tag:'Cold, dark, and humming. So are they.',
   doors:[],portals:[],
   zones:[{id:'barn',name:'Barn',x0:30,x1:42,z0:-10,z1:6,roof:true},{id:'farm',name:'Farmhouse',x0:-42,x1:-30,z0:-8,z1:8},{id:'court',name:'Courtyard',x0:-18,x1:18,z0:-22,z1:22},
     {id:'lab',name:'Research Lab',x0:-18,x1:18,z0:-40,z1:-22,roof:true},{id:'east',name:'East Yard',x0:18,x1:30,z0:-22,z1:22},{id:'west',name:'West Yard',x0:-30,x1:-18,z0:-22,z1:22},
@@ -1163,7 +1163,7 @@ beginMap('engine',{note:'Buy doors and clear debris to push out from the courtya
     ['lab',-16.5,-36],['lab',16.5,-36],['lab',-16.5,-25],['lab',16.5,-25],['lab',-6,-38.6],['lab',6,-38.6],
     ['eastN',40,-20],['eastS',40,20],['east',27,-19.5],['east',24,20],['barn',39,-8.5],['barn',40.5,4.8],
     ['westN',-40,-20],['westS',-40,20],['west',-27,-19.5],['west',-24,20],['farm',-39,-6],['farm',-38.5,6.5],
-    ['rail',-38,34],['rail',38,34],['rail',-5,33.4],['rail',-26,34],['rail',26,34]].map(([zone,x,z])=>({zone,x,z})),
+    ['rail',-38,34],['rail',38,34],['rail',-7.5,33.4],['rail',-26,34],['rail',26,34]].map(([zone,x,z])=>({zone,x,z})),
   radar:[[[[-18,-40],[18,-40],[18,-22],[-18,-22]],'rgba(241,236,226,.22)'],[[[30,-10],[42,-10],[42,6],[30,6]],'rgba(170,50,40,.3)'],[[[-42,-8],[-30,-8],[-30,8],[-42,8]],'rgba(150,120,80,.3)'],[[[-5,-2],[5,-2],[5,2],[-5,2]],'rgba(176,74,255,.35)']],
   ready:'The machine is waking up',first:'The machine woke them',hold:'Hold the site',held:'You held the site until wave ',empty:'No runs yet. The machine is humming and the lab lights still flicker.'});
 {
@@ -1256,7 +1256,6 @@ beginMap('engine',{note:'Buy doors and clear debris to push out from the courtya
   addBox(1.2,2.2,1.2,lam(0x2a2e34),-16.8,1.1,-34,{collide:true}); addBox(1.2,2.2,1.2,lam(0x2a2e34),16.8,1.1,-34,{collide:true});
   [[-8,5.6,-31,0x9fc0ff],[8,5.6,-31,0x9fc0ff],[0,5.6,-26,0xffd0a0],[0,5.6,-37,0xb070ff]].forEach(([x,y,z,c])=>{ const l=new THREE.PointLight(c,0.9,20,1.5); l.position.set(x,y,z); world.add(l);
     addBox(1.6,0.1,0.4,new THREE.MeshBasicMaterial({color:c}),x,6.35,z,{cast:false,solid:false}); });
-  buildPap(0,-33);
 
   /* barn in the east yard: walk in through the big west door */
   wallLine('x',30,-10.3,6.3,[[-3,1]],6,red); addBox(0.6,1.8,4,red,30,5.1,-1,{cast:false}); wallLine('z',-10,30,42,[],6,red); wallLine('z',6,30,42,[],6,red);
@@ -1293,6 +1292,10 @@ beginMap('engine',{note:'Buy doors and clear debris to push out from the courtya
     addBox(2,2.6,0.1,woodD,x,2.1,26.95,{cast:false});
     for(const wx of [-3.6,3.6]) addBox(1.4,0.6,2.6,lam(0x18181a),x+wx,0.3,28.5,{solid:false});
   });
+  /* Pump-a-Punch at the far end of the rail yard, the deepest point of the site and two buys from the start; flush to the fence so nothing gets stuck behind it */
+  buildPap(0,35.1);
+  { const l=new THREE.PointLight(0xb04aff,1.2,22,1.4); l.position.set(0,6,33.4); world.add(l);
+    addBox(3.2,0.15,1.6,concreteD,0,0.075,34.9,{cast:false,solid:false}); }
 
   /* courtyard dressing */
   function sandbags(x,z,len,ry){ addBox(len,0.9,0.9,sand,x,0.45,z,{collide:true,ry}); addBox(len-0.4,0.35,0.8,lam(0x9a8a66),x,1.07,z,{ry,cast:false}); }
@@ -1949,16 +1952,18 @@ function updateZombies(dt){
     }
     if(z.type!=='spitter'&&z.type!=='mother'&&z.type!=='screamer'&&z.mode!=='charge'&&!title&&dist<d.reach*0.8) move=0;
     if(z.detour>0&&z.mode!=='charge'){ z.detour-=dt; mx=z.ddir.x; mz=z.ddir.z; }
+    const ox0=p.x, oz0=p.z;
     if(move>0){ p.x+=mx*speed*move*dt; p.z+=mz*speed*move*dt; }
     if(z.kbv.x||z.kbv.z){ p.x+=z.kbv.x*dt; p.z+=z.kbv.z*dt; z.kbv.multiplyScalar(Math.max(0,1-dt*6)); if(Math.abs(z.kbv.x)+Math.abs(z.kbv.z)<0.1) z.kbv.set(0,0,0); }
-    const blocked=z.mode==='air'?false:resolveCircle(p,d.radius);
-    if(blocked&&move>0&&lastHit&&z.detour<=0){ z.stuck+=dt;
+    const blocked=z.mode==='air'?false:resolveCircle(p,d.radius), slid=blocked&&move>0&&Math.hypot(p.x-ox0,p.z-oz0)>speed*move*dt*0.5;
+    if(blocked&&!slid&&move>0&&lastHit&&z.detour<=0){ z.stuck+=dt;
       if(z.stuck>0.2){ const c=lastHit, cx=(c.minX+c.maxX)/2, cz=(c.minZ+c.maxZ)/2, r=d.radius+0.6; let dist2;
         const bl=(x,y)=>colliders.some(o=>o!==c&&x>o.minX-d.radius+0.05&&x<o.maxX+d.radius-0.05&&y>o.minZ-d.radius+0.05&&y<o.maxZ+d.radius-0.05);
-        if(p.z<c.minZ||p.z>c.maxZ){ let dir=(tx<c.minX)?-1:(tx>c.maxX)?1:(p.x<cx?-1:1); if(bl(dir<0?c.minX:c.maxX,p.z)&&!bl(dir<0?c.maxX:c.minX,p.z)) dir=-dir; z.ddir.set(dir,0,0); dist2=Math.abs((dir<0?c.minX-r:c.maxX+r)-p.x); }
+        const ox=p.x<c.minX?c.minX-p.x:(p.x>c.maxX?p.x-c.maxX:0), oz=p.z<c.minZ?c.minZ-p.z:(p.z>c.maxZ?p.z-c.maxZ:0);
+        if(oz>ox){ let dir=(tx<c.minX)?-1:(tx>c.maxX)?1:(p.x<cx?-1:1); if(bl(dir<0?c.minX:c.maxX,p.z)&&!bl(dir<0?c.maxX:c.minX,p.z)) dir=-dir; z.ddir.set(dir,0,0); dist2=Math.abs((dir<0?c.minX-r:c.maxX+r)-p.x); }
         else{ let dir=(tz<c.minZ)?-1:(tz>c.maxZ)?1:(p.z<cz?-1:1); if(bl(p.x,dir<0?c.minZ:c.maxZ)&&!bl(p.x,dir<0?c.maxZ:c.minZ)) dir=-dir; z.ddir.set(0,0,dir); dist2=Math.abs((dir<0?c.minZ-r:c.maxZ+r)-p.z); }
         z.detour=Math.min(6,dist2/Math.max(0.5,speed)+0.5); z.stuck=0; } }
-    else if(!blocked) z.stuck=Math.max(0,z.stuck-dt);
+    else if(!blocked||slid) z.stuck=Math.max(0,z.stuck-dt);
     if(z.mode==='charge'&&blocked){ z.mode='walk'; z.chargeCd=rand(4,6)*bossCd(); shake+=0.3; burst(new THREE.Vector3(p.x,1,p.z),12,'dust',4,3,0.6); z.stagger=0.8; }
     p.x=clamp(p.x,-92,92); p.z=clamp(p.z,-92,92);
     if(canAct&&curMap.zones&&z.mode!=='air'){ const zi=zoneAt(p.x,p.z); if(zi<0||!curMap.zones[zi].open){ const [sx2,sz2]=spawnPoint(40,60); p.x=sx2; p.z=sz2; z.bestD=1e9; z.noProg=0; z.detour=0; if(z.mode==='charge') z.mode='walk'; } }
