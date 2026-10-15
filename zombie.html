@@ -2933,11 +2933,12 @@ function swapWeapon(i){
 }
 function updateWeapon(dt){
   if(papT>0){ papT-=dt; if(papT<=0) finishPap(); }
-  fireCd=fireCd>0?fireCd-dt:0; if(swapT>0) swapT-=dt;
+  fireCd-=dt; if(swapT>0) swapT-=dt;
   const s=inv[cur], w=W(s), gn=guns[s.id];
   if(reloading){ reloadT-=dt; if(reloadT<=0){ reloading=false; const take=Math.min(w.mag-s.mag,s.res); s.mag+=take; if(s.res!==Infinity) s.res-=take; } }
   if(w.spin&&mouseDown&&s.mag>0&&!reloading) spinT=Math.min(2,spinT+dt); else spinT=Math.max(0,spinT-dt*2);
   if(mouseDown||s.bq>0) fire();
+  if(fireCd<0) fireCd=0;
   adsT=clamp(adsT+((ads&&!reloading&&swapT<=0&&papT<=0)?1:-1)*dt*(hasPerk('dead')?12:7),0,1);
   const fov=75+(w.adsFov-75)*adsT; if(Math.abs(camera.fov-fov)>0.01){ camera.fov=fov; camera.updateProjectionMatrix(); }
   gunKick=Math.max(0,gunKick-dt*0.6);
