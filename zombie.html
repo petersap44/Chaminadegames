@@ -304,7 +304,7 @@
           <dt><kbd>Shift</kbd></dt><dd>Sprint</dd>
           <dt><kbd>Space</kbd></dt><dd>Jump</dd>
           <dt><kbd>G</kbd></dt><dd>Throw grenade</dd>
-          <dt><kbd>F</kbd></dt><dd>Use Pump-a-Punch, perks, wall guns, ammo crates, armor and the Mystery Crate</dd>
+          <dt><kbd>F</kbd></dt><dd>Use Pump-a-Punch, perks, ammo crates, armor and the Mystery Crate</dd>
           <dt><kbd>Esc</kbd></dt><dd>Pause</dd>
         </dl>
         <dl class="keys touch-only">
@@ -314,7 +314,7 @@
           <dt><kbd>Aim</kbd></dt><dd>Toggle sights</dd>
           <dt><kbd>Swap</kbd></dt><dd>Switch weapons</dd>
           <dt><kbd>Nade</kbd></dt><dd>Throw grenade</dd>
-          <dt><kbd>Punch / Buy</kbd></dt><dd>Use Pump-a-Punch, perks, wall guns, ammo crates, armor and the Mystery Crate</dd>
+          <dt><kbd>Punch / Buy</kbd></dt><dd>Use Pump-a-Punch, perks, ammo crates, armor and the Mystery Crate</dd>
         </dl>
       </div>
       <div>
@@ -468,7 +468,7 @@ function flat(w,d,canvas,rep,x,y,z){
   m.rotation.x=-Math.PI/2; m.position.set(x,y,z); m.receiveShadow=true; world.add(m); return m;
 }
 
-beginMap('station',{note:'Pump-a-Punch is the glowing machine behind the store and perk machines line the store front. You can hold 4 perks. Out on the lot are wall guns, ammo crates, an armor locker and the Mystery Crate.',tag:'Gas and food, open all night. So are they.',name:'Last Stop',sub:'The all-night gas station',sky:0x0c1320,fog:0.021,hemi:[0x50608a,0x20180c,0.65],moon:[0x9fb0e0,0.5],start:[0,4],yaw:Math.PI,
+beginMap('station',{note:'Pump-a-Punch is the glowing machine behind the store and perk machines line the store front. You can hold 4 perks. Out on the lot are ammo crates, an armor locker and the Mystery Crate.',tag:'Gas and food, open all night. So are they.',name:'Last Stop',sub:'The all-night gas station',sky:0x0c1320,fog:0.021,hemi:[0x50608a,0x20180c,0.65],moon:[0x9fb0e0,0.5],start:[0,4],yaw:Math.PI,
   ready:'They are coming from the road',first:'They heard the generator',hold:'Hold the station',held:'You held the station until wave ',empty:'No runs yet. The pumps are on and the lights still work.'});
 /* sky */
 {
@@ -643,9 +643,10 @@ const WEAPONS={
   lmg:{name:'LMG',price:3000,dmg:30,rate:0.08,mag:100,reserve:300,reload:4.2,spread:0.012,adsSpread:0.45,pellets:1,recoil:0.008,kick:0.03,adsFov:58,sound:'lmg',heavy:0.85,bars:[4,8,10],desc:'A 100-round belt. Slows you down and takes ages to reload.'},
   raygun:{name:'Ray Gun',price:5000,dmg:150,splash:90,splashR:3.2,rate:0.3,mag:20,reserve:160,reload:2.0,spread:0.006,adsSpread:0.5,pellets:1,recoil:0.015,kick:0.05,adsFov:60,sound:'ray',projectile:true,flash:0x7dff6a,bars:[9,5,4],desc:'Fires plasma bolts that burst and splash nearby zombies.'},
   flamer:{name:'Pump Nozzle',price:7500,dmg:6,rate:0.05,mag:100,reserve:400,reload:2.5,spread:0.02,adsSpread:0.6,pellets:1,recoil:0.0012,kick:0.008,adsFov:64,sound:'flame',flame:true,flameV:21,poolT:5,poolR:1.5,flash:0xff8a2a,bars:[6,10,6],desc:'Lobs a long stream of liquid fire that leaves burning pools on the ground.'},
+  thumper:{name:'M79 Thumper',price:3500,dmg:300,rate:0.5,mag:1,reserve:24,reload:1.4,spread:0.004,adsSpread:0.5,pellets:1,recoil:0.06,kick:0.14,adsFov:60,sound:'thump',thumper:true,blastR:6,flash:0xffb060,bars:[9,2,1],desc:'Lobs 40mm grenades that explode on impact. Big blast, slow reload.'},
   tesla:{name:'Tesla Cannon',price:10000,dmg:420,chain:10,chainR:11,rate:0.45,mag:12,reserve:84,reload:2.2,spread:0,adsSpread:1,pellets:1,recoil:0.03,kick:0.08,adsFov:62,sound:'zap',tesla:true,flash:0x8fd0ff,bars:[10,5,3],desc:'Lightning that jumps between up to ten zombies and stuns them.'}
 };
-const SHOP_ORDER=['smg','shotgun','rifle','sniper','lmg','flamer','tesla'];
+const SHOP_ORDER=['smg','shotgun','rifle','sniper','lmg','thumper','flamer','tesla'];
 const CASH={walker:50,runner:60,spitter:90,bloater:90,brute:175,riot:120,screamer:160,stalker:150,spider:300,butcher:1500,mother:1500,leaper:1500,torch:1500};
 const BOSSES=['butcher','mother','leaper','torch'];
 function bossList(c){ const n=c<=4?1:(c<=8?2:3), l=[]; for(let k=0;k<n;k++) l.push(BOSSES[(c-1+k)%4]); return l; }
@@ -704,6 +705,11 @@ const MODELS={
     add(new THREE.ConeGeometry(0.055,0.07,14),gRed,0,0,-0.39,P2); add(new THREE.SphereGeometry(0.02,10,8),gGreenGlow,0,0,-0.39);
     add(BX(0.006,0.07,0.09),gRed,0,0.06,-0.05); add(BX(0.04,0.11,0.05),gRed,0,-0.08,0.02,-0.3); add(BX(0.07,0.006,0.06),gRed,0,-0.03,0.08);
     return finish([0,0,-0.43],[0.2,-0.19,-0.34],[0,-0.075,-0.3],0.3,0x7dff6a); },
+  thumper(){ const {add,finish}=gunKit();
+    add(CY(0.045,0.045,0.38,14),gOlive,0,0.02,-0.3,P2); add(CY(0.05,0.05,0.025,14),gDark,0,0.02,-0.49,P2);
+    add(BX(0.08,0.09,0.16),gMetal,0,0,-0.04); add(BX(0.06,0.11,0.3),gWood,0,-0.04,0.18,0.15);
+    add(BX(0.04,0.1,0.05),gWood,0,-0.08,0.02,-0.3); add(BX(0.008,0.06,0.03),gDark,0,0.085,-0.2); add(BX(0.07,0.03,0.18),gWood,0,-0.035,-0.3);
+    return finish([0,0.02,-0.5],[0.21,-0.21,-0.36],[0,-0.09,-0.3],0.38,0xffb060); },
   flamer(){ const {add,finish}=gunKit(); const yel=new THREE.MeshLambertMaterial({color:0xd9a62a});
     add(BX(0.06,0.13,0.05),gDark,0,-0.08,0.06,-0.25); add(BX(0.07,0.065,0.26),yel,0,0,-0.04); add(BX(0.05,0.02,0.18),gDark,0,-0.045,-0.02);
     add(CY(0.022,0.026,0.3),gMetal,0,0,-0.3,P2); add(CY(0.016,0.02,0.14),gMetal,0,-0.03,-0.5,P2+0.35);
@@ -731,6 +737,7 @@ const PAP={
   sniper:[{name:'Longshot',d:'Double damage, bigger magazine'},{name:'Rail Gun',pierce:99,wallPierce:true,d:'Pierces every zombie and wall'},{name:'Judgment',rateMul:0.6,headBoom:true,d:'Headshot kills explode, faster fire'}],
   lmg:[{name:'Belt Fed',d:'Double damage, 150-round belt'},{name:'Grinder',heavy:1,reloadMul:0.5,d:'No slowdown, much faster reload'},{name:'Meat Grinder',spin:true,pierce:2,d:'Spins up faster the longer you fire, pierces'}],
   raygun:[{name:'Ray Gun X',red:true,flash:0xff4a2a,d:'Red bolts, double damage and splash'},{name:'Ray Gun XX',burst:3,d:'Fires a 3-bolt burst'},{name:'Ray Gun Omega',homing:true,pool:true,d:'Homing bolts that leave plasma pools'}],
+  thumper:[{name:'Big Thump',blastR:7,mag:2,d:'Double damage, bigger blast, 2 rounds'},{name:'Cluster Thump',cluster:true,mag:3,d:'Rounds burst into 4 bomblets, 3 rounds'},{name:'Doomsday',blastR:9,crater:true,bossBonus:1.5,mag:5,d:'Huge blast, burning craters, bosses take 50% more, 5 rounds'}],
   flamer:[{name:'Full Service',flameV:24,poolT:7,d:'Double damage, longer range, longer-lasting pools'},{name:'Sticky Fire',sticky:true,d:'Burning zombies drip trails of fire'},{name:'Premium Inferno',inferno:true,blue:true,slow:true,flash:0x4ab0ff,d:'Blue fire that slows zombies, and burning kills explode'}],
   tesla:[{name:'Storm Bringer',chain:14,d:'More damage, chains to 14 zombies'},{name:'Thunderhead',chain:18,freeze:true,d:'Freezes zombies, chains to 18'},{name:'Zeus',zeus:true,d:'Calls lightning strikes from the sky'}]
 };
@@ -839,13 +846,80 @@ function igniteZ(z,w,direct){
 }
 function firePool(pt,w,sc){
   const r=w.poolR*(sc||1);
-  for(const p of pools){ if(p.fire&&Math.hypot(p.x-pt.x,p.z-pt.z)<Math.max(r,p.r)*0.75){ p.t=Math.max(p.t,w.poolT); p.dps=Math.max(p.dps,w.dmg*4); if(w.tier>(p.w.tier||0)) p.w=w; return; } }
+  for(const p of pools){ if(p.fire&&Math.hypot(p.x-pt.x,p.z-pt.z)<Math.max(r,p.r)*0.75){ p.t=Math.max(p.t,w.poolT); p.dps=Math.max(p.dps,w.dmg*4); if(w.tier>(p.w.tier||0)) p.w=w;
+    if(r>p.r){ p.r=r; p.x=pt.x; p.z=pt.z; p.m.position.x=pt.x; p.m.position.z=pt.z; p.m.scale.setScalar(r); } return; } }
   let fireCount=0, oldest=-1; for(let i=0;i<pools.length;i++) if(pools[i].fire){ fireCount++; if(oldest<0) oldest=i; }
   if(fireCount>=50&&oldest>=0){ const o=pools[oldest]; scene.remove(o.m); o.m.material.dispose(); pools.splice(oldest,1); }
   const m=new THREE.Mesh(poolGeo,new THREE.MeshBasicMaterial({color:w.blue?0x3a8aff:0xff6a1a,transparent:true,opacity:0.55,blending:THREE.AdditiveBlending,depthWrite:false}));
   m.rotation.x=-Math.PI/2; m.position.set(pt.x,0.06+Math.random()*0.02,pt.z); m.scale.setScalar(r); scene.add(m);
   pools.push({m,x:pt.x,z:pt.z,r,t:w.poolT,dps:w.dmg*4,fire:true,w});
 }
+
+/* blasts and the M79 Thumper */
+function blastFalloff(d,r){ return d<=r*0.5?1:1-0.4*Math.min(1,(d-r*0.5)/(r*0.5)); }
+const scorchGeo=new THREE.RingGeometry(0.88,1,48);
+function blast(pt,r,zDmg,bDmg,selfDmg,color,loud){
+  if(loud!==false) sfx.explode(); else sfx.pop();
+  const sph=new THREE.Mesh(boomGeo,new THREE.MeshBasicMaterial({color:color||0xffa040,transparent:true,opacity:0.85,blending:THREE.AdditiveBlending,depthWrite:false}));
+  sph.position.copy(pt); scene.add(sph); effects.push({obj:sph,t:0.45,max:0.45,kind:'boom2',r});
+  const ring=new THREE.Mesh(scorchGeo,new THREE.MeshBasicMaterial({color:color||0xffa040,transparent:true,opacity:0.7,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false}));
+  ring.rotation.x=-Math.PI/2; ring.position.set(pt.x,0.09,pt.z); ring.scale.setScalar(r); scene.add(ring); effects.push({obj:ring,t:1.1,max:1.1,kind:'scorch'});
+  boomLight.color.setHex(color||0xff8a30); boomLight.position.copy(pt).setY(2); boomLight.intensity=3.5;
+  burst(pt,loud===false?10:24,'spark',9,7,0.6); burst(pt,loud===false?4:10,'dust',5,4,0.8);
+  const dp=Math.hypot(player.pos.x-pt.x,(player.pos.y+1)-pt.y,player.pos.z-pt.z);
+  if(selfDmg>0&&dp<r) hurt(selfDmg*blastFalloff(dp,r));
+  shake+=(loud===false?0.2:0.55)*(1-Math.min(1,dp/30));
+  let hitAny=false, killed=false;
+  for(const z of zombies){
+    if(z.dead) continue;
+    const dh=Math.max(0,Math.hypot(z.root.position.x-pt.x,z.root.position.z-pt.z)-z.d.radius), dy=Math.max(0,pt.y-(z.root.position.y+2*z.d.scale)), d=Math.hypot(dh,dy);
+    if(d<r){ damageZombie(z,(z.d.boss?bDmg:zDmg)*blastFalloff(d,r),false,null,false); hitAny=true; if(z.dead) killed=true; else if(!z.d.boss) z.stagger=Math.max(z.stagger,0.4); }
+  }
+  if(hitAny) showHit(killed);
+}
+const shells=[], bomblets=[];
+const shellGeo=new THREE.SphereGeometry(0.07,8,6), shellMat=new THREE.MeshLambertMaterial({color:0x4a5a32}), bombletMat=new THREE.MeshBasicMaterial({color:0xffb060});
+const _sd=new THREE.Vector3();
+function fireShell(w,spread){
+  _sd.copy(_muz).sub(camera.position); const md=_sd.length(); _bray.set(camera.position,_sd.normalize()); _bray.far=md;
+  const bh=_bray.intersectObjects(getHittables(),false); if(bh.length){ thumpBlast(bh[0].point.clone().addScaledVector(_sd,-0.2),w); return; }
+  _fd.set((Math.random()-0.5)*2*spread,(Math.random()-0.5)*2*spread+0.012,-1).normalize().applyQuaternion(camera.quaternion);
+  const m=new THREE.Mesh(shellGeo,shellMat); m.scale.set(1,1,1.6); m.position.copy(_muz); scene.add(m);
+  shells.push({m,vel:_fd.clone().multiplyScalar(40),life:6,w,trail:0});
+}
+function thumpBlast(pt,w){
+  const self=hasPerk('fire')?0:20;
+  blast(pt,w.blastR,w.dmg,w.dmg*(w.bossBonus||1),self,w.tier>=3?0xff6a2a:0xffa040,true);
+  if(w.crater) firePool(new THREE.Vector3(pt.x,0,pt.z),{poolR:w.blastR*0.45,poolT:5,dmg:w.dmg*0.03,tier:0},1);
+  if(w.cluster) for(let k=0;k<4;k++){
+    const a=k*Math.PI/2+rand(-0.4,0.4), sp=rand(5,8);
+    const m=new THREE.Mesh(shellGeo,bombletMat); m.position.set(pt.x,Math.max(0.5,pt.y),pt.z); scene.add(m);
+    bomblets.push({m,vel:new THREE.Vector3(Math.cos(a)*sp,rand(4,6),Math.sin(a)*sp),life:2,arm:0.2,w});
+  }
+}
+function updateShells(dt){
+  for(let i=shells.length-1;i>=0;i--){
+    const s=shells[i]; s.vel.y-=9*dt; const step=s.vel.length()*dt; s.life-=dt;
+    _sd.copy(s.vel).normalize(); _bray.set(s.m.position,_sd); _bray.far=step;
+    const hits=_bray.intersectObjects(getHittables(),false);
+    let pt=null;
+    if(hits.length) pt=hits[0].point.clone().addScaledVector(_sd,-0.2);
+    else{ s.m.position.addScaledVector(s.vel,dt); s.m.lookAt(s.m.position.clone().add(_sd)); if(s.m.position.y<=0.05) pt=s.m.position.clone().setY(0.1); }
+    if(!pt&&s.life<=0) pt=s.m.position.clone();
+    s.trail-=dt; if(s.trail<=0&&!pt){ s.trail=0.03; burst(s.m.position.clone(),1,'dust',0.3,0.3,0.4,0.06); }
+    if(pt){ scene.remove(s.m); shells.splice(i,1); thumpBlast(pt,s.w); }
+  }
+  for(let i=bomblets.length-1;i>=0;i--){
+    const b=bomblets[i]; b.vel.y-=14*dt; b.life-=dt; b.arm-=dt;
+    _sd.copy(b.vel).normalize(); _bray.set(b.m.position,_sd); _bray.far=b.vel.length()*dt;
+    const bh=_bray.intersectObjects(solids,false);
+    if(bh.length) b.m.position.copy(bh[0].point).addScaledVector(_sd,-0.1); else b.m.position.addScaledVector(b.vel,dt);
+    const q=b.m.position; let go=bh.length>0||q.y<=0.1||b.life<=0;
+    if(!go&&b.arm<=0) for(const z of zombies){ if(z.dead) continue; const dx=z.root.position.x-q.x, dz=z.root.position.z-q.z, r=z.d.radius+0.3; if(dx*dx+dz*dz<r*r&&q.y<2*z.d.scale){ go=true; break; } }
+    if(go){ scene.remove(b.m); bomblets.splice(i,1); blast(new THREE.Vector3(q.x,Math.max(0.3,q.y),q.z),b.w.blastR*0.5,b.w.dmg*0.4,b.w.dmg*0.4*(b.w.bossBonus||1),hasPerk('fire')?0:8,0xffb060,false); }
+  }
+}
+
 function updateGlobs(dt){
   for(let i=globs.length-1;i>=0;i--){
     const g=globs[i]; g.vel.y-=18*dt; g.m.position.addScaledVector(g.vel,dt); g.life-=dt; g.m.scale.multiplyScalar(1+dt*0.9);
@@ -909,7 +983,7 @@ function gAdd(g,geo,mat,x,y,z,solid){ const o=new THREE.Mesh(geo,mat); o.positio
 function signTex(w,h,draw){ const c=document.createElement('canvas'); c.width=w; c.height=h; draw(c.getContext('2d'),w,h); return new THREE.CanvasTexture(c); }
 
 const BOX_PRICE=950, BOX_SPIN=3.2, BOX_OFFER=9;
-const BOX_POOL=[['smg',12],['shotgun',12],['rifle',12],['sniper',9],['lmg',9],['flamer',8],['tesla',6],['raygun',6]];
+const BOX_POOL=[['smg',12],['shotgun',12],['rifle',12],['sniper',9],['lmg',9],['raygun',3]];
 function buildBox(x,z,ry){
   const g=placeGroup(x,z,ry), M=curBuild();
   const wood=lam(0x4a3220), band=lam(0x2a2a2e);
@@ -1074,14 +1148,13 @@ function buildPerk(id,x,z,ry){
   footprint(x,z,ry,1.2,0.85,2.2);
 }
 buildPerks([-11.9,-10.5,-9.1,-7.7,1.5,2.9,4.3,5.7],-11.5);
-buildWall('smg',-13,-15,-Math.PI/2); buildWall('shotgun',13,-15,Math.PI/2); buildWall('sniper',13,-20.5,Math.PI/2); buildWall('rifle',6,-23,Math.PI);
 buildBox(-20,-2,Math.PI/2);
 buildAmmo(11,-9.5,0); buildAmmo(-14,22,Math.PI);
 buildArmor(-22,-16,Math.PI/2);
 endMap('station');
 
 /* map 2: Dead Engine, a frozen research site built around a humming machine */
-beginMap('engine',{note:'Buy doors and clear debris to push out from the courtyard. Perk machines are spread through every area, Pump-a-Punch waits inside the lab, and each area has its own wall guns, ammo crates and the armor locker.',name:'Dead Engine',sub:'A frozen research site with a machine that hums',sky:0x161021,fog:0.024,hemi:[0x6a5a8a,0x1a1418,0.6],moon:[0xb8a8e0,0.42],start:[0,15],yaw:0,cam:[14,9],tag:'Cold, dark, and humming. So are they.',
+beginMap('engine',{note:'Buy doors and clear debris to push out from the courtyard. Perk machines are spread through every area, Pump-a-Punch waits inside the lab, and the areas hold ammo crates, the armor locker and the Mystery Crate.',name:'Dead Engine',sub:'A frozen research site with a machine that hums',sky:0x161021,fog:0.024,hemi:[0x6a5a8a,0x1a1418,0.6],moon:[0xb8a8e0,0.42],start:[0,15],yaw:0,cam:[14,9],tag:'Cold, dark, and humming. So are they.',
   doors:[],portals:[],
   zones:[{id:'barn',name:'Barn',x0:30,x1:42,z0:-10,z1:6,roof:true},{id:'farm',name:'Farmhouse',x0:-42,x1:-30,z0:-8,z1:8},{id:'court',name:'Courtyard',x0:-18,x1:18,z0:-22,z1:22},
     {id:'lab',name:'Research Lab',x0:-18,x1:18,z0:-40,z1:-22,roof:true},{id:'east',name:'East Yard',x0:18,x1:30,z0:-22,z1:22},{id:'west',name:'West Yard',x0:-30,x1:-18,z0:-22,z1:22},
@@ -1245,8 +1318,7 @@ beginMap('engine',{note:'Buy doors and clear debris to push out from the courtya
   buildPerk('road',24,-21.25,0); buildPerk('cash',41.25,-6,-Math.PI/2);
   buildPerk('fire',-24,-21.25,0); buildPerk('wire',-41.25,3,Math.PI/2);
 
-  /* wall guns, crate, ammo and armor */
-  buildWall('smg',-10,21.7,Math.PI); buildWall('rifle',-17.7,-30,Math.PI/2); buildWall('shotgun',29.7,3.8,-Math.PI/2); buildWall('sniper',-29.7,5,Math.PI/2); buildWall('lmg',0,35.7,Math.PI);
+  /* crate, ammo and armor */
   buildBox(-14,-12,Math.PI/2);
   buildAmmo(10,21.24,Math.PI); buildAmmo(36,-9.24,0); buildAmmo(-12,35.24,Math.PI);
   buildArmor(12,35.2,Math.PI);
@@ -1393,7 +1465,7 @@ function resetBox(){
   box={st:'idle',t:0,pick:null,cyc:0,shown:null};
   for(const k in MAPS){ const R=MAPS[k].boxRef; if(!R) continue; R.pivot.rotation.x=0; for(const id in R.shows) R.shows[id].visible=false; R.beamMat.opacity=0.22; R.light.intensity=0.9; }
 }
-function boxShow(R,id){ if(box.shown===id) return; if(box.shown) R.shows[box.shown].visible=false; box.shown=id; if(id) R.shows[id].visible=true; }
+function boxShow(R,id){ if(box.shown===id) return; if(box.shown&&R.shows[box.shown]) R.shows[box.shown].visible=false; box.shown=id; if(id&&R.shows[id]) R.shows[id].visible=true; }
 function updateBox(dt){
   const R=curMap.boxRef; if(!R) return;
   const t=performance.now()/1000, open=box.st==='spin'||box.st==='offer';
@@ -1480,6 +1552,7 @@ const sfx={
   lmg(){ nz(0.16,1500,0.6); tn(120,40,0.1,'square',0.18); },
   sniper(){ nz(0.55,1300,1.0); tn(90,30,0.45,'square',0.32); },
   ray(){ tn(1500,180,0.26,'sine',0.25); tn(760,120,0.2,'square',0.05); },
+  thump(){ tn(150,55,0.16,'sine',0.35); nz(0.12,500,0.3); },
   flame(){ if(Math.random()<0.5) nz(0.18,650,0.16,'bandpass',0.7); },
   zap(){ nz(0.35,3200,0.45,'highpass'); tn(80,55,0.32,'sawtooth',0.22); setTimeout(()=>nz(0.15,4000,0.25,'highpass'),60); },
   scream(){ tn(900,1700,0.65,'sawtooth',0.12); tn(1300,650,0.65,'square',0.05); nz(0.65,3000,0.22,'bandpass',3); },
@@ -1560,6 +1633,8 @@ function updateEffects(dt){
   boomLight.intensity=Math.max(0,boomLight.intensity-dt*10);
   for(let i=effects.length-1;i>=0;i--){
     const e=effects[i]; e.t-=dt;
+    if(e.kind==='boom2'){ const k=1-e.t/e.max; e.obj.scale.setScalar(Math.max(0.01,e.r*Math.sqrt(k))); e.obj.material.opacity=0.85*(1-k); }
+    if(e.kind==='scorch'){ e.obj.material.opacity=0.7*(e.t/e.max); }
     if(e.kind==='pulse'){ const k=1-e.t/e.max; e.obj.scale.setScalar(Math.max(0.01,e.r*k)); e.obj.material.opacity=0.8*(1-k); }
     if(e.kind==='boom'){ const k=1-e.t/e.max; e.obj.scale.setScalar(e.r*(0.3+k*0.9)); e.obj.material.opacity=0.9*(1-k); }
     if(e.t<=0){ scene.remove(e.obj); if(e.kind==='tracer') e.obj.geometry.dispose(); else e.obj.material.dispose(); effects.splice(i,1); }
@@ -1988,7 +2063,7 @@ function updateGrenades(dt){
       for(const z of zombies){ if(z.dead) continue; if(Math.hypot(z.root.position.x-q.x,z.root.position.z-q.z)<z.d.radius+0.35&&q.y<2.2*z.d.scale+z.root.position.y){ boom=q.clone(); break; } }
       if(!boom&&(q.y<=0.08||g.life<=0)) boom=q.clone();
     }
-    if(boom){ scene.remove(g.m); grenades.splice(i,1); boom.y=Math.max(0.4,boom.y); explode(boom,6.5,hasPerk('fire')?0:14,null,380*(1+0.09*Math.max(0,wave-1)),260*bossHpMul()); burst(boom,16,'fire',5,4,0.5,0.14); }
+    if(boom){ scene.remove(g.m); grenades.splice(i,1); boom.y=Math.max(0.4,boom.y); blast(boom,8,380*(1+0.09*Math.max(0,wave-1)),260*bossHpMul(),hasPerk('fire')?0:14,0xffa040,true); burst(boom,16,'fire',5,4,0.5,0.14); }
   }
 }
 function dropNade(pos){
@@ -2214,6 +2289,8 @@ function fire(){
     const target=hits.length&&hits[0].distance>1.5?hits[0].point.clone():camera.position.clone().addScaledVector(_dir,100);
     const bd=target.sub(_muz).normalize(), n=w.burst||1;
     for(let k=0;k<n;k++){ const d2=bd.clone(); const ang=(k-(n-1)/2)*0.045; if(ang) d2.applyAxisAngle(_up,ang); fireBolt(_muz.clone(),d2,w); }
+  }else if(w.thumper){
+    fireShell(w,spread);
   }else if(w.flame){
     flameShot(w);
   }else if(w.tesla){
@@ -2453,6 +2530,7 @@ function clearWorld(){
   projectiles.forEach(p=>{ scene.remove(p.m); p.m.geometry.dispose(); }); projectiles.length=0;
   bolts.forEach(b=>scene.remove(b.m)); bolts.length=0;
   globs.forEach(g=>scene.remove(g.m)); globs.length=0;
+  shells.forEach(x=>scene.remove(x.m)); shells.length=0; bomblets.forEach(x=>scene.remove(x.m)); bomblets.length=0;
   grenades.forEach(g=>scene.remove(g.m)); grenades.length=0;
   hazards.forEach(h=>{ scene.remove(h.m); h.m.material.dispose(); }); hazards.length=0;
   pools.forEach(p=>{ scene.remove(p.m); p.m.material.dispose(); }); pools.length=0;
@@ -2486,7 +2564,7 @@ function continueRun(){
   perks=(Array.isArray(d.perks)?d.perks:[]).filter(id=>PERKS[id]).slice(0,PERK_MAX); renderPerks();
   cheat=!!d.cheat; cheatUsed=!!d.cheatUsed||cheat;
   if(Array.isArray(d.doors)) for(const id of d.doors){ const D=curMap.doors.find(q=>q.id===id); if(D) openDoor(D,true); }
-  if(d.box&&WEAPONS[d.box]&&curMap.boxRef){ const pk=ownsGun(d.box)>=0?boxPick():d.box; box={st:'offer',t:0,pick:pk,cyc:0,shown:null}; boxShow(curMap.boxRef,pk); curMap.boxRef.preview.position.y=1.9; }
+  if(d.box&&WEAPONS[d.box]&&curMap.boxRef){ const pk=(ownsGun(d.box)>=0||!curMap.boxRef.shows[d.box])?boxPick():d.box; box={st:'offer',t:0,pick:pk,cyc:0,shown:null}; boxShow(curMap.boxRef,pk); curMap.boxRef.preview.position.y=1.9; }
   $('titleScreen').hidden=true; $('overScreen').hidden=true; $('pauseScreen').hidden=true;
   state='playing'; openShop(true);
 }
@@ -2742,7 +2820,7 @@ function loop(){
   if(state==='playing'){
     gameTime+=dt;
     updatePlayer(dt); updateWeapon(dt); updateZombies(dt); updateWaves(dt); updateBox(dt);
-    updateProjectiles(dt); updateBolts(dt); updateGlobs(dt); updateGrenades(dt); updateHazards(dt); updatePools(dt); updatePickups(dt); updateCamera(dt); updateHud(); drawRadar();
+    updateProjectiles(dt); updateBolts(dt); updateGlobs(dt); updateShells(dt); updateGrenades(dt); updateHazards(dt); updatePools(dt); updatePickups(dt); updateCamera(dt); updateHud(); drawRadar();
     hitT=Math.max(0,hitT-dt);
     groanT-=dt;
     if(groanT<=0){ groanT=rand(1.2,3);
