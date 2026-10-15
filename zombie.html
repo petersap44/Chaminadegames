@@ -454,6 +454,21 @@ function addBox(w,h,d,mat,x,y,z,o){
     colliders.push({minX:x-hw,maxX:x+hw,minZ:z-hd,maxZ:z+hd,h:y+h/2}); }
   return m;
 }
+/* merge a map's static meshes into one instanced draw per material and shape: the same picture with far fewer draw calls, which phones need */
+function batchStatic(group){
+  const unit=new THREE.BoxGeometry(1,1,1), sets=new Map(), sol=new Set(solids), sc=new THREE.Matrix4();
+  for(const o of group.children){
+    if(!o.isMesh||o.isInstancedMesh||o.userData.keep||!o.visible||Array.isArray(o.material)||o.material.transparent) continue;
+    const gp=o.geometry.parameters, box=o.geometry.type==='BoxGeometry'&&gp.widthSegments===1&&gp.heightSegments===1&&gp.depthSegments===1, solid=sol.has(o);
+    const k=(box?'box':o.geometry.uuid)+'|'+o.material.uuid+'|'+o.castShadow+'|'+o.receiveShadow+'|'+solid;
+    let st=sets.get(k); if(!st) sets.set(k,st={geo:box?unit:o.geometry,box,mat:o.material,cast:o.castShadow,recv:o.receiveShadow,solid,list:[]}); st.list.push(o);
+  }
+  for(const st of sets.values()){ if(st.list.length<2) continue;
+    const im=new THREE.InstancedMesh(st.geo,st.mat,st.list.length);
+    st.list.forEach((o,i)=>{ o.updateMatrix(); const m=o.matrix.clone(); if(st.box){ const q=o.geometry.parameters; m.multiply(sc.makeScale(q.width,q.height,q.depth)); } im.setMatrixAt(i,m);
+      group.remove(o); if(st.solid) solids.splice(solids.indexOf(o),1); });
+    im.castShadow=st.cast; im.receiveShadow=st.recv; group.add(im); if(st.solid) solids.push(im); }
+}
 function noiseCanvas(size,r,g,b,v,stains,grid){
   const c=document.createElement('canvas'); c.width=c.height=size; const x=c.getContext('2d');
   const img=x.createImageData(size,size), d=img.data;
@@ -1081,10 +1096,11 @@ function buildDoor(o){
   const verb=o.type==='debris'?'CLEAR':'OPEN';
   const tex=signTex(256,128,(c,W2,H)=>{ c.fillStyle='#16181b'; c.fillRect(0,0,W2,H); c.strokeStyle='#ffd27a'; c.lineWidth=6; c.strokeRect(4,4,W2-8,H-8);
     c.textAlign='center'; c.textBaseline='middle'; c.fillStyle='#f1ece2'; c.font='bold 34px Impact, "Arial Black", sans-serif'; c.fillText(verb+' $'+o.price.toLocaleString(),W2/2,44);
-    c.fillStyle='#ffd27a'; c.font='bold 22px "Arial Narrow", Arial, sans-serif'; c.fillText('TO '+o.label.toUpperCase(),W2/2,90); });
+    const sub='TO '+o.label.toUpperCase(); let fs=22; const ft=()=>c.font=`bold ${fs}px "Arial Narrow", Arial, sans-serif`; ft();
+    while(c.measureText(sub).width>W2-24&&fs>12){ fs--; ft(); } c.fillStyle='#ffd27a'; c.fillText(sub,W2/2,90); });
   for(const sd of [1,-1]){ const sg=new THREE.Mesh(new THREE.PlaneGeometry(1.6,0.8),new THREE.MeshBasicMaterial({map:tex})); sg.position.set(0,h+0.55,sd*0.2); if(sd<0) sg.rotation.y=Math.PI; g.add(sg); sol.push(sg); }
   const dep=o.type==='debris'?1.1:0.4, hw=o.axis==='z'?w/2:dep, hd=o.axis==='z'?dep:w/2;
-  const D={id:o.id,price:o.price,label:o.label,type:o.type,x:o.x,z:o.z,w,sx:Math.cos(along),sz:-Math.sin(along),g,sol,open:false,anim:0,col:{minX:o.x-hw,maxX:o.x+hw,minZ:o.z-hd,maxZ:o.z+hd,h:h+1}};
+  const D={id:o.id,price:o.price,label:o.label,type:o.type,x:o.x,z:o.z,w,sx:Math.cos(along),sz:-Math.sin(along),sink:!!o.sink,g,sol,open:false,anim:0,col:{minX:o.x-hw,maxX:o.x+hw,minZ:o.z-hd,maxZ:o.z+hd,h:h+1}};
   M.doors.push(D); M.portals.push({a:o.a,b:o.b,x:o.x,z:o.z,axis:o.axis,door:D});
   for(const sd of [1,-1]){ const ux=o.axis==='z'?o.x:o.x+sd*1.7, uz=o.axis==='z'?o.z+sd*1.7:o.z;
     M.uses.push({kind:'door',door:D,x:ux,z:uz,ry:Math.atan2(o.x-ux,o.z-uz)+Math.PI}); }
@@ -1112,7 +1128,7 @@ function openDoor(D,silent){
 function updateDoors(dt){
   const m=curMap; if(!m.doors) return;
   for(const D of m.doors){ if(!D.open||D.anim<=0||!D.g.visible) continue; D.anim+=dt;
-    if(D.type==='bars'){ const k=Math.min(1,D.anim/0.9)*D.w; D.g.position.set(D.x+D.sx*k,0,D.z+D.sz*k); } else D.g.position.y=-D.anim*D.anim*5;
+    if(D.type==='bars'&&!D.sink){ const k=Math.min(1,D.anim/0.9)*D.w; D.g.position.set(D.x+D.sx*k,0,D.z+D.sz*k); } else D.g.position.y=-D.anim*D.anim*5;
     if(D.anim>1.1) D.g.visible=false; }
 }
 function zoneAt(x,z){ const zs=curMap.zones; if(!zs) return -1; for(let i=0;i<zs.length;i++){ const r=zs[i]; if(x>=r.x0&&x<=r.x1&&z>=r.z0&&z<=r.z1) return i; } return -1; }
@@ -1373,13 +1389,15 @@ endMap('engine');
 /* map 3: Lockwater, a prison island out in the fog */
 beginMap('prison',{note:'Buy the barred gates to break out of the cell block. The Mess Hall and the Showers open first, then the Warden\'s Office, the Rec Yard, the Citadel and the Docks. Perk machines are spread through every wing, and Pump-a-Punch waits at the end of the Pier, the farthest point on the island.',name:'Lockwater',sub:'A prison island lost in the fog',sky:0x0b1418,fog:0.026,hemi:[0x6a8a9c,0x3c4448,0.95],moon:[0x9fbcd0,0.42],start:[0,8],yaw:0,cam:[8,4.6],tag:'Nobody leaves the island. Not even the dead.',
   doors:[],portals:[],
+  /* low overhangs a Road Runner jump would put the camera into: [x0,x1,z0,z1, highest feet y] */
+  ceils:[[-12.25,-10.4,-16,-6.1,1.55],[-12.25,-10.4,-1.9,16,1.55],[10.4,12.25,-16,-6.1,1.55],[10.4,12.25,-1.9,16,1.55]],
   zones:[{id:'cell',name:'Cell Block',x0:-12.25,x1:12.25,z0:-16,z1:16,roof:true},{id:'mess',name:'Mess Hall',x0:12.25,x1:34,z0:-16,z1:16,roof:true},{id:'showers',name:'Showers',x0:-34,x1:-12.25,z0:-16,z1:16,roof:true},
     {id:'warden',name:"Warden's Office",x0:12,x1:34,z0:-34,z1:-16,roof:true},{id:'citadel',name:'Citadel',x0:-12,x1:12,z0:-34,z1:-16,roof:true},{id:'yard',name:'Rec Yard',x0:-34,x1:-12,z0:-34,z1:-16},
     {id:'docks',name:'Docks',x0:-34,x1:34,z0:16,z1:32},{id:'pier',name:'Pier',x0:-4,x1:4,z0:32,z1:54}],
   /* each spawn sits 1.1m in from the wall it climbs through, on the side named */
   spawns:[['cell',-6,-14.6,'n'],['cell',4.5,-14.6,'n'],['cell',-10.5,-14.6,'n'],['cell',-10,14.6,'s'],['cell',10,14.6,'s'],
     ['mess',17,14.6,'s'],['mess',30,-14.6,'n'],['mess',17,-14.6,'n'],['mess',32.6,-8.5,'e'],
-    ['showers',-17,-14.6,'n'],['showers',-32.6,-6,'w'],['showers',-30,14.6,'s'],['showers',-17,14.6,'s'],
+    ['showers',-17,-14.6,'n'],['showers',-32.6,-7.5,'w'],['showers',-30,14.6,'s'],['showers',-17,14.6,'s'],
     ['warden',32.6,-19.5,'e'],['warden',16,-32.6,'n'],['citadel',-9.5,-32.6,'n'],['citadel',9.5,-32.6,'n'],['yard',-20,-32.6,'n'],['yard',-32.6,-20.5,'w'],
     ['docks',32.6,28,'e'],['docks',-32.6,28,'w'],['docks',12,30.6,'s'],['docks',-12,30.6,'s'],['pier',-2.75,40,'w'],['pier',2.75,46,'e']].map(([zone,x,z,side])=>({zone,x,z,side})),
   radar:[[[[-60,32],[60,32],[60,100],[-60,100]],'rgba(60,120,140,.22)'],[[[-14.5,-16],[14.5,-16],[14.5,16],[-14.5,16]],'rgba(241,236,226,.24)'],
@@ -1421,11 +1439,11 @@ beginMap('prison',{note:'Buy the barred gates to break out of the cell block. Th
   for(const x of [-23,23]){ addBox(4,1.5,0.6,wallC,x,5.25,-16,{cast:false}); addBox(4,1.5,0.6,wallC,x,5.25,16,{cast:false}); }
   for(const x of [-12,12]) addBox(0.6,3,4,wallC,x,6,-25,{cast:false});
   /* institutional green band low on the inside walls */
-  for(const [w,d,x,z] of [[28.4,0.04,0,-15.68],[28.4,0.04,0,15.68],[19,0.04,24.4,-15.68],[19,0.04,-24.4,-15.68],[19,0.04,24.4,15.68],[19,0.04,-24.4,15.68],[0.04,31.4,33.68,0],[0.04,9.7,14.82,-10.85],[0.04,17.7,14.82,6.85]])
+  for(const [w,d,x,z] of [[28.4,0.04,0,-15.68],[28.4,0.04,0,15.68],[6.1,0.04,17.95,-15.68],[8.9,0.04,29.45,-15.68],[6.1,0.04,-17.95,-15.68],[8.9,0.04,-29.45,-15.68],[6.1,0.04,17.95,15.68],[8.9,0.04,29.45,15.68],[6.1,0.04,-17.95,15.68],[8.9,0.04,-29.45,15.68],[0.04,31.4,33.68,0],[0.04,9.7,14.82,-10.85],[0.04,17.7,14.82,6.85]])
     addBox(w,1.1,d,wallG,x,0.55,z,{cast:false,solid:false});
   /* roofs */
   addBox(29.6,0.5,32.6,roofM,0,H+0.25,0); addBox(19.8,0.4,32.6,roofM,24.4,HW+0.2,0); addBox(19.8,0.4,32.6,roofM,-24.4,HW+0.2,0);
-  addBox(22.6,0.4,18,roofM,23,HW+0.2,-25.3); addBox(24.6,0.4,18,roofM,0,7.7,-25.3);
+  addBox(22,0.4,18,roofM,23.3,HW+0.2,-25.3); addBox(24.6,0.4,18,roofM,0,7.7,-25.3);
 
   /* the cell block: two tiers of cells behind bars down both long sides */
   { const barGeo=new THREE.CylinderGeometry(0.035,0.035,1,6), slots=[];
@@ -1451,7 +1469,7 @@ beginMap('prison',{note:'Buy the barred gates to break out of the cell block. Th
     bars.castShadow=true; world.add(bars);
     /* bunks and toilets in each cell, both tiers */
     const cz=[-12,-8.05,0.05,4,8,12], bunk=new THREE.InstancedMesh(bgeo(0.8,0.45,1.9),lam(0x5a5e5a),cz.length*4), loo=new THREE.InstancedMesh(bgeo(0.45,0.5,0.5),white,cz.length*4);
-    let n=0; for(const sx of [-1,1]) for(const y of [0,3.5]) for(const z of cz){ m4.makeTranslation(sx*13.7,y+0.5,z-0.6); bunk.setMatrixAt(n,m4); m4.makeTranslation(sx*13.9,y+0.25,z+1.3); loo.setMatrixAt(n,m4); n++; }
+    let n=0; for(const sx of [-1,1]) for(const y of [0,3.5]) for(const z of cz){ m4.makeTranslation(sx*13.78,y+0.225,z-0.6); bunk.setMatrixAt(n,m4); m4.makeTranslation(sx*13.9,y+0.25,z+1.3); loo.setMatrixAt(n,m4); n++; }
     world.add(bunk); world.add(loo);
   }
   /* sign helper */
@@ -1464,7 +1482,7 @@ beginMap('prison',{note:'Buy the barred gates to break out of the cell block. Th
   { const plate=new THREE.MeshLambertMaterial({map:signTex(256,256,(c,W2,H2)=>{ c.fillStyle='#3e4248'; c.fillRect(0,0,W2,H2); c.fillStyle='#2a2d31'; for(let y=16;y<H2;y+=40) for(let x=16;x<W2;x+=40){ c.beginPath(); c.arc(x,y,4,0,6.283); c.fill(); }
       c.strokeStyle='#23262a'; c.lineWidth=6; c.strokeRect(3,3,W2-6,H2-6); c.beginPath(); c.moveTo(W2/2,0); c.lineTo(W2/2,H2); c.stroke();
       c.strokeStyle='rgba(255,170,60,.6)'; c.lineWidth=5; c.beginPath(); c.moveTo(W2/2,10); for(let y=10;y<H2-10;y+=12) c.lineTo(W2/2+((y/12)%2?5:-5),y); c.stroke(); })});
-    for(const [z,ry] of [[15.66,Math.PI],[16.34,0]]){ const m=new THREE.Mesh(new THREE.PlaneGeometry(4.2,4.6),plate); m.position.set(0,2.3,z); m.rotation.y=ry; world.add(m); }
+    for(const [z,ry] of [[15.64,Math.PI],[16.34,0]]){ const m=new THREE.Mesh(new THREE.PlaneGeometry(4.2,4.6),plate); m.position.set(0,2.3,z); m.rotation.y=ry; world.add(m); }
     plaque('CELL BLOCK C',6,0.9,0,6,15.67,Math.PI); plaque('LOCKWATER',10,1.8,0,6.6,16.33,0,'#c8a860','STATE PENITENTIARY  .  NO VISITORS'); }
   /* guard desk in the middle of the block */
   addBox(3.2,1.05,1.5,woodD,0,0.525,0,{collide:true}); addBox(3.4,0.08,1.7,wood,0,1.09,0);
@@ -1558,7 +1576,7 @@ beginMap('prison',{note:'Buy the barred gates to break out of the cell block. Th
   for(const x of [-11.9,11.9]){ const l=new THREE.PointLight(0xffc888,0.85,26,1.4); l.position.set(x,7.4,31.3); world.add(l); }
   /* lit, barred windows high on the prison's south face */
   { const lit=lam(0x2a2418,{emissive:0xffb860,emissiveIntensity:0.32});
-    for(const x of [-31,-27,-18,-11,-7,7,11,18,27,31]){ const y=x>-14.5&&x<14.5?5.2:3.9; addBox(1.1,1.2,0.04,lit,x,y,16.32,{cast:false,solid:false});
+    for(const x of [-27,-18,-11,-7,7,11,18,27,31]){ const y=x>-14.5&&x<14.5?5.2:3.9; addBox(1.1,1.2,0.04,lit,x,y,16.32,{cast:false,solid:false});
       for(const k of [-0.3,0,0.3]) addBox(0.05,1.2,0.05,iron,x+k,y,16.36,{cast:false,solid:false}); } }
 
   /* the pier, Pump-a-Punch at its far end */
@@ -1569,7 +1587,7 @@ beginMap('prison',{note:'Buy the barred gates to break out of the cell block. Th
   addBox(8.3,0.1,0.12,wood,0,1.05,54,{cast:false}); addBox(8.3,0.08,0.08,wood,0,0.6,54,{cast:false}); addBox(0.18,1.15,0.18,woodD,0,0.575,54,{cast:false});
   { const pg=new THREE.CylinderGeometry(0.22,0.26,3.7,8), pil=new THREE.InstancedMesh(pg,woodD,14), m4=new THREE.Matrix4(); let i=0;
     for(const sx of [-1,1]) for(let k=0;k<7;k++){ m4.makeTranslation(sx*4.45,-1.35,33+k*3.5); pil.setMatrixAt(i++,m4); } world.add(pil); }
-  for(const sx of [-1,1]) addBox(0.8,3.8,0.8,wallD,sx*2.4,1.9,32,{collide:true});
+  for(const sx of [-1,1]) addBox(0.8,5.0,0.8,wallD,sx*2.4,2.5,32,{collide:true});
   addBox(5.6,0.5,0.5,wallD,0,4.75,32); plaque('PIER',1.6,0.42,0,4.75,32.26,0); plaque('PIER',1.6,0.42,0,4.75,31.74,Math.PI);
   buildPap(0,53.3);
   { const l=new THREE.PointLight(0xb04aff,1.2,20,1.4); l.position.set(0,5.5,51.6); world.add(l); }
@@ -1584,16 +1602,16 @@ beginMap('prison',{note:'Buy the barred gates to break out of the cell block. Th
     gAdd(boat,bgeo(2.0,0.5,0.06),lam(0x1a2a34,{emissive:0x3a5a6a,emissiveIntensity:0.4}),0,1.8,-0.52); }
   /* channel buoys */
   const buoys=[[-16,62,0xff3020],[16,62,0x30ff60]].map(([x,z,c])=>{ const b=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.7,1.4,10),lam(c)); b.position.set(x,-0.7,z); world.add(b);
-    const tip=new THREE.Mesh(new THREE.SphereGeometry(0.22,8,6),new THREE.MeshBasicMaterial({color:c,fog:false})); tip.position.set(x,0.25,z); world.add(tip); return tip; });
+    const tip=new THREE.Mesh(new THREE.SphereGeometry(0.22,8,6),new THREE.MeshBasicMaterial({color:c,fog:false})); tip.position.set(x,0.25,z); tip.userData.keep=true; world.add(tip); return tip; });
 
   /* doors: barred gates you buy to push outward */
-  buildDoor({id:'mess',label:'the Mess Hall',type:'bars',price:750,x:12.25,z:-4,axis:'x',a:'cell',b:'mess'});
-  buildDoor({id:'showers',label:'the Showers',type:'bars',price:1000,x:-12.25,z:-4,axis:'x',a:'cell',b:'showers'});
+  buildDoor({id:'mess',label:'the Mess Hall',type:'bars',sink:true,price:750,x:12.25,z:-4,axis:'x',a:'cell',b:'mess'});
+  buildDoor({id:'showers',label:'the Showers',type:'bars',sink:true,price:1000,x:-12.25,z:-4,axis:'x',a:'cell',b:'showers'});
   buildDoor({id:'warden',label:"the Warden's Office",type:'bars',price:1250,x:23,z:-16,axis:'z',a:'mess',b:'warden'});
   buildDoor({id:'yard',label:'the Rec Yard',type:'bars',price:1250,x:-23,z:-16,axis:'z',a:'showers',b:'yard'});
   buildDoor({id:'docksE',label:'the Docks',type:'bars',price:1250,x:23,z:16,axis:'z',a:'mess',b:'docks'});
   buildDoor({id:'docksW',label:'the Docks',type:'bars',price:1250,x:-23,z:16,axis:'z',a:'showers',b:'docks'});
-  buildDoor({id:'pier',label:'the Pier',type:'bars',price:1500,x:0,z:32,axis:'z',a:'docks',b:'pier'});
+  buildDoor({id:'pier',label:'the Pier',type:'bars',sink:true,price:1500,x:0,z:32,axis:'z',a:'docks',b:'pier'});
   P.portals.push({a:'citadel',b:'warden',x:12,z:-25,axis:'x',door:null},{a:'citadel',b:'yard',x:-12,z:-25,axis:'x',door:null});
 
   /* perks spread through every wing */
@@ -1603,7 +1621,7 @@ beginMap('prison',{note:'Buy the barred gates to break out of the cell block. Th
   buildPerk('fire',-33.275,-25,Math.PI/2); buildPerk('cash',-31,21.425,0);
 
   /* crate, ammo and armor */
-  buildBox(0,-15.15,0);
+  buildBox(0,-14.9,0);
   buildAmmo(9.5,-15.25,0); buildAmmo(33.24,-12,-Math.PI/2); buildAmmo(20,31.24,Math.PI);
   buildArmor(23,-33.22,0);
 
@@ -1620,7 +1638,7 @@ beginMap('prison',{note:'Buy the barred gates to break out of the cell block. Th
           addBox(0.06,0.3,0.06,iron,ix+kx,t1-0.15,iz+kz,{cast:false,solid:false}); }
         for(let y=t0+0.2;y<t1-0.1;y+=0.32) addBox(onX?0.05:0.62,0.05,onX?0.62:0.05,iron,ox,y,oz,{cast:false,solid:false});
       }else{
-        const wx=fx-dx*0.02, wz=fz-dz*0.02;
+        const wx=fx-dx*0.06, wz=fz-dz*0.06;
         addBox(onX?0.04:1.5,1.2,onX?1.5:0.04,hole,wx,1.6,wz,{cast:false,solid:false});
         addBox(onX?0.14:1.8,0.12,onX?1.8:0.14,trim,wx-dx*0.05,0.98,wz-dz*0.05,{cast:false,solid:false});
         for(let k=0;k<4;k++){ const off=-0.54+k*0.36, b=addBox(0.05,1.2,0.05,iron,wx-dx*0.06+(onX?0:off),1.6,wz-dz*0.06+(onX?off:0),{cast:false,solid:false});
@@ -1658,21 +1676,21 @@ beginMap('prison',{note:'Buy the barred gates to break out of the cell block. Th
   /* a long red bridge and city lights far across the bay */
   { const bm=new THREE.MeshBasicMaterial({color:0x2c1612,fog:false}), bz=240, deckY=16, top=60, towers=[-70,60];
     const add=(w,h,d,x,y,z)=>{ const m=new THREE.Mesh(bgeo(w,h,d),bm); m.position.set(x,y,z); world.add(m); return m; };
-    add(380,1.4,6,-10,deckY,bz);
+    add(370,1.4,6,-5,deckY,bz);
     for(const tx of towers){ for(const o of [-2.6,2.6]) add(2.6,top,2.6,tx,top/2-1.2,bz+o); for(const y of [deckY+10,deckY+26,top-4]) add(2.6,2,7.8,tx,y,bz); }
     const cy=x=>{ if(x<towers[0]){ const t=(x+200)/(towers[0]+200); return deckY+2+(top-deckY-4)*t*t; } if(x>towers[1]){ const t=(170-x)/(170-towers[1]); return deckY+2+(top-deckY-4)*t*t; }
       const m=(towers[0]+towers[1])/2, u=(x-m)/((towers[1]-towers[0])/2); return deckY+3+(top-deckY-5)*u*u; };
     const lm=new THREE.LineBasicMaterial({color:0x5a2a20,fog:false}), sus=[];
-    for(const o of [-2.6,2.6]){ const pts=[]; for(let x=-200;x<=170;x+=5) pts.push(new THREE.Vector3(x,cy(x),bz+o)); world.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),lm));
-      for(let x=-195;x<170;x+=7.5){ if(Math.abs(x-towers[0])<2||Math.abs(x-towers[1])<2) continue; sus.push(new THREE.Vector3(x,deckY,bz+o),new THREE.Vector3(x,cy(x),bz+o)); } }
+    for(const o of [-2.6,2.6]){ const pts=[]; for(let x=-190;x<=170;x+=5) pts.push(new THREE.Vector3(x,cy(x),bz+o)); world.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),lm));
+      for(let x=-187.5;x<170;x+=7.5){ if(Math.abs(x-towers[0])<2||Math.abs(x-towers[1])<2) continue; sus.push(new THREE.Vector3(x,deckY,bz+o),new THREE.Vector3(x,cy(x),bz+o)); } }
     world.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(sus),lm));
-    const lp=[]; for(let x=-195;x<=170;x+=9) lp.push(x,deckY+1.2,bz-3.4);
+    const lp=[]; for(let x=-186;x<=170;x+=9) lp.push(x,deckY+1.2,bz-3.4);
     const cm=new THREE.MeshBasicMaterial({color:0x101a1e,fog:false});
-    for(let i=0;i<24;i++){ const x=rand(-250,-150), z=rand(110,200), w=rand(6,14), h=rand(10,44); const m=new THREE.Mesh(bgeo(w,h,w),cm); m.position.set(x,h/2-1.2,z); world.add(m);
+    for(let i=0;i<24;i++){ const x=rand(-215,-150), z=rand(110,175), w=rand(6,14), h=rand(10,44); const m=new THREE.Mesh(bgeo(w,h,w),cm); m.position.set(x,h/2-1.2,z); world.add(m);
       for(let k=0;k<9;k++) lp.push(x+w/2+0.3,rand(1,h-2),z+rand(-w/2,w/2)); }
     const lg=new THREE.BufferGeometry(); lg.setAttribute('position',new THREE.Float32BufferAttribute(lp,3));
     world.add(new THREE.Points(lg,new THREE.PointsMaterial({color:0xffc070,size:2.5,sizeAttenuation:false,fog:false})));
-    P.beacons=towers.map(tx=>{ const b=new THREE.Mesh(new THREE.SphereGeometry(0.8,8,6),new THREE.MeshBasicMaterial({color:0xff3020,fog:false})); b.position.set(tx,top,bz); world.add(b); return b; }); }
+    P.beacons=towers.map(tx=>{ const b=new THREE.Mesh(new THREE.SphereGeometry(0.8,8,6),new THREE.MeshBasicMaterial({color:0xff3020,fog:false})); b.position.set(tx,top,bz); b.userData.keep=true; world.add(b); return b; }); }
 
   /* rain that follows the camera */
   { const n=isTouch?450:1000, a=new Float32Array(n*6);
@@ -1693,6 +1711,7 @@ beginMap('prison',{note:'Buy the barred gates to break out of the cell block. Th
     updateDoors(dt); };
 }
 { const P=MAPS.prison; P.portals.forEach(Q=>{ Q.ai=zoneOf(P,Q.a); Q.bi=zoneOf(P,Q.b); }); P.spawns.forEach(s=>s.zi=zoneOf(P,s.zone)); P.zoneStart=zoneOf(P,'cell'); }
+batchStatic(MAPS.prison.group);
 endMap('prison');
 
 function selectMap(id){
@@ -1992,11 +2011,11 @@ function resolveCircle(p,r){
     if(d2>r*r) continue;
     hit=true; lastHit=c;
     if(d2>1e-8){ const d=Math.sqrt(d2), push=r-d; p.x+=dx/d*push; p.z+=dz/d*push; }
-    else{ /* centre buried inside the box (crowds can shove a zombie deep into a perk machine): leave by the nearest side that stays in
+    else{ /* centre buried inside the box (crowds can shove a zombie deep into a perk machine): leave by a near side that stays in
          the open map, ideally clear of other boxes too, so it is not pushed out through the wall at its back */
       const ex=[[p.x-c.minX,c.minX-r,p.z],[c.maxX-p.x,c.maxX+r,p.z],[p.z-c.minZ,p.x,c.minZ-r],[c.maxZ-p.z,p.x,c.maxZ+r]].sort((u,v)=>u[0]-v[0]);
       const free=([,x,z])=>!colliders.some(o=>o!==c&&x>o.minX&&x<o.maxX&&z>o.minZ&&z<o.maxZ), inMap=([,x,z])=>{ if(!curMap||!curMap.zones) return true; const zi=zoneAt(x,z); return zi>=0&&curMap.zones[zi].open; };
-      const e=ex.find(q=>free(q)&&inMap(q))||ex.find(inMap)||ex.find(free)||ex[0]; p.x=e[1]; p.z=e[2]; }
+      const near=ex.filter(q=>q[0]<=ex[0][0]+r+0.6), e=near.find(q=>free(q)&&inMap(q))||near.find(inMap)||ex.find(q=>free(q)&&inMap(q))||ex.find(inMap)||ex.find(free)||ex[0]; p.x=e[1]; p.z=e[2]; }
   }
   return hit;
 }
@@ -2523,6 +2542,7 @@ function updatePlayer(dt){
   if((keys.Space||touchJump)&&player.onGround){ player.vy=hasPerk('road')?8:6.5; player.onGround=false; }
   touchJump=false;
   player.vy-=18*dt; player.pos.y+=player.vy*dt;
+  if(player.vy>0&&curMap.ceils) for(const c of curMap.ceils) if(player.pos.x>c[0]&&player.pos.x<c[1]&&player.pos.z>c[2]&&player.pos.z<c[3]&&player.pos.y>c[4]){ player.pos.y=c[4]; player.vy=0; }
   if(player.pos.y<=0){ player.pos.y=0; player.vy=0; player.onGround=true; }
   resolveCircle(player.pos,0.4);
   player.pos.x=clamp(player.pos.x,-90,90); player.pos.z=clamp(player.pos.z,-90,90);
