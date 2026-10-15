@@ -149,7 +149,7 @@
   #reticle{position:fixed;left:50%;top:50%;width:0;height:0;pointer-events:none;z-index:2}
   #reticle::before{content:'';position:absolute;left:-3px;top:-3px;width:6px;height:6px;border-radius:50%;background:#ff3a2a;box-shadow:0 0 6px 2px rgba(255,58,42,.7)}
   #reticle.holo::before{left:-2px;top:-2px;width:4px;height:4px}
-  #reticle.holo::after{content:'';position:absolute;left:-17px;top:-17px;width:30px;height:30px;border-radius:50%;border:2px solid #ff3a2a;box-shadow:0 0 5px rgba(255,58,42,.6)}
+  #reticle.holo::after{content:'';position:absolute;left:-15px;top:-15px;width:30px;height:30px;border-radius:50%;border:2px solid #ff3a2a;box-shadow:0 0 5px rgba(255,58,42,.6)}
 
   .shop{background:rgba(10,12,14,.95);align-items:flex-start;display:block}
   .shopWrap{max-width:1000px;width:100%;margin:0 auto}
@@ -999,7 +999,7 @@ function usePap(){
   const s=inv[cur], t=s.tier||0;
   if(t>=3){ sfx.deny(); return; }
   if(cash<PAP_COST[t]){ sfx.deny(); popup(`Need $${(PAP_COST[t]-cash).toLocaleString()} more`,'head'); return; }
-  cash-=PAP_COST[t]; papT=PAP_TIME; papSlot=s; reloading=false; ads=false; sfx.papStart();
+  cash-=PAP_COST[t]; papT=PAP_TIME; papSlot=s; s.bq=0; reloading=false; ads=false; sfx.papStart();
 }
 function finishPap(){
   const s=papSlot; papSlot=null; papT=0; if(!s) return;
@@ -2859,7 +2859,7 @@ function fire(){
   if(slot.mag<=0){ slot.bq=0; sfx.empty(); fireCd=0.25; startReload(); return; }
   /* burst guns fire burstN quick shots per pull, then wait the full rate */
   let gap=w.rate; if(w.burstN){ slot.bq=(slot.bq>0?slot.bq:w.burstN)-1; if(slot.bq>0) gap=w.burstGap; }
-  slot.mag--; fireCd=gap*(w.spin?1-0.4*spinT/2:1)*(hasPerk('rapid')?0.75:1); sfx[w.sound]();
+  slot.mag--; fireCd+=gap*(w.spin?1-0.4*spinT/2:1)*(hasPerk('rapid')?0.75:1); sfx[w.sound]();
   if(w.bolt&&slot.mag>0) setTimeout(()=>{ if(state==='playing'&&inv[cur]===slot) sfx.bolt(); },Math.min(380,fireCd*500));
   camera.updateMatrixWorld(); const gn=guns[slot.id]; gn.muzzle.getWorldPosition(_muz);
   const spread=w.spread*(1+moveAmt*1.2+(player.onGround?0:1.5))*(1-adsT*(1-w.adsSpread));
@@ -2933,12 +2933,12 @@ function swapWeapon(i){
 }
 function updateWeapon(dt){
   if(papT>0){ papT-=dt; if(papT<=0) finishPap(); }
-  fireCd-=dt; if(swapT>0) swapT-=dt;
+  fireCd=fireCd>0?fireCd-dt:0; if(swapT>0) swapT-=dt;
   const s=inv[cur], w=W(s), gn=guns[s.id];
   if(reloading){ reloadT-=dt; if(reloadT<=0){ reloading=false; const take=Math.min(w.mag-s.mag,s.res); s.mag+=take; if(s.res!==Infinity) s.res-=take; } }
   if(w.spin&&mouseDown&&s.mag>0&&!reloading) spinT=Math.min(2,spinT+dt); else spinT=Math.max(0,spinT-dt*2);
   if(mouseDown||s.bq>0) fire();
-  adsT=clamp(adsT+((ads&&!reloading&&swapT<=0)?1:-1)*dt*(hasPerk('dead')?12:7),0,1);
+  adsT=clamp(adsT+((ads&&!reloading&&swapT<=0&&papT<=0)?1:-1)*dt*(hasPerk('dead')?12:7),0,1);
   const fov=75+(w.adsFov-75)*adsT; if(Math.abs(camera.fov-fov)>0.01){ camera.fov=fov; camera.updateProjectionMatrix(); }
   gunKick=Math.max(0,gunKick-dt*0.6);
   const pos=gn.g.position; pos.lerpVectors(gn.hip,gn.aim,adsT);
@@ -3143,6 +3143,7 @@ function continueRun(){
   if(d.armor&&!d.armorLv){ armorLv=2; armorHp=100; }
   player.maxHp=100; player.hp=clamp(d.hp||player.maxHp,1,player.maxHp); nades=clamp(d.nades|0,0,2);
   inv=d.inv.slice(0,2).map(x=>x&&WEAPONS[x.id]?{id:x.id,mag:x.mag|0,res:x.res<0?Infinity:x.res|0,tier:clamp(x.tier|0,0,3)}:null);
+  for(const x of inv) if(x){ const w=W(x); x.mag=Math.min(x.mag,w.mag); if(x.res!==Infinity) x.res=Math.min(x.res,w.reserve); }
   while(inv.length<2) inv.push(null);
   if(!inv[0]){ inv[0]=inv[1]; inv[1]=null; } if(!inv[0]) inv[0]=newSlot('pistol');
   cur=(d.cur===1&&inv[1])?1:0; syncCamo();
@@ -3214,7 +3215,7 @@ document.addEventListener('visibilitychange',()=>{ if(document.hidden) pause(); 
 const shopEl=$('shopScreen'), swapDlg=$('swapDlg');
 function openShop(resumed){
   if(papT>0) finishPap();
-  state='shop'; mouseDown=false; ads=false; adsT=0; reloading=false; scopeEl.hidden=true; reticleEl.hidden=true; reticleEl.dataset.k='';
+  state='shop'; mouseDown=false; ads=false; adsT=0; reloading=false; inv.forEach(x=>{ if(x) x.bq=0; }); scopeEl.hidden=true; reticleEl.hidden=true; reticleEl.dataset.k='';
   if(document.pointerLockElement) document.exitPointerLock();
   document.body.classList.remove('playing'); $('touchUI').hidden=true; $('hud').hidden=true;
   for(const id in guns) guns[id].g.visible=false;
