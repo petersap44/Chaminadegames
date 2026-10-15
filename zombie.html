@@ -49,6 +49,10 @@
   #hpFill{height:100%;width:100%;background:var(--sodium);transition:width .15s,background-color .3s}
   .hpBar::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 calc(10% - 2px),rgba(16,18,20,.95) calc(10% - 2px) 10%)}
   #healthBox.low #hpFill{background:var(--canopy)}
+  #armorWrap{margin-bottom:8px}
+  .arBar{height:10px}
+  #arFill{height:100%;width:100%;background:#4a86ff;transition:width .15s}
+  .arNum{font-size:22px;color:#8fc0ff}
   #healthBox.low #hpNum{color:var(--canopy)}
   #ammoBox{position:absolute;right:calc(12px + var(--safe-r));bottom:calc(14px + var(--safe-b));text-align:right;min-width:140px}
   #weapName{font-size:18px;font-weight:700}
@@ -235,6 +239,7 @@
   </div>
   <canvas id="radar" width="260" height="260"></canvas>
   <div id="healthBox" class="panel">
+    <div id="armorWrap" hidden><div class="hpRow"><span class="lbl" id="arLbl">Armor</span><span class="big arNum" id="arNum">0</span></div><div class="hpBar arBar"><div id="arFill"></div></div></div>
     <div class="hpRow"><span class="lbl" id="hpLbl">Health</span><span class="big" id="hpNum">100</span></div>
     <div class="hpBar"><div id="hpFill"></div></div>
     <div id="perkRow"></div>
@@ -287,7 +292,7 @@
           <dt><kbd>Shift</kbd></dt><dd>Sprint</dd>
           <dt><kbd>Space</kbd></dt><dd>Jump</dd>
           <dt><kbd>G</kbd></dt><dd>Throw grenade</dd>
-          <dt><kbd>F</kbd></dt><dd>Pump-a-Punch or buy a perk</dd>
+          <dt><kbd>F</kbd></dt><dd>Use Pump-a-Punch, perks, wall guns, ammo crates, armor and the Mystery Crate</dd>
           <dt><kbd>Esc</kbd></dt><dd>Pause</dd>
         </dl>
         <dl class="keys touch-only">
@@ -297,7 +302,7 @@
           <dt><kbd>Aim</kbd></dt><dd>Toggle sights</dd>
           <dt><kbd>Swap</kbd></dt><dd>Switch weapons</dd>
           <dt><kbd>Nade</kbd></dt><dd>Throw grenade</dd>
-          <dt><kbd>Punch / Buy</kbd></dt><dd>Pump-a-Punch or buy a perk</dd>
+          <dt><kbd>Punch / Buy</kbd></dt><dd>Use Pump-a-Punch, perks, wall guns, ammo crates, armor and the Mystery Crate</dd>
         </dl>
       </div>
       <div>
@@ -327,7 +332,7 @@
       <div class="cashBox"><div class="lbl">Cash</div><div class="cashBig" id="shopCash" role="presentation">$0</div></div>
     </div>
     <h3>Your loadout</h3>
-    <p class="shopNote">Upgrade the gun in your hand at the glowing Pump-a-Punch machine behind the store. Perk vending machines line the front of the store, and you can hold 4 perks.</p>
+    <p class="shopNote" id="shopNote">Upgrade the gun in your hand at the glowing Pump-a-Punch machine.</p>
     <div class="slots" id="slots"></div>
     <h3>Behind the counter</h3>
     <div class="board" id="board"></div>
@@ -407,7 +412,7 @@ const colliders=[], solids=[];
 let world=scene;
 const MAPS={};
 let curMap=null;
-function beginMap(id,o){ const g=new THREE.Group(); g.visible=false; scene.add(g); world=g; colliders.length=0; solids.length=0; MAPS[id]=Object.assign({id,group:g,perks:[]},o); return MAPS[id]; }
+function beginMap(id,o){ const g=new THREE.Group(); g.visible=false; scene.add(g); world=g; colliders.length=0; solids.length=0; MAPS[id]=Object.assign({id,group:g,perks:[],uses:[]},o); return MAPS[id]; }
 function endMap(id){ const m=MAPS[id]; m.colliders=colliders.slice(); m.solids=solids.slice(); world=scene; }
 const _mc={};
 function lam(color,extra){ const k=color+'|'+(extra?JSON.stringify(extra):''); return _mc[k]||(_mc[k]=new THREE.MeshLambertMaterial(Object.assign({color},extra||{}))); }
@@ -437,7 +442,7 @@ function flat(w,d,canvas,rep,x,y,z){
   m.rotation.x=-Math.PI/2; m.position.set(x,y,z); m.receiveShadow=true; world.add(m); return m;
 }
 
-beginMap('station',{tag:'Gas and food, open all night. So are they.',name:'Last Stop',sub:'The all-night gas station',sky:0x0c1320,fog:0.021,hemi:[0x50608a,0x20180c,0.65],moon:[0x9fb0e0,0.5],start:[0,4],yaw:Math.PI,
+beginMap('station',{note:'Pump-a-Punch is the glowing machine behind the store and perk machines line the store front. You can hold 4 perks. Out on the lot are wall guns, ammo crates, an armor locker and the Mystery Crate.',tag:'Gas and food, open all night. So are they.',name:'Last Stop',sub:'The all-night gas station',sky:0x0c1320,fog:0.021,hemi:[0x50608a,0x20180c,0.65],moon:[0x9fb0e0,0.5],start:[0,4],yaw:Math.PI,
   ready:'They are coming from the road',first:'They heard the generator',hold:'Hold the station',held:'You held the station until wave ',empty:'No runs yet. The pumps are on and the lights still work.'});
 /* sky */
 {
@@ -614,9 +619,8 @@ const WEAPONS={
   flamer:{name:'Pump Nozzle',price:7500,dmg:6,rate:0.05,mag:100,reserve:400,reload:2.5,spread:0.02,adsSpread:0.6,pellets:1,recoil:0.0012,kick:0.008,adsFov:64,sound:'flame',flame:true,flameV:21,poolT:5,poolR:1.5,flash:0xff8a2a,bars:[6,10,6],desc:'Lobs a long stream of liquid fire that leaves burning pools on the ground.'},
   tesla:{name:'Tesla Cannon',price:10000,dmg:420,chain:10,chainR:11,rate:0.45,mag:12,reserve:84,reload:2.2,spread:0,adsSpread:1,pellets:1,recoil:0.03,kick:0.08,adsFov:62,sound:'zap',tesla:true,flash:0x8fd0ff,bars:[10,5,3],desc:'Lightning that jumps between up to ten zombies and stuns them.'}
 };
-const SHOP_ORDER=['smg','shotgun','rifle','sniper','lmg','raygun','flamer','tesla'];
+const SHOP_ORDER=['smg','shotgun','rifle','sniper','lmg','flamer','tesla'];
 const CASH={walker:50,runner:60,spitter:90,bloater:90,brute:175,riot:120,screamer:160,stalker:150,spider:300,butcher:1500,mother:1500,leaper:1500,torch:1500};
-const ARMOR_PRICE=2500;
 const BOSSES=['butcher','mother','leaper','torch'];
 function bossList(c){ const n=c<=4?1:(c<=8?2:3), l=[]; for(let k=0;k<n;k++) l.push(BOSSES[(c-1+k)%4]); return l; }
 const HEAL_PRICE=400;
@@ -839,7 +843,7 @@ function tracerC(a,b,color){
 /* run saving */
 const SAVE_KEY='laststop-run-v1';
 function saveRun(){
-  try{ localStorage.setItem(SAVE_KEY,JSON.stringify({v:1,map:curMap.id,wave,score,kills,cash,bossCount,cur,armor,perks,cheat,cheatUsed,hp:Math.ceil(player.hp),nades,
+  try{ localStorage.setItem(SAVE_KEY,JSON.stringify({v:1,map:curMap.id,box:(box.st==='spin'||box.st==='offer')?box.pick:null,wave,score,kills,cash,bossCount,cur,armorLv,armorHp:Math.ceil(armorHp),perks,cheat,cheatUsed,hp:Math.ceil(player.hp),nades,
     inv:inv.map(s=>s&&{id:s.id,mag:s.mag,res:s.res===Infinity?-1:s.res,tier:s.tier||0})})); }catch(e){}
 }
 function loadRun(){
@@ -885,11 +889,90 @@ function buildPerks(xs,z){
     colliders.push({minX:x-0.6,maxX:x+0.6,minZ:z-0.45,maxZ:z+0.4,h:2.2});
   });
 }
+/* mystery crate, wall guns, ammo crates, armor lockers */
+function modelHolder(id,len){
+  const m=MODELS[id](); m.fl.visible=false;
+  const b=new THREE.Box3().setFromObject(m.g), sz=b.getSize(new THREE.Vector3()), c=b.getCenter(new THREE.Vector3());
+  const s=len/Math.max(sz.z,0.01); m.g.scale.setScalar(s); m.g.position.set(-c.x*s,-c.y*s,-c.z*s);
+  const h=new THREE.Group(); h.add(m.g); h.traverse(o=>{ if(o.isMesh) o.castShadow=true; }); return h;
+}
+function placeGroup(x,z,ry){ const g=new THREE.Group(); g.position.set(x,0,z); g.rotation.y=ry; world.add(g); return g; }
+function footprint(x,z,ry,w,d,h){ const sw=Math.abs(Math.sin(ry))>0.7, hw=(sw?d:w)/2, hd=(sw?w:d)/2; colliders.push({minX:x-hw,maxX:x+hw,minZ:z-hd,maxZ:z+hd,h}); }
+function useSpot(kind,x,z,ry,dist,extra){ curBuild().uses.push(Object.assign({kind,ry,x:x+Math.sin(ry)*dist,z:z+Math.cos(ry)*dist},extra||{})); }
+function gAdd(g,geo,mat,x,y,z,solid){ const o=new THREE.Mesh(geo,mat); o.position.set(x,y,z); o.castShadow=o.receiveShadow=true; g.add(o); if(solid) solids.push(o); return o; }
+function signTex(w,h,draw){ const c=document.createElement('canvas'); c.width=w; c.height=h; draw(c.getContext('2d'),w,h); return new THREE.CanvasTexture(c); }
+
+const BOX_PRICE=950, BOX_SPIN=3.2, BOX_OFFER=9;
+const BOX_POOL=[['smg',12],['shotgun',12],['rifle',12],['sniper',9],['lmg',9],['flamer',8],['tesla',6],['raygun',6]];
+function buildBox(x,z,ry){
+  const g=placeGroup(x,z,ry), M=curBuild();
+  const wood=lam(0x4a3220), band=lam(0x2a2a2e);
+  const qTex=signTex(256,128,(c,w,h)=>{ c.fillStyle='#3a2616'; c.fillRect(0,0,w,h); c.strokeStyle='#1c120a'; c.lineWidth=6; c.strokeRect(3,3,w-6,h-6);
+    c.font='bold 92px Impact, "Arial Black", sans-serif'; c.textAlign='center'; c.textBaseline='middle'; c.shadowColor='#38e0ff'; c.shadowBlur=18; c.fillStyle='#bff6ff';
+    c.fillText('?',w*0.25,h/2+4); c.fillText('?',w*0.75,h/2+4); c.shadowBlur=0; c.font='bold 22px "Arial Narrow", Arial, sans-serif'; c.fillStyle='#e6dccb'; c.fillText('MYSTERY',w/2,22); c.fillText('$950',w/2,h-20); });
+  const front=new THREE.MeshLambertMaterial({map:qTex,emissive:0x0a3a44,emissiveIntensity:0.6});
+  const body=new THREE.Mesh(bgeo(2.0,0.85,1.0),[wood,wood,wood,wood,front,front]); body.position.y=0.5; body.castShadow=body.receiveShadow=true; g.add(body); solids.push(body);
+  gAdd(g,bgeo(2.06,0.1,1.06),band,0,0.12,0); gAdd(g,bgeo(0.1,0.88,1.04),band,-0.8,0.5,0); gAdd(g,bgeo(0.1,0.88,1.04),band,0.8,0.5,0);
+  const pivot=new THREE.Group(); pivot.position.set(0,0.95,-0.5); g.add(pivot);
+  const lid=new THREE.Mesh(bgeo(2.06,0.12,1.04),wood); lid.position.set(0,0,0.52); lid.castShadow=true; pivot.add(lid);
+  const glow=new THREE.Mesh(bgeo(1.86,0.04,0.86),new THREE.MeshBasicMaterial({color:0x7ff0ff})); glow.position.y=0.92; g.add(glow);
+  const beamMat=new THREE.MeshBasicMaterial({color:0x6fe8ff,transparent:true,opacity:0.22,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,fog:false});
+  const beam=new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.42,24,14,1,true),beamMat); beam.position.y=15.2; g.add(beam);
+  const light=new THREE.PointLight(0x5fe0ff,0.9,12,1.6); light.position.set(0,1.8,0.4); g.add(light);
+  const preview=new THREE.Group(); preview.position.set(0,1.1,0); g.add(preview);
+  const shows={}; BOX_POOL.forEach(([id])=>{ const h=modelHolder(id,1.1); h.rotation.y=Math.PI/2; h.visible=false; preview.add(h); shows[id]=h; });
+  footprint(x,z,ry,2.06,1.06,1.0);
+  M.boxRef={pivot,beamMat,light,preview,shows,glow}; M.boxAt=[x,z];
+  useSpot('box',x,z,ry,1.5);
+}
+function chalkGun(c,w,h){
+  c.strokeStyle='rgba(235,240,245,.85)'; c.lineWidth=5; c.lineJoin='round'; c.setLineDash([]);
+  c.beginPath(); c.moveTo(w*0.12,h*0.42); c.lineTo(w*0.86,h*0.42); c.lineTo(w*0.86,h*0.5); c.lineTo(w*0.6,h*0.5); c.lineTo(w*0.56,h*0.72); c.lineTo(w*0.48,h*0.72);
+  c.lineTo(w*0.5,h*0.56); c.lineTo(w*0.3,h*0.56); c.lineTo(w*0.18,h*0.66); c.lineTo(w*0.1,h*0.6); c.closePath(); c.stroke();
+}
+function buildWall(id,x,z,ry){
+  const g=placeGroup(x,z,ry), w=WEAPONS[id];
+  const tex=signTex(512,256,(c,W2,H)=>{ c.clearRect(0,0,W2,H); c.fillStyle='rgba(10,12,14,.55)'; c.fillRect(0,0,W2,H);
+    c.strokeStyle='rgba(235,240,245,.7)'; c.lineWidth=4; c.setLineDash([14,10]); c.strokeRect(10,10,W2-20,H-20); c.setLineDash([]);
+    chalkGun(c,W2,H); c.textAlign='center'; c.textBaseline='middle'; c.fillStyle='#f1ece2'; c.font='bold 44px Impact, "Arial Black", sans-serif';
+    c.fillText(w.name.toUpperCase(),W2/2,46); c.fillStyle='#ffd27a'; c.font='bold 40px "Courier New", monospace'; c.fillText('$'+w.price.toLocaleString(),W2/2,H-42); });
+  const board=new THREE.Mesh(new THREE.PlaneGeometry(2.2,1.1),new THREE.MeshBasicMaterial({map:tex,transparent:true})); board.position.set(0,1.75,0.04); g.add(board);
+  const h=modelHolder(id,1.3); h.rotation.y=Math.PI/2; h.position.set(0,1.73,0.16); g.add(h);
+  useSpot('wall',x,z,ry,1.5,{id});
+}
+function buildAmmo(x,z,ry){
+  const g=placeGroup(x,z,ry), olive=lam(0x3f4a2c), dark=lam(0x22261c), brass=lam(0xb8902e);
+  const tex=signTex(256,128,(c,w,h)=>{ c.fillStyle='#3f4a2c'; c.fillRect(0,0,w,h); c.fillStyle='#e8c84a'; c.font='bold 58px Impact, "Arial Black", sans-serif'; c.textAlign='center'; c.textBaseline='middle'; c.fillText('AMMO',w/2,h/2+2);
+    c.strokeStyle='#e8c84a'; c.lineWidth=5; c.strokeRect(10,10,w-20,h-20); });
+  const front=new THREE.MeshLambertMaterial({map:tex,emissive:0x1a1a08,emissiveIntensity:0.5});
+  const body=new THREE.Mesh(bgeo(1.4,0.75,0.9),[olive,olive,olive,olive,front,olive]); body.position.y=0.38; body.castShadow=body.receiveShadow=true; g.add(body); solids.push(body);
+  const lid=gAdd(g,bgeo(1.42,0.08,0.92),dark,0,0.98,-0.38); lid.rotation.x=-1.25;
+  for(let i=0;i<4;i++) gAdd(g,bgeo(0.28,0.16,0.3),i%2?brass:dark,-0.48+i*0.32,0.82,0.05);
+  footprint(x,z,ry,1.42,0.92,0.9);
+  useSpot('ammo',x,z,ry,1.3);
+}
+const ARMOR=[{max:0},{max:50,price:1500,name:'Armor I'},{max:100,price:3000,name:'Armor II'},{max:150,price:5000,name:'Armor III'}];
+function buildArmor(x,z,ry){
+  const g=placeGroup(x,z,ry), steel=lam(0x4e555e), dark=lam(0x1d2024), vest=lam(0x23324a), plate=lam(0x5a6a80);
+  gAdd(g,bgeo(1.8,0.9,0.8),steel,0,0.45,0,true); gAdd(g,bgeo(1.9,0.08,0.86),dark,0,0.93,0);
+  gAdd(g,bgeo(1.6,2.7,0.12),dark,0,1.35,-0.42,true);
+  gAdd(g,bgeo(0.7,0.75,0.3),vest,0,1.7,-0.25); gAdd(g,bgeo(0.5,0.42,0.06),plate,0,1.78,-0.08); gAdd(g,bgeo(0.22,0.34,0.26),vest,-0.38,1.86,-0.25); gAdd(g,bgeo(0.22,0.34,0.26),vest,0.38,1.86,-0.25);
+  for(let i=0;i<3;i++) gAdd(g,bgeo(0.36,0.06,0.46),plate,-0.5+i*0.5,1.0,0.05);
+  const tex=signTex(256,64,(c,w,h)=>{ c.fillStyle='#101a28'; c.fillRect(0,0,w,h); c.fillStyle='#8fc0ff'; c.font='bold 40px Impact, "Arial Black", sans-serif'; c.textAlign='center'; c.textBaseline='middle'; c.shadowColor='#4a86ff'; c.shadowBlur=12; c.fillText('ARMOR',w/2,h/2+2); });
+  const sg=new THREE.Mesh(new THREE.PlaneGeometry(1.4,0.35),new THREE.MeshBasicMaterial({map:tex})); sg.position.set(0,2.42,-0.35); g.add(sg);
+  const l=new THREE.PointLight(0x4a86ff,0.7,7,1.8); l.position.set(0,2.3,0.6); g.add(l);
+  footprint(x,z,ry,1.9,0.96,2.2);
+  useSpot('armor',x,z,ry,1.4);
+}
 buildPerks([-11.9,-10.5,-9.1,-7.7,1.5,2.9,4.3,5.7],-11.5);
+buildWall('smg',-13,-15,-Math.PI/2); buildWall('shotgun',13,-15,Math.PI/2); buildWall('sniper',13,-20.5,Math.PI/2); buildWall('rifle',6,-23,Math.PI);
+buildBox(-20,-2,Math.PI/2);
+buildAmmo(11,-9.5,0); buildAmmo(-14,22,Math.PI);
+buildArmor(-22,-16,Math.PI/2);
 endMap('station');
 
 /* map 2: Dead Engine, a frozen research site built around a humming machine */
-beginMap('engine',{name:'Dead Engine',sub:'A frozen research site with a machine that hums',sky:0x161021,fog:0.024,hemi:[0x6a5a8a,0x1a1418,0.6],moon:[0xb8a8e0,0.42],start:[0,15],yaw:0,cam:[22,10],tag:'Cold, dark, and humming. So are they.',
+beginMap('engine',{note:'Pump-a-Punch sits between the machine and the lab, and perk machines line the lab front. You can hold 4 perks. Look for wall guns on the lab, barn and farmhouse, ammo crates, the armor locker and the Mystery Crate.',name:'Dead Engine',sub:'A frozen research site with a machine that hums',sky:0x161021,fog:0.024,hemi:[0x6a5a8a,0x1a1418,0.6],moon:[0xb8a8e0,0.42],start:[0,15],yaw:0,cam:[22,10],tag:'Cold, dark, and humming. So are they.',
   radar:[[[[-16,-38],[16,-38],[16,-26],[-16,-26]],'rgba(241,236,226,.22)'],[[[27,-11],[37,-11],[37,3],[27,3]],'rgba(170,50,40,.3)'],[[[-5,-2],[5,-2],[5,2],[-5,2]],'rgba(176,74,255,.35)']],
   ready:'The machine is waking up',first:'The machine woke them',hold:'Hold the site',held:'You held the site until wave ',empty:'No runs yet. The machine is humming and the lab lights still flicker.'});
 {
@@ -963,6 +1046,10 @@ beginMap('engine',{name:'Dead Engine',sub:'A frozen research site with a machine
   { const l=new THREE.PointLight(0xffb070,0.9,20,1.5); l.position.set(0,4,-23); world.add(l); }
   buildPerks([-13.2,-11.8,-10.4,-9.0,9.0,10.4,11.8,13.2],-25.5);
   buildPap(0,-9.5);
+  buildWall('smg',-16,-30,-Math.PI/2); buildWall('shotgun',16,-30,Math.PI/2); buildWall('rifle',27,0.5,-Math.PI/2); buildWall('sniper',-29,0.25,0);
+  buildBox(-20,4,Math.PI/2);
+  buildAmmo(4,-22,0); buildAmmo(21,-6,-Math.PI/2);
+  buildArmor(-4,-22,0);
 
   /* sandbag walls and crates near the machine */
   function sandbags(x,z,len,ry){ addBox(len,0.9,0.9,sand,x,0.45,z,{collide:true,ry}); addBox(len-0.4,0.35,0.8,lam(0x9a8a66),x,1.07,z,{ry,cast:false}); }
@@ -1047,6 +1134,7 @@ function selectMap(id){
   hemi.color.setHex(m.hemi[0]); hemi.groundColor.setHex(m.hemi[1]); hemi.intensity=m.hemi[2];
   moonLight.color.setHex(m.moon[0]); moonLight.intensity=m.moon[1];
   for(const z of zombies){ resolveCircle(z.root.position,z.d.radius); z.wander=null; }
+  resetBox();
   loadBest(); $('bestLine').textContent=bestText(); document.querySelector('#titleScreen .tag').textContent=m.tag;
   document.querySelectorAll('.mapBtn').forEach(b=>{ const on=b.dataset.map===m.id; b.classList.toggle('on',on); b.setAttribute('aria-pressed',on); });
   try{ localStorage.setItem('laststop-map',m.id); }catch(e){}
@@ -1059,7 +1147,7 @@ function renderPerks(){
 function interact(){
   if(state!=='playing') return;
   if(nearPap()){ usePap(); return; }
-  const pm=nearPerk(); if(!pm) return; const P=PERKS[pm.id];
+  const pm=nearPerk(); if(!pm){ const u=nearUse(); if(u) useThing(u); return; } const P=PERKS[pm.id];
   if(hasPerk(pm.id)){
     if(dropArm.id===pm.id&&gameTime-dropArm.t<3){ perks=perks.filter(x=>x!==pm.id); dropArm={id:null,t:0}; renderPerks(); popup(`Dropped ${P.name}`,''); sfx.deny(); }
     else dropArm={id:pm.id,t:gameTime};
@@ -1082,6 +1170,90 @@ function liveWire(){
 }
 
 
+
+/* crate, wall guns, ammo, armor: using them */
+let box={st:'idle',t:0,pick:null,cyc:0,shown:null};
+function nearUse(){ let best=null, bd=1.7; for(const u of curMap.uses){ const d=Math.hypot(player.pos.x-u.x,player.pos.z-u.z); if(d<bd){ bd=d; best=u; } } return best; }
+function ownsGun(id){ return inv.findIndex(s=>s&&s.id===id); }
+function ammoPrice(s){ return refillPrice(s.id); }
+function ammoFull(s){ const w=W(s); return s.res===Infinity||(s.res>=w.reserve&&s.mag>=w.mag); }
+function giveWeapon(id){
+  const own=ownsGun(id);
+  if(own>=0){ const s=inv[own], w=W(s); s.mag=w.mag; s.res=w.reserve; cur=own; }
+  else{ const empty=inv.indexOf(null), slot=empty>=0?empty:cur; inv[slot]=newSlot(id); cur=slot; }
+  reloading=false; swapT=0.35; syncCamo(); showGun();
+}
+function refill(s){ const w=W(s); s.mag=w.mag; s.res=w.reserve; if(s===inv[cur]) reloading=false; }
+function needMore(n){ sfx.deny(); popup(`Need $${n.toLocaleString()} more`,'head'); }
+function boxPick(){
+  const pool=BOX_POOL.filter(([id])=>ownsGun(id)<0); let tot=0; pool.forEach(p=>tot+=p[1]); let r=Math.random()*tot;
+  for(const p of pool){ r-=p[1]; if(r<=0) return p[0]; }
+  return pool.length?pool[pool.length-1][0]:'smg';
+}
+function armorAction(){
+  const lv=armorLv, A=ARMOR[lv];
+  const rep=repairPrice();
+  if(rep) return {kind:'repair',price:rep};
+  if(lv<3) return upgradeAction();
+  return {kind:'full'};
+}
+function repairPrice(){ const miss=ARMOR[armorLv].max-armorHp; return armorLv>0&&miss>0.5?Math.max(100,Math.ceil(miss*10/50)*50):0; }
+function upgradeAction(){ const up=ARMOR[armorLv+1]; return up?{kind:'up',price:up.price,next:up,lv:armorLv+1}:null; }
+function useThing(u){
+  if(papT>0) return;
+  if(u.kind==='box'){
+    if(box.st==='idle'){ if(cash<BOX_PRICE){ needMore(BOX_PRICE-cash); return; }
+      cash-=BOX_PRICE; box={st:'spin',t:0,pick:boxPick(),cyc:0,shown:null}; sfx.box(); }
+    else if(box.st==='offer'){ const id=box.pick, w=WEAPONS[id]; giveWeapon(id); sfx.buy();
+      banner(w.name,id==='raygun'?'Jackpot. The Ray Gun!':'Fresh from the Mystery Crate'); box.st='close'; box.t=0; }
+    return;
+  }
+  if(u.kind==='wall'){
+    const own=ownsGun(u.id), w=WEAPONS[u.id];
+    if(own>=0){ const s=inv[own]; if(ammoFull(s)){ sfx.deny(); popup('Ammo full',''); return; }
+      const pr=ammoPrice(s); if(cash<pr){ needMore(pr-cash); return; } cash-=pr; refill(s); sfx.buy(); popup(`${W(s).name} ammo refilled`,''); return; }
+    if(cash<w.price){ needMore(w.price-cash); return; }
+    cash-=w.price; giveWeapon(u.id); sfx.buy(); popup(`Bought the ${w.name}`,''); return;
+  }
+  if(u.kind==='ammo'){
+    const s=inv[cur]; if(ammoFull(s)){ sfx.deny(); popup(s.res===Infinity?'Your pistol never runs out':'Ammo full',''); return; }
+    const pr=ammoPrice(s); if(cash<pr){ needMore(pr-cash); return; } cash-=pr; refill(s); sfx.buy(); popup(`${W(s).name} ammo refilled`,''); return;
+  }
+  if(u.kind==='armor'){
+    const a=armorAction(); if(a.kind==='full'){ sfx.deny(); popup('Armor is maxed out',''); return; }
+    if(cash<a.price){ needMore(a.price-cash); return; }
+    cash-=a.price;
+    if(a.kind==='up'){ armorLv=a.lv; armorHp=ARMOR[armorLv].max; banner(a.next.name,`${a.next.max} armor soaks up hits before your health`); }
+    else{ armorHp=ARMOR[armorLv].max; popup('Armor repaired',''); }
+    sfx.perk(); return;
+  }
+}
+function resetBox(){
+  box={st:'idle',t:0,pick:null,cyc:0,shown:null};
+  for(const k in MAPS){ const R=MAPS[k].boxRef; if(!R) continue; R.pivot.rotation.x=0; for(const id in R.shows) R.shows[id].visible=false; R.beamMat.opacity=0.22; R.light.intensity=0.9; }
+}
+function boxShow(R,id){ if(box.shown===id) return; if(box.shown) R.shows[box.shown].visible=false; box.shown=id; if(id) R.shows[id].visible=true; }
+function updateBox(dt){
+  const R=curMap.boxRef; if(!R) return;
+  const t=performance.now()/1000, open=box.st==='spin'||box.st==='offer';
+  R.pivot.rotation.x+=((open?-1.75:0)-R.pivot.rotation.x)*Math.min(1,dt*(open?9:6));
+  R.beamMat.opacity=open?0.45+0.15*Math.sin(t*12):0.18+0.05*Math.sin(t*2);
+  R.light.intensity=open?1.6+0.5*Math.sin(t*10):0.8;
+  if(box.st==='idle') return;
+  box.t+=dt;
+  if(box.st==='spin'){
+    const k=Math.min(1,box.t/BOX_SPIN); R.preview.position.y=1.0+k*0.9; R.preview.rotation.y=0;
+    box.cyc-=dt;
+    if(box.cyc<=0){ box.cyc=0.06+k*k*0.32; let id; do{ id=BOX_POOL[(Math.random()*BOX_POOL.length)|0][0]; }while(id===box.shown&&BOX_POOL.length>1); boxShow(R,id); sfx.tick(); }
+    if(box.t>=BOX_SPIN){ if(ownsGun(box.pick)>=0) box.pick=boxPick(); boxShow(R,box.pick); box.st='offer'; box.t=0; sfx.boxLand(box.pick==='raygun'); }
+  }else if(box.st==='offer'){
+    R.preview.position.y=1.9+Math.sin(t*2)*0.06; R.preview.rotation.y=Math.sin(t*1.3)*0.35;
+    if(box.t>=BOX_OFFER){ box.st='close'; box.t=0; popup('The crate closed','head'); }
+  }else if(box.st==='close'){
+    boxShow(R,null);
+    if(box.t>0.6) box.st='idle';
+  }
+}
 
 /* zombie types */
 const TYPES={
@@ -1109,7 +1281,7 @@ let yaw=Math.PI, pitch=0, bobT=0, moveAmt=0;
 let state='title';
 let wave=0, score=0, kills=0, bossCount=0, phase='intermission', interT=0, queue=0, spawnT=0, bossPending=false, bossTimer=0;
 let shake=0, hurtFlash=0, gameTime=0, titleT=0, deathT=0, groanT=2, hitT=0;
-let armor=false, inv=[null,null], cur=0, cash=0, pendingBuy=null, reloading=false, reloadT=0, fireCd=0, swapT=0, ads=false, adsT=0, mouseDown=false, gunKick=0, flashT=0;
+let armorLv=0, armorHp=0, inv=[null,null], cur=0, cash=0, pendingBuy=null, reloading=false, reloadT=0, fireCd=0, swapT=0, ads=false, adsT=0, mouseDown=false, gunKick=0, flashT=0;
 let aliveN=0;
 const zombies=[], projectiles=[], pickups=[], particles=[], effects=[];
 const scopeEl=document.getElementById('scope');
@@ -1159,6 +1331,9 @@ const sfx={
   whoosh(){ nz(0.25,900,0.25,'bandpass',1.5); },
   buy(){ tn(1250,1250,0.08,'triangle',0.2); setTimeout(()=>tn(1870,1870,0.22,'triangle',0.18),90); },
   deny(){ tn(180,140,0.18,'square',0.1); },
+  box(){ [0,110,220,330,440,550].forEach((ms,i)=>setTimeout(()=>{ const f=[660,880,740,990,830,1110][i]; tn(f,f,0.14,'triangle',0.12); },ms)); },
+  tick(){ tn(1600,1500,0.03,'square',0.04); },
+  boxLand(j){ if(j){ [0,100,200,300,450].forEach((ms,i)=>setTimeout(()=>tn(500*(1+i*0.25),1000*(1+i*0.25),0.22,'sine',0.2),ms)); } else { tn(520,780,0.18,'triangle',0.18); } },
   shotgun(){ nz(0.38,1100,0.95); tn(110,35,0.24,'square',0.28); },
   empty(){ tn(1800,1600,0.03,'square',0.08); },
   reload(){ tn(900,700,0.05,'square',0.08); setTimeout(()=>tn(1300,900,0.05,'square',0.08),260); },
@@ -1739,6 +1914,7 @@ const joy={x:0,y:0,active:false,id:null};
 let touchJump=false;
 function hurt(dmg){
   if(state!=='playing'||player.hp<=0) return;
+  if(armorHp>0){ const a=Math.min(armorHp,dmg); armorHp-=a; dmg-=a; if(armorHp<=0){ armorHp=0; popup('Armor broken','head'); } }
   lastHurtT=gameTime; player.hp=Math.max(0,player.hp-dmg); hurtFlash=Math.min(1,hurtFlash+0.35+dmg/60); shake+=0.15+dmg/80; sfx.hurt();
   if(player.hp<=0) die();
 }
@@ -1958,7 +2134,7 @@ function updateCamera(dt){
 }
 
 /* HUD */
-const el={papPrompt:$('papPrompt'),papTxt:$('papTxt'),papSub:$('papSub'),papFill:$('papFill'),tPap:$('tPap'),hpLbl:$('hpLbl'),nadeHud:$('nadeHud'),cash:$('cash'),slotHint:$('slotHint'),score:$('score'),waveNum:$('waveNum'),leftNum:$('leftNum'),hpNum:$('hpNum'),hpFill:$('hpFill'),healthBox:$('healthBox'),
+const el={armorWrap:$('armorWrap'),arNum:$('arNum'),arLbl:$('arLbl'),arFill:$('arFill'),papPrompt:$('papPrompt'),papTxt:$('papTxt'),papSub:$('papSub'),papFill:$('papFill'),tPap:$('tPap'),hpLbl:$('hpLbl'),nadeHud:$('nadeHud'),cash:$('cash'),slotHint:$('slotHint'),score:$('score'),waveNum:$('waveNum'),leftNum:$('leftNum'),hpNum:$('hpNum'),hpFill:$('hpFill'),healthBox:$('healthBox'),
   ammoNum:$('ammoNum'),ammoMax:$('ammoMax'),weapName:$('weapName'),reloadTxt:$('reloadTxt'),bossWrap:$('bossWrap'),bossName:$('bossName'),
   bossFill:$('bossFill'),cross:$('cross'),hit:$('hit'),vignette:$('vignette')};
 const cache={};
@@ -1974,7 +2150,9 @@ function updateHud(){
   el.healthBox.classList.toggle('low',player.hp<30);
   const sl=inv[cur], w=W(sl), other=inv[1-cur];
   setT('cash','$'+cash.toLocaleString());
-  setT('hpLbl',armor?'Health + armor':'Health');
+  setT('hpLbl','Health');
+  el.armorWrap.hidden=armorLv===0;
+  if(armorLv){ setT('arNum',String(Math.ceil(armorHp))); setT('arLbl',ARMOR[armorLv].name); const ap=(armorHp/ARMOR[armorLv].max*100).toFixed(1)+'%'; if(cache.arw!==ap){ cache.arw=ap; el.arFill.style.width=ap; } }
   setT('nadeHud',`${isTouch?'':'G: '}Grenades ${'●'.repeat(nades)}${'○'.repeat(2-nades)}`);
   setT('weapName',w.name); setT('ammoNum',String(sl.mag)); setT('ammoMax',`/ ${sl.res===Infinity?'∞':sl.res}`);
   setT('reloadTxt',reloading?'Reloading':(sl.mag===0?(sl.res>0?(isTouch?'Tap reload':'Press R to reload'):'Out of ammo'):(sl.res===0&&sl.mag<=w.mag*0.25?'Low ammo':'')));
@@ -1987,10 +2165,11 @@ function updateHud(){
   el.cross.style.opacity=(w.scope?(1-adsT):(1-adsT*0.75)).toFixed(2);
   el.hit.style.opacity=hitT>0?'1':'0';
   const wc=PAP_CSS[w.tier||0]; if(cache.wc!==wc){ cache.wc=wc; el.weapName.style.color=wc; }
-  const near=nearPap(), pm=near?null:nearPerk();
-  el.tPap.hidden=!(isTouch&&(near||pm)&&papT<=0);
-  const tl=pm?(hasPerk(pm.id)?'Drop':'Buy'):'Punch'; if(cache.tl!==tl){ cache.tl=tl; el.tPap.textContent=tl; }
-  const bc=pm?PERKS[pm.id].css:''; if(cache.pbc!==bc){ cache.pbc=bc; el.papPrompt.style.borderColor=bc; }
+  const near=nearPap(), pm=near?null:nearPerk(), u=(near||pm)?null:nearUse();
+  const boxBusy=u&&u.kind==='box'&&box.st!=='idle'&&box.st!=='offer';
+  el.tPap.hidden=!(isTouch&&(near||pm||(u&&!boxBusy))&&papT<=0);
+  const tl=pm?(hasPerk(pm.id)?'Drop':'Buy'):(u?useLabel(u):'Punch'); if(cache.tl!==tl){ cache.tl=tl; el.tPap.textContent=tl; }
+  const bc=pm?PERKS[pm.id].css:(u?USE_CSS[u.kind]:''); if(cache.pbc!==bc){ cache.pbc=bc; el.papPrompt.style.borderColor=bc; }
   const wc2=hasPerk('wire')&&gameTime<wireReadyT; if(cache.wcool!==wc2||cache.pl!==perks.length){ cache.wcool=wc2; cache.pl=perks.length; const we=document.querySelector('.perk[data-p="wire"]'); if(we) we.classList.toggle('cool',wc2); }
   if(papT>0){
     el.papPrompt.hidden=false; el.papPrompt.className='busy';
@@ -2010,7 +2189,42 @@ function updateHud(){
     else if(perks.length>=PERK_MAX){ el.papPrompt.className='poor'; setT('papTxt',`${P.name}: ${P.d}`); setT('papSub',`You can hold ${PERK_MAX} perks. Drop one at its machine first.`); }
     else{ el.papPrompt.className=cash<P.price?'poor':''; setT('papTxt',`${isTouch?'Tap Buy':'Press F'} to buy ${P.name} for $${P.price.toLocaleString()}`);
       setT('papSub',cash<P.price?`You need $${(P.price-cash).toLocaleString()} more`:P.d); }
-  }else el.papPrompt.hidden=true;
+  }else if(u){ el.papPrompt.hidden=false; usePrompt(u); }
+  else el.papPrompt.hidden=true;
+}
+const USE_CSS={box:'#38e0ff',wall:'#f1ece2',ammo:'#9ccc3c',armor:'#4a86ff'};
+function useLabel(u){
+  if(u.kind==='box') return box.st==='offer'?'Take':'Open';
+  if(u.kind==='wall') return ownsGun(u.id)>=0?'Ammo':'Buy';
+  if(u.kind==='ammo') return 'Ammo';
+  return 'Armor';
+}
+function usePrompt(u){
+  const key=isTouch?`Tap ${useLabel(u)}`:'Press F', poor=n=>`You need $${(n-cash).toLocaleString()} more`;
+  const swapNote=()=>inv.indexOf(null)>=0?'Goes in your empty slot':`Replaces your ${W(inv[cur]).name}`;
+  const say=(cls,a,b)=>{ el.papPrompt.className=cls; setT('papTxt',a); setT('papSub',b); };
+  if(u.kind==='box'){
+    if(box.st==='spin') say('','The Mystery Crate is choosing...','');
+    else if(box.st==='offer'){ const w=WEAPONS[box.pick]; say('',`${key} to take the ${w.name}`,`${ownsGun(box.pick)>=0?'You have it, so this refills it':swapNote()}. ${Math.max(0,Math.ceil(BOX_OFFER-box.t))}s left`); }
+    else if(box.st==='close') say('','The crate is closing','');
+    else say(cash<BOX_PRICE?'poor':'',`${key} to open the Mystery Crate for $${BOX_PRICE}`,cash<BOX_PRICE?poor(BOX_PRICE):'A random weapon. Small chance of the Ray Gun.');
+  }else if(u.kind==='wall'){
+    const w=WEAPONS[u.id], own=ownsGun(u.id);
+    if(own>=0){ const s=inv[own], pr=ammoPrice(s);
+      if(ammoFull(s)) say('',`${W(s).name}: ammo full`,'Come back when you run low');
+      else say(cash<pr?'poor':'',`${key} to refill ${W(s).name} ammo for $${pr.toLocaleString()}`,cash<pr?poor(pr):'Fills the magazine and your reserve'); }
+    else say(cash<w.price?'poor':'',`${key} to buy the ${w.name} for $${w.price.toLocaleString()}`,cash<w.price?poor(w.price):swapNote());
+  }else if(u.kind==='ammo'){
+    const s=inv[cur], pr=ammoPrice(s);
+    if(s.res===Infinity) say('','Ammo crate','Your pistol never runs out. Hold another gun to refill it.');
+    else if(ammoFull(s)) say('',`${W(s).name}: ammo full`,'Refills the gun in your hand');
+    else say(cash<pr?'poor':'',`${key} to refill ${W(s).name} ammo for $${pr.toLocaleString()}`,cash<pr?poor(pr):'Refills the gun in your hand');
+  }else{
+    const a=armorAction();
+    if(a.kind==='full') say('','Armor III, fully repaired','Your armor is maxed out');
+    else if(a.kind==='up') say(cash<a.price?'poor':'',`${key} to buy ${a.next.name} for $${a.price.toLocaleString()}`,cash<a.price?poor(a.price):`${a.next.max} armor that soaks up hits before your health`);
+    else say(cash<a.price?'poor':'',`${key} to repair your armor for $${a.price.toLocaleString()}`,cash<a.price?poor(a.price):`Back to ${ARMOR[armorLv].max} armor`);
+  }
 }
 const rc=$('radar'), rg=rc.getContext('2d');
 const storePoly=[[-13,-23],[13,-23],[13,-12],[-13,-12]], canopyPoly=[[-12,-2.5],[12,-2.5],[12,10.5],[-12,10.5]];
@@ -2028,6 +2242,8 @@ function drawRadar(){
   rg.restore();
   { const q=tr(PAP_POS.x,PAP_POS.z); let dx=q[0]-c, dy=q[1]-c; const mm=Math.hypot(dx,dy); if(mm>R-10){ dx*=(R-10)/mm; dy*=(R-10)/mm; }
     rg.fillStyle='#b04aff'; rg.save(); rg.translate(c+dx,c+dy); rg.rotate(Math.PI/4); rg.fillRect(-6,-6,12,12); rg.restore(); }
+  if(curMap.boxAt){ const q=tr(curMap.boxAt[0],curMap.boxAt[1]); let dx=q[0]-c, dy=q[1]-c; const mm=Math.hypot(dx,dy); if(mm>R-10){ dx*=(R-10)/mm; dy*=(R-10)/mm; }
+    rg.fillStyle='#38e0ff'; rg.fillRect(c+dx-6,c+dy-6,12,12); rg.fillStyle='#0a2a30'; rg.font='bold 12px sans-serif'; rg.textAlign='center'; rg.textBaseline='middle'; rg.fillText('?',c+dx,c+dy+1); }
   for(const z of zombies){
     if(z.dead) continue;
     const dx=z.root.position.x-player.pos.x, dz=z.root.position.z-player.pos.z;
@@ -2069,10 +2285,10 @@ function clearWorld(){
 }
 function resetGame(){
   clearWorld();
-  player.maxHp=100; armor=false; nades=1; nadeCd=0; player.burnT=0;
+  player.maxHp=100; armorLv=0; armorHp=0; nades=1; nadeCd=0; player.burnT=0;
   player.pos.set(curMap.start[0],0,curMap.start[1]); player.vy=0; player.hp=player.maxHp; player.kb.set(0,0,0); player.onGround=true;
   yaw=curMap.yaw; pitch=0; wave=0; score=0; kills=0; bossCount=0; phase='intermission'; interT=3.5; queue=0; bossPending=false;
-  papT=0; papSlot=null; spinT=0; cheat=false; cheatUsed=false; perks=[]; lastHurtT=-99; wireReadyT=0; dropArm={id:null,t:0}; renderPerks();
+  papT=0; papSlot=null; spinT=0; resetBox(); cheat=false; cheatUsed=false; perks=[]; lastHurtT=-99; wireReadyT=0; dropArm={id:null,t:0}; renderPerks();
   inv=[newSlot('pistol'),null]; cur=0; cash=500; pendingBuy=null; reloading=false; fireCd=0; swapT=0; adsT=0; ads=false; mouseDown=false;
   hurtFlash=0; shake=0; gameTime=0; aliveN=0;
   scopeEl.hidden=true;
@@ -2085,13 +2301,16 @@ function continueRun(){
   const d=loadRun(); if(!d){ refreshTitle(); return; }
   selectMap(MAPS[d.map]?d.map:'station'); initAudio(); resetGame(); $('banner').classList.remove('show');
   wave=d.wave|0; score=d.score|0; kills=d.kills|0; cash=Math.max(0,d.cash|0); bossCount=d.bossCount|0;
-  armor=!!d.armor; player.maxHp=armor?200:100; player.hp=clamp(d.hp||player.maxHp,1,player.maxHp); nades=clamp(d.nades|0,0,2);
+  armorLv=clamp(d.armorLv|0,0,3); armorHp=clamp(d.armorHp|0,0,ARMOR[armorLv].max);
+  if(d.armor&&!d.armorLv){ armorLv=2; armorHp=100; }
+  player.maxHp=100; player.hp=clamp(d.hp||player.maxHp,1,player.maxHp); nades=clamp(d.nades|0,0,2);
   inv=d.inv.slice(0,2).map(x=>x&&WEAPONS[x.id]?{id:x.id,mag:x.mag|0,res:x.res<0?Infinity:x.res|0,tier:clamp(x.tier|0,0,3)}:null);
   while(inv.length<2) inv.push(null);
   if(!inv[0]){ inv[0]=inv[1]; inv[1]=null; } if(!inv[0]) inv[0]=newSlot('pistol');
   cur=(d.cur===1&&inv[1])?1:0; syncCamo();
   perks=(Array.isArray(d.perks)?d.perks:[]).filter(id=>PERKS[id]).slice(0,PERK_MAX); renderPerks();
   cheat=!!d.cheat; cheatUsed=!!d.cheatUsed||cheat;
+  if(d.box&&WEAPONS[d.box]&&curMap.boxRef){ const pk=ownsGun(d.box)>=0?boxPick():d.box; box={st:'offer',t:0,pick:pk,cyc:0,shown:null}; boxShow(curMap.boxRef,pk); curMap.boxRef.preview.position.y=1.9; }
   $('titleScreen').hidden=true; $('overScreen').hidden=true; $('pauseScreen').hidden=true;
   state='playing'; openShop(true);
 }
@@ -2161,7 +2380,7 @@ function openShop(resumed){
   for(const id in guns) guns[id].g.visible=false;
   $('shopTitle').textContent=resumed?`Welcome back. Wave ${wave} cleared, your run is saved.`:`Wave ${wave} cleared. Your run is saved.`;
   $('nextWaveBtn').textContent=`Start wave ${wave+1}`;
-  renderShop(); shopEl.hidden=false; shopEl.scrollTop=0;
+  $('shopNote').textContent=curMap.note; renderShop(); shopEl.hidden=false; shopEl.scrollTop=0;
   try{ $('nextWaveBtn').focus({preventScroll:true}); }catch(e){}
 }
 function closeShop(){
@@ -2186,11 +2405,15 @@ function renderShop(){
   const hpFull=player.hp>=player.maxHp;
   h+=`<div class="slot"><div class="slotNum">First aid</div><div class="slotName">${Math.ceil(player.hp)} / ${player.maxHp}</div><div class="slotAmmo">Health</div>
     <button class="sbtn" data-heal="1" ${hpFull||cash<HEAL_PRICE?'disabled':''}>${hpFull?'Health full':`Restore health $${HEAL_PRICE}`}</button></div>`;
-  h+=`<div class="slot${armor?' active':''}"><div class="slotNum">Body armor</div><div class="slotName">${armor?'Equipped':'Max health 200'}</div>
-    <div class="slotAmmo">${armor?'Your max health is doubled for this run':'Doubles your max health and fills it up'}</div>
-    ${armor?'':`<button class="sbtn" data-armor="1" ${cash<ARMOR_PRICE?'disabled':''}>Buy armor $${ARMOR_PRICE.toLocaleString()}</button>`}</div>`;
+  { const a=armorAction(), A=ARMOR[armorLv];
+    h+=`<div class="slot${armorLv?' active':''}"><div class="slotNum">Armor</div><div class="slotName">${armorLv?`${A.name}: ${Math.ceil(armorHp)} / ${A.max}`:'None'}</div>
+    <div class="slotAmmo">${armorLv?'Soaks up hits before your health':'Soaks up hits before your health. Also sold at the armor locker.'}</div>
+    ${(()=>{ const rp=repairPrice(), up=upgradeAction(); let o='';
+      if(rp) o+=`<button class="sbtn" data-armor="repair" ${cash<rp?'disabled':''}>Repair armor $${rp.toLocaleString()}</button>`;
+      if(up) o+=`<button class="sbtn" data-armor="up" ${cash<up.price?'disabled':''}>Buy ${up.next.name} $${up.price.toLocaleString()}</button>`;
+      return o||'<div class="slotAmmo">Maxed out</div>'; })()}</div>`; }
   h+=`<div class="slot"><div class="slotNum">Perks</div><div class="slotName">${perks.length} / ${PERK_MAX}</div>
-    <div class="slotAmmo">${perks.length?perks.map(id=>PERKS[id].name).join(', '):'Buy them from the vending machines in front of the store'}</div></div>`;
+    <div class="slotAmmo">${perks.length?perks.map(id=>PERKS[id].name).join(', '):'Buy them from the perk machines'}</div></div>`;
   $('slots').innerHTML=h;
   let b='';
   SHOP_ORDER.forEach(id=>{
@@ -2200,6 +2423,9 @@ function renderShop(){
       <div class="stats3">${bars(w.bars)}</div><div class="price">$${w.price.toLocaleString()}</div>
       <button class="sbtn${!owned&&afford?' buy':''}" data-buy="${id}" ${owned||!afford?'disabled':''}>${label}</button></div>`;
   });
+  b+=`<div class="item"><div><div class="iname">${WEAPONS.raygun.name}</div><div class="idesc">${WEAPONS.raygun.desc} Only from the Mystery Crate.</div></div>
+      <div class="stats3">${bars(WEAPONS.raygun.bars)}</div><div class="price">$${BOX_PRICE}</div>
+      <button class="sbtn" disabled>${inv.some(s=>s&&s.id==='raygun')?'Owned':'Mystery Crate'}</button></div>`;
   $('board').innerHTML=b;
   if(state==='shop') saveRun();
 }
@@ -2222,7 +2448,7 @@ shopEl.addEventListener('click',e=>{
   else if(t.dataset.drop!==undefined&&pendingBuy) completeBuy(pendingBuy,+t.dataset.drop);
   else if(t.dataset.cancel){ pendingBuy=null; swapDlg.hidden=true; }
   else if(t.dataset.refill!==undefined){ const s=inv[+t.dataset.refill], pr=refillPrice(s.id); if(cash>=pr){ cash-=pr; s.res=W(s).reserve; s.mag=W(s).mag; sfx.buy(); renderShop(); } }
-  else if(t.dataset.armor){ if(cash>=ARMOR_PRICE&&!armor){ cash-=ARMOR_PRICE; armor=true; player.maxHp=200; player.hp=200; sfx.buy(); renderShop(); } }
+  else if(t.dataset.armor){ const a=t.dataset.armor==='up'?upgradeAction():{kind:'repair',price:repairPrice()}; if(a&&a.price&&cash>=a.price){ cash-=a.price; if(a.kind==='up') armorLv=a.lv; armorHp=ARMOR[armorLv].max; sfx.buy(); renderShop(); } }
   else if(t.dataset.heal){ if(cash>=HEAL_PRICE&&player.hp<player.maxHp){ cash-=HEAL_PRICE; player.hp=player.maxHp; sfx.buy(); renderShop(); } }
 });
 $('nextWaveBtn').addEventListener('click',closeShop);
@@ -2261,7 +2487,7 @@ addEventListener('keydown',e=>{
     if(e.code==='Digit2') swapWeapon(1);
     if(e.code==='KeyQ') swapWeapon();
     if(e.code==='KeyG') throwNade();
-    if(e.code==='KeyF') interact();
+    if(e.code==='KeyF'&&!e.repeat) interact();
     if(e.code==='KeyE') ads=true;
     if(e.code==='KeyP'||(e.code==='Escape'&&(freeLook||isTouch))) pause();
   }
@@ -2338,7 +2564,7 @@ function loop(){
   const dt=Math.min(clock.getDelta(),0.05); frameNo++;
   if(state==='playing'){
     gameTime+=dt;
-    updatePlayer(dt); updateWeapon(dt); updateZombies(dt); updateWaves(dt);
+    updatePlayer(dt); updateWeapon(dt); updateZombies(dt); updateWaves(dt); updateBox(dt);
     updateProjectiles(dt); updateBolts(dt); updateGlobs(dt); updateGrenades(dt); updateHazards(dt); updatePools(dt); updatePickups(dt); updateCamera(dt); updateHud(); drawRadar();
     hitT=Math.max(0,hitT-dt);
     groanT-=dt;
