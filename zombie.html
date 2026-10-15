@@ -142,11 +142,14 @@
   #slotHint{margin-top:2px}
   body.touch #healthBox{top:calc(112px + var(--safe-t))}
   .pitch{font-size:19px;line-height:1.4;color:var(--dim);max-width:46ch;margin:-8px 0 24px}
-  #scope{position:fixed;inset:0;pointer-events:none;z-index:2;
-    background:radial-gradient(circle at center,transparent 0 min(36vh,36vw),#000 calc(min(36vh,36vw) + 2px))}
-  #scope::before,#scope::after{content:'';position:absolute;background:rgba(0,0,0,.85)}
-  #scope::before{left:50%;top:14%;bottom:14%;width:2px;transform:translateX(-50%)}
-  #scope::after{top:50%;left:14%;right:14%;height:2px;transform:translateY(-50%)}
+  #scope{position:fixed;inset:0;pointer-events:none;z-index:2;--r:min(36vh,36vw);
+    background:radial-gradient(circle at center,transparent 0 var(--r),#000 calc(var(--r) + 2px))}
+  #scope.acog,#scope.aug{--r:min(42vh,42vw)}
+  #scope svg{position:absolute;left:50%;top:50%;width:calc(var(--r) * 2);height:calc(var(--r) * 2);transform:translate(-50%,-50%);overflow:visible}
+  #reticle{position:fixed;left:50%;top:50%;width:0;height:0;pointer-events:none;z-index:2}
+  #reticle::before{content:'';position:absolute;left:-3px;top:-3px;width:6px;height:6px;border-radius:50%;background:#ff3a2a;box-shadow:0 0 6px 2px rgba(255,58,42,.7)}
+  #reticle.holo::before{left:-2px;top:-2px;width:4px;height:4px}
+  #reticle.holo::after{content:'';position:absolute;left:-17px;top:-17px;width:30px;height:30px;border-radius:50%;border:2px solid #ff3a2a;box-shadow:0 0 5px rgba(255,58,42,.6)}
 
   .shop{background:rgba(10,12,14,.95);align-items:flex-start;display:block}
   .shopWrap{max-width:1000px;width:100%;margin:0 auto}
@@ -175,6 +178,9 @@
   .item.owned{background:rgba(0,0,0,.05)}
   .iname{font-family:Bungee,Impact,sans-serif;font-size:20px}
   .idesc{font-size:17px;color:#4a4740;line-height:1.3}
+  .ichips{font-size:14px;font-weight:700;color:#7a5a2a;margin-top:4px;letter-spacing:.01em}
+  .ghead{font-family:Bungee,Impact,sans-serif;font-size:15px;letter-spacing:.08em;text-transform:uppercase;padding:8px 16px;background:#d6cdbc;color:#4a4740;border-top:1px solid rgba(0,0,0,.14)}
+  .ghead:first-child{border-top:0}
   .stats3{display:grid;gap:5px}
   .stat{display:grid;grid-template-columns:64px 1fr;align-items:center;gap:8px;font-size:14px;font-weight:700;color:#4a4740}
   .stat i{height:8px;background:rgba(0,0,0,.12);position:relative;display:block;overflow:hidden}
@@ -234,6 +240,7 @@
 <body class="desk">
 <div id="game"></div>
 <div id="scope" hidden></div>
+<div id="reticle" hidden></div>
 <div id="vignette"></div>
 
 <div class="hud" id="hud" hidden>
@@ -649,20 +656,44 @@ const flashlight=new THREE.SpotLight(0xfff2d8,1.25,45,0.42,0.55,1.2);
 flashlight.position.set(0.15,-0.1,0); camera.add(flashlight);
 const flTarget=new THREE.Object3D(); flTarget.position.set(0,-0.15,-5); camera.add(flTarget); flashlight.target=flTarget;
 
-/* weapons */
+/* weapons: real-world guns, each with its own magazine, fire mode and optic */
 const WEAPONS={
-  pistol:{name:'Pistol',price:0,dmg:34,rate:0.2,mag:12,reserve:Infinity,reload:1.2,spread:0.006,adsSpread:0.4,pellets:1,recoil:0.02,kick:0.05,adsFov:62,sound:'pistol',bars:[3,4,2],desc:'Your trusty sidearm. Never runs out of ammo.'},
-  smg:{name:'SMG',price:900,dmg:20,rate:0.065,mag:32,reserve:224,reload:1.5,spread:0.011,adsSpread:0.5,pellets:1,recoil:0.007,kick:0.025,adsFov:60,sound:'smg',bars:[2,9,5],desc:'Sprays fast. Great against runners.'},
-  shotgun:{name:'Shotgun',price:1200,dmg:26,rate:0.6,mag:8,reserve:64,reload:1.7,spread:0.025,adsSpread:0.5,pellets:9,recoil:0.045,kick:0.11,adsFov:65,sound:'shotgun',falloff:true,falloffR:12,falloffMin:0.6,stagger:0.35,bars:[9,3,3],desc:'Nine heavy pellets. Brutal up close and still solid at mid range.'},
-  rifle:{name:'Assault Rifle',price:1600,dmg:26,rate:0.1,mag:30,reserve:210,reload:1.6,spread:0.007,adsSpread:0.35,pellets:1,recoil:0.010,kick:0.035,adsFov:55,sound:'rifle',bars:[4,8,5],desc:'Accurate and steady at any range.'},
-  sniper:{name:'Sniper',price:2400,dmg:240,rate:1.1,mag:5,reserve:35,reload:2.6,spread:0.0025,adsSpread:0,pellets:1,recoil:0.06,kick:0.15,adsFov:22,sound:'sniper',pierce:4,scope:true,bars:[10,1,1],desc:'Scoped. Each shot punches through up to four zombies.'},
-  lmg:{name:'LMG',price:3000,dmg:30,rate:0.08,mag:100,reserve:300,reload:4.2,spread:0.012,adsSpread:0.45,pellets:1,recoil:0.008,kick:0.03,adsFov:58,sound:'lmg',heavy:0.85,bars:[4,8,10],desc:'A 100-round belt. Slows you down and takes ages to reload.'},
+  pistol:{name:'M1911',cls:'Pistol',price:0,dmg:38,rate:0.2,mag:8,reserve:Infinity,reload:1.1,spread:0.006,adsSpread:0.4,pellets:1,recoil:0.02,kick:0.05,adsFov:62,sound:'pistol',optic:'iron',mode:'semi',bars:[3,4,2],desc:'Your trusty sidearm. Never runs out of ammo.'},
+  deagle:{name:'Desert Eagle',cls:'Pistol',price:800,dmg:100,rate:0.32,mag:7,reserve:56,reload:1.4,spread:0.008,adsSpread:0.35,pellets:1,recoil:0.05,kick:0.11,adsFov:60,sound:'deagle',optic:'iron',mode:'semi',pierce:2,stagger:0.15,bars:[6,3,2],desc:'A hand cannon. Seven huge rounds that punch through two zombies.'},
+  smg11:{name:'SMG-11',cls:'SMG',price:750,dmg:18,rate:0.045,mag:16,reserve:192,reload:1.1,spread:0.016,adsSpread:0.5,pellets:1,recoil:0.008,kick:0.022,adsFov:58,sound:'smg11',optic:'dot',mode:'auto',bars:[2,10,3],desc:'Tiny and wild. Empties all 16 rounds in under a second.'},
+  mp5:{name:'MP5',cls:'SMG',price:1000,dmg:22,rate:0.07,mag:30,reserve:240,reload:1.5,spread:0.01,adsSpread:0.45,pellets:1,recoil:0.006,kick:0.022,adsFov:58,sound:'smg',optic:'iron',mode:'auto',bars:[2,8,5],desc:'The classic. Smooth, accurate and easy to control.'},
+  mp7:{name:'MP7',cls:'SMG',price:1200,dmg:20,rate:0.06,mag:40,reserve:280,reload:1.6,spread:0.011,adsSpread:0.4,pellets:1,recoil:0.006,kick:0.02,adsFov:54,sound:'smg',optic:'holo',mode:'auto',bars:[2,9,6],desc:'Compact, with a 40-round mag and a holo sight.'},
+  p90:{name:'P90',cls:'SMG',price:1500,dmg:19,rate:0.055,mag:50,reserve:300,reload:2.0,spread:0.012,adsSpread:0.4,pellets:1,recoil:0.005,kick:0.02,adsFov:55,sound:'p90',optic:'dot',mode:'auto',bars:[2,9,7],desc:'50 rounds in a mag on top, with a built-in red dot.'},
+  ppsh:{name:'PPSh-41',cls:'SMG',price:1800,dmg:18,rate:0.05,mag:71,reserve:284,reload:2.4,spread:0.014,adsSpread:0.5,pellets:1,recoil:0.007,kick:0.024,adsFov:60,sound:'ppsh',optic:'iron',mode:'auto',magName:'drum',bars:[2,10,8],desc:'A 71-round drum that never seems to run dry.'},
+  m16:{name:'M16',cls:'Assault rifle',price:1400,dmg:34,rate:0.26,burstN:3,burstGap:0.06,mag:30,reserve:240,reload:1.6,spread:0.006,adsSpread:0.3,pellets:1,recoil:0.011,kick:0.035,adsFov:54,sound:'burst',optic:'iron',mode:'burst',bars:[4,6,5],desc:'Fires tight 3-round bursts. Great for headshots.'},
+  famas:{name:'FAMAS',cls:'Assault rifle',price:1300,dmg:22,rate:0.065,mag:25,reserve:225,reload:1.5,spread:0.008,adsSpread:0.4,pellets:1,recoil:0.009,kick:0.03,adsFov:55,sound:'rifle',optic:'iron',mode:'auto',bars:[3,9,4],desc:'Blistering fire rate, but only 25 rounds.'},
+  ak47:{name:'AK-47',cls:'Assault rifle',price:1500,dmg:30,rate:0.1,mag:30,reserve:240,reload:1.7,spread:0.009,adsSpread:0.4,pellets:1,recoil:0.014,kick:0.04,adsFov:57,sound:'ak',optic:'iron',mode:'auto',bars:[4,7,5],desc:'Hits hard and kicks hard. A legend.'},
+  m4a1:{name:'M4A1',cls:'Assault rifle',price:1600,dmg:24,rate:0.08,mag:30,reserve:240,reload:1.5,spread:0.007,adsSpread:0.32,pellets:1,recoil:0.008,kick:0.03,adsFov:52,sound:'rifle',optic:'dot',mode:'auto',bars:[3,8,5],desc:'Steady and accurate, topped with a red dot.'},
+  galil:{name:'Galil',cls:'Assault rifle',price:1700,dmg:27,rate:0.09,mag:35,reserve:280,reload:1.8,spread:0.008,adsSpread:0.35,pellets:1,recoil:0.01,kick:0.035,adsFov:52,sound:'ak',optic:'holo',mode:'auto',bars:[4,7,5],desc:'A big 35-round mag and a holo sight.'},
+  aug:{name:'AUG',cls:'Assault rifle',price:1900,dmg:26,rate:0.085,mag:30,reserve:270,reload:1.6,spread:0.007,adsSpread:0.25,pellets:1,recoil:0.008,kick:0.03,adsFov:42,sound:'rifle',optic:'aug',scope:'aug',mode:'auto',bars:[3,8,5],desc:'A built-in scope for picking off zombies at range.'},
+  scarh:{name:'SCAR-H',cls:'Assault rifle',price:2000,dmg:42,rate:0.12,mag:20,reserve:160,reload:1.7,spread:0.008,adsSpread:0.25,pellets:1,recoil:0.016,kick:0.045,adsFov:34,sound:'scar',optic:'acog',scope:'acog',mode:'auto',ap:true,bars:[5,6,4],desc:'Heavy rounds that cut through armor, with an ACOG scope.'},
+  dbl:{name:'Double Barrel',cls:'Shotgun',price:900,dmg:30,rate:0.18,mag:2,reserve:60,reload:1.4,spread:0.03,adsSpread:0.6,pellets:9,recoil:0.06,kick:0.15,adsFov:64,sound:'dbl',optic:'iron',mode:'break',magName:'shells',falloff:true,falloffR:9,falloffMin:0.5,stagger:0.45,bars:[9,5,1],desc:'Two shells, one right after the other. Devastating up close.'},
+  spas12:{name:'SPAS-12',cls:'Shotgun',price:1200,dmg:26,rate:0.55,mag:8,reserve:64,reload:1.7,spread:0.025,adsSpread:0.5,pellets:9,recoil:0.045,kick:0.11,adsFov:63,sound:'shotgun',optic:'iron',mode:'pump',magName:'shells',falloff:true,falloffR:12,falloffMin:0.6,stagger:0.35,bars:[9,3,2],desc:'Eight heavy shells. Brutal up close and still solid at mid range.'},
+  aa12:{name:'AA-12',cls:'Shotgun',price:2800,dmg:15,rate:0.22,mag:20,reserve:120,reload:2.6,spread:0.028,adsSpread:0.5,pellets:8,recoil:0.025,kick:0.07,adsFov:58,sound:'aa12',optic:'holo',mode:'auto',magName:'drum',falloff:true,falloffR:10,falloffMin:0.5,stagger:0.2,heavy:0.95,bars:[8,5,4],desc:'A full-auto shotgun with a 20-shell drum.'},
+  kar98k:{name:'Kar98k',cls:'Sniper rifle',price:1500,dmg:200,rate:0.95,mag:5,reserve:40,reload:2.4,spread:0.003,adsSpread:0,pellets:1,recoil:0.06,kick:0.15,adsFov:30,sound:'sniper',optic:'sniper',scope:'sniper',zoom:'3x',mode:'bolt',bolt:true,pierce:3,bars:[8,1,1],desc:'Bolt action with a low scope. Each shot goes through three zombies.'},
+  dragunov:{name:'Dragunov',cls:'Sniper rifle',price:2200,dmg:130,rate:0.4,mag:10,reserve:60,reload:2.3,spread:0.004,adsSpread:0.05,pellets:1,recoil:0.04,kick:0.1,adsFov:26,sound:'marksman',optic:'sniper',scope:'pso',zoom:'4x',mode:'semi',pierce:2,bars:[7,3,2],desc:'A semi-auto marksman rifle with a 10-round mag.'},
+  intervention:{name:'Intervention',cls:'Sniper rifle',price:2600,dmg:300,rate:1.2,mag:5,reserve:35,reload:2.8,spread:0.0025,adsSpread:0,pellets:1,recoil:0.07,kick:0.16,adsFov:16,sound:'sniper',optic:'sniper',scope:'sniper',zoom:'8x',mode:'bolt',bolt:true,pierce:5,bars:[10,1,1],desc:'Huge zoom. One shot goes through five zombies.'},
+  barrett:{name:'Barrett .50 Cal',cls:'Sniper rifle',price:3200,dmg:200,rate:0.62,mag:10,reserve:50,reload:3.0,spread:0.005,adsSpread:0.05,pellets:1,recoil:0.08,kick:0.18,adsFov:20,sound:'fifty',optic:'sniper',scope:'mil',zoom:'6x',mode:'semi',pierce:4,ap:true,heavy:0.9,bars:[9,2,2],desc:'Ten .50 cal rounds that shred armor. Heavy to carry.'},
+  rpk:{name:'RPK',cls:'LMG',price:2400,dmg:28,rate:0.085,mag:75,reserve:300,reload:3.2,spread:0.011,adsSpread:0.45,pellets:1,recoil:0.009,kick:0.03,adsFov:56,sound:'lmg',optic:'iron',mode:'auto',magName:'drum',heavy:0.9,bars:[4,8,8],desc:'A 75-round drum on a long barrel.'},
+  m60:{name:'M60',cls:'LMG',price:3000,dmg:34,rate:0.095,mag:100,reserve:300,reload:4.2,spread:0.012,adsSpread:0.45,pellets:1,recoil:0.009,kick:0.032,adsFov:58,sound:'lmg',optic:'iron',mode:'auto',magName:'belt',heavy:0.85,bars:[4,7,10],desc:'A 100-round belt. Slows you down and takes ages to reload.'},
   raygun:{name:'Ray Gun',price:5000,dmg:150,splash:90,splashR:3.2,rate:0.3,mag:20,reserve:160,reload:2.0,spread:0.006,adsSpread:0.5,pellets:1,recoil:0.015,kick:0.05,adsFov:60,sound:'ray',projectile:true,flash:0x7dff6a,bars:[9,5,4],desc:'Fires plasma bolts that burst and splash nearby zombies.'},
   flamer:{name:'Pump Nozzle',price:7500,dmg:6,rate:0.05,mag:100,reserve:400,reload:2.5,spread:0.02,adsSpread:0.6,pellets:1,recoil:0.0012,kick:0.008,adsFov:64,sound:'flame',flame:true,flameV:21,poolT:5,poolR:1.5,flash:0xff8a2a,bars:[6,10,6],desc:'Lobs a long stream of liquid fire that leaves burning pools on the ground.'},
   thumper:{name:'M79 Thumper',price:3500,dmg:300,rate:0.5,mag:1,reserve:24,reload:1.4,spread:0.004,adsSpread:0.5,pellets:1,recoil:0.06,kick:0.14,adsFov:60,sound:'thump',thumper:true,blastR:6,flash:0xffb060,bars:[9,2,1],desc:'Lobs 40mm grenades that explode on impact. Big blast, slow reload.'},
   tesla:{name:'Tesla Cannon',price:10000,dmg:420,chain:10,chainR:11,rate:0.45,mag:12,reserve:84,reload:2.2,spread:0,adsSpread:1,pellets:1,recoil:0.03,kick:0.08,adsFov:62,sound:'zap',tesla:true,flash:0x8fd0ff,bars:[10,5,3],desc:'Lightning that jumps between up to ten zombies and stuns them.'}
 };
-const SHOP_ORDER=['smg','shotgun','rifle','sniper','lmg','thumper','flamer','tesla'];
+const SHOP_GROUPS=[['Pistols',['deagle']],['SMGs',['smg11','mp5','mp7','p90','ppsh']],['Assault rifles',['famas','m16','ak47','m4a1','galil','aug','scarh']],
+  ['Shotguns',['dbl','spas12','aa12']],['Sniper rifles',['kar98k','dragunov','intervention','barrett']],['LMGs',['rpk','m60']],['Specials',['thumper','flamer','tesla']]];
+const SHOP_ORDER=SHOP_GROUPS.flatMap(g=>g[1]);
+/* runs saved before the gun update named their guns by type */
+const LEGACY_GUNS={smg:'mp5',rifle:'m4a1',shotgun:'spas12',sniper:'intervention',lmg:'m60'};
+const OPTIC_NAME={iron:'Iron sights',dot:'Red dot sight',holo:'Holo sight',acog:'ACOG scope',aug:'Built-in scope',sniper:'Sniper scope'};
+const MODE_NAME={auto:'Full auto',semi:'Semi auto',burst:'3-round burst',bolt:'Bolt action',pump:'Pump action',break:'Break action'};
+function gunInfo(w){ if(!w.optic) return ''; const m=w.magName==='shells'?`${w.mag} shells`:`${w.mag}-round ${w.magName||'mag'}`; return `${m} · ${OPTIC_NAME[w.optic]}${w.zoom?' ('+w.zoom+')':''} · ${MODE_NAME[w.mode]}`; }
 const CASH={walker:50,runner:60,spitter:90,bloater:90,brute:175,riot:120,screamer:160,stalker:150,spider:300,butcher:1500,mother:1500,leaper:1500,torch:1500};
 const BOSSES=['butcher','mother','leaper','torch'];
 function bossList(c){ const n=c<=4?1:(c<=8?2:3), l=[]; for(let k=0;k<n;k++) l.push(BOSSES[(c-1+k)%4]); return l; }
@@ -674,47 +705,190 @@ const gMetal=new THREE.MeshLambertMaterial({color:0x3a3f46}), gDark=new THREE.Me
       gOlive=new THREE.MeshLambertMaterial({color:0x3f4a30}), gSilver=new THREE.MeshLambertMaterial({color:0xa9afb6}),
       gRed=new THREE.MeshLambertMaterial({color:0x9a2a22}), gCopper=new THREE.MeshLambertMaterial({color:0xb87333}),
       gGreenGlow=new THREE.MeshBasicMaterial({color:0x7dff6a}), gBlueGlow=new THREE.MeshBasicMaterial({color:0x8fd0ff});
-const BX=(w,h,d)=>new THREE.BoxGeometry(w,h,d), CY=(r1,r2,l,s)=>new THREE.CylinderGeometry(r1,r2,l,s||10);
+const gSand=new THREE.MeshLambertMaterial({color:0x8f7a55}), gSteel=new THREE.MeshLambertMaterial({color:0x7d8288}), gBake=new THREE.MeshLambertMaterial({color:0x6e3018}), gPoly=new THREE.MeshLambertMaterial({color:0x2b2e30}),
+      gGlass=new THREE.MeshBasicMaterial({color:0x9fd8ff,transparent:true,opacity:0.12,depthWrite:false});
+const BX=(w,h,d)=>new THREE.BoxGeometry(w,h,d), CY=(r1,r2,l,s)=>new THREE.CylinderGeometry(r1,r2,l,s||10), TOR=(r,t)=>new THREE.TorusGeometry(r,t,6,18);
 function flashPlane(size,color){
   return new THREE.Mesh(new THREE.PlaneGeometry(size,size),new THREE.MeshBasicMaterial({color:color||0xffd27a,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,fog:false}));
 }
 function gunKit(){
   const g=new THREE.Group();
-  const add=(geo,m,x,y,z,rx,ry)=>{ const b=new THREE.Mesh(geo,m); b.position.set(x,y,z); if(rx) b.rotation.x=rx; if(ry) b.rotation.y=ry; g.add(b); return b; };
+  const add=(geo,m,x,y,z,rx,ry,rz)=>{ const b=new THREE.Mesh(geo,m); b.position.set(x,y,z); if(rx) b.rotation.x=rx; if(ry) b.rotation.y=ry; if(rz) b.rotation.z=rz; g.add(b); return b; };
   const finish=(mz,hip,aim,fs,fc)=>{ const muzzle=new THREE.Object3D(); muzzle.position.set(mz[0],mz[1],mz[2]); g.add(muzzle);
     const fl=flashPlane(fs,fc); muzzle.add(fl); return {g,muzzle,fl,hip:new THREE.Vector3(hip[0],hip[1],hip[2]),aim:new THREE.Vector3(aim[0],aim[1],aim[2])}; };
-  return {g,add,finish};
+  /* shared parts. Sights sit on a receiver whose top is at height t; each returns the height of its sight line so the aim pose can centre it */
+  const part={
+    /* box magazine hanging down from (y,z) in n segments, each bending a little further forward */
+    mag(m,y,z,w,h,d,n,bend,tilt){ let py=y,pz=z,a=tilt||0; for(let i=0;i<n;i++){ add(BX(w,h,d),m,0,py-Math.cos(a)*h/2,pz-Math.sin(a)*h/2,a); py-=Math.cos(a)*h*0.94; pz-=Math.sin(a)*h*0.94; a+=bend; } },
+    /* drum magazine: a disc on its side under the gun */
+    drum(m,y,z,r,w){ add(CY(r,r,w,18),m,0,y,z,0,0,P2); add(CY(r*0.35,r*0.35,w+0.012,10),gMetal,0,y,z,0,0,P2); },
+    grip(m,z,y){ add(BX(0.038,0.1,0.048),m,0,y||-0.085,z,-0.32); },
+    dot(t,z){ const y=t+0.042; add(BX(0.026,0.024,0.05),gDark,0,y-0.03,z); add(TOR(0.019,0.0045),gDark,0,y,z-0.018); add(TOR(0.018,0.004),gDark,0,y,z+0.018);
+      for(const [x,yy] of [[0.0205,0],[-0.0205,0],[0,0.0205]]) add(BX(0.006,0.006,0.036),gDark,x,y+yy,z); add(new THREE.PlaneGeometry(0.034,0.034),gGlass,0,y,z-0.018); return y; },
+    holo(t,z){ const y=t+0.042; add(BX(0.036,0.016,0.08),gDark,0,y-0.034,z); for(const x of [0.026,-0.026]) add(BX(0.006,0.046,0.03),gDark,x,y-0.003,z-0.022);
+      add(BX(0.058,0.006,0.034),gDark,0,y+0.022,z-0.022); add(BX(0.03,0.024,0.03),gDark,0,y-0.021,z+0.026); add(new THREE.PlaneGeometry(0.046,0.04),gGlass,0,y,z-0.03); return y; },
+    acog(t,z){ const y=t+0.044; add(BX(0.022,0.026,0.06),gDark,0,y-0.031,z); add(CY(0.017,0.017,0.11,12),gDark,0,y,z,P2); add(CY(0.019,0.025,0.04,12),gDark,0,y,z-0.07,P2);
+      add(CY(0.021,0.017,0.03,12),gDark,0,y,z+0.065,P2); add(BX(0.005,0.005,0.07),gRed,0,y+0.019,z-0.005); return y; },
+    scope(t,z,len,r,b){ const y=t+r+0.03; add(CY(r,r,len,12),gDark,0,y,z,P2); add(CY(r,b,0.06,12),gDark,0,y,z-len/2-0.025,P2); add(CY(b*0.85,r,0.05,12),gDark,0,y,z+len/2+0.02,P2);
+      add(CY(0.011,0.011,0.022,8),gDark,0,y+r+0.008,z-0.01); add(CY(0.011,0.011,0.022,8),gDark,r+0.008,y,z-0.01,0,0,P2);
+      for(const dz of [-len*0.3,len*0.3]) add(BX(0.018,0.034,0.018),gDark,0,t+0.014,z+dz); return y; },
+    bipod(z,y,open){ for(const x of [0.028,-0.028]) open?add(BX(0.011,0.15,0.011),gMetal,x,y-0.07,z-0.03,0.5,0,x>0?0.18:-0.18):add(BX(0.011,0.011,0.2),gMetal,x,y,z); },
+    rail(t,z,len){ add(BX(0.036,0.01,len),gDark,0,t+0.005,z); for(let k=-len/2+0.015;k<len/2;k+=0.03) add(BX(0.04,0.005,0.012),gDark,0,t+0.012,z+k); return t+0.012; },
+    iron(rear,front,y){ add(BX(0.03,0.022,0.02),gDark,0,y-0.011,rear); add(BX(0.007,0.026,0.007),gDark,0,y-0.013,front); return y; }
+  };
+  return {g,add,finish,part};
 }
 const P2=Math.PI/2;
 const MODELS={
   pistol(){ const {add,finish}=gunKit();
     add(BX(0.045,0.05,0.2),gMetal,0,0.02,-0.06); add(BX(0.04,0.03,0.16),gDark,0,-0.01,-0.05);
-    add(BX(0.038,0.12,0.055),gDark,0,-0.07,0.03,-0.25); add(BX(0.008,0.012,0.01),gDark,0,0.05,-0.15); add(BX(0.03,0.012,0.01),gDark,0,0.05,0.03);
+    add(BX(0.038,0.12,0.055),gDark,0,-0.07,0.03,-0.25); add(BX(0.042,0.085,0.04),gWood,0,-0.066,0.026,-0.25);
+    add(BX(0.008,0.012,0.01),gDark,0,0.05,-0.15); add(BX(0.03,0.012,0.01),gDark,0,0.05,0.03); add(BX(0.014,0.02,0.02),gDark,0,0.04,0.045);
     return finish([0,0.02,-0.17],[0.17,-0.17,-0.32],[0,-0.055,-0.3],0.2); },
-  smg(){ const {add,finish}=gunKit();
-    add(BX(0.06,0.08,0.3),gMetal,0,0,-0.05); add(BX(0.03,0.03,0.12),gDark,0,0.01,-0.26);
-    add(BX(0.035,0.2,0.05),gDark,0,-0.13,-0.08,0.1); add(BX(0.04,0.1,0.045),gDark,0,-0.08,0.06,-0.3);
-    add(BX(0.02,0.02,0.18),gDark,0,0,0.18); add(BX(0.02,0.03,0.05),gDark,0,0.055,-0.02);
-    return finish([0,0.01,-0.33],[0.2,-0.19,-0.34],[0,-0.07,-0.3],0.22); },
-  shotgun(){ const {add,finish}=gunKit();
-    add(BX(0.07,0.1,0.3),gMetal,0,0,0); add(CY(0.022,0.022,0.56),gDark,0,0.025,-0.42,P2); add(CY(0.018,0.018,0.42,8),gDark,0,-0.02,-0.36,P2);
-    add(BX(0.075,0.065,0.17),gWood,0,-0.022,-0.3); add(BX(0.06,0.1,0.26),gWood,0,-0.035,0.27,0.12); add(BX(0.012,0.02,0.012),gTan,0,0.05,-0.68);
-    return finish([0,0.025,-0.72],[0.22,-0.21,-0.36],[0,-0.052,-0.32],0.42); },
-  rifle(){ const {add,finish}=gunKit();
-    add(BX(0.07,0.09,0.44),gMetal,0,0,-0.06); add(BX(0.035,0.035,0.32),gDark,0,0.015,-0.42); add(BX(0.05,0.15,0.075),gDark,0,-0.11,-0.04,0.25);
-    add(BX(0.06,0.085,0.2),gTan,0,-0.02,0.24); add(BX(0.045,0.11,0.05),gDark,0,-0.09,0.1,-0.35); add(BX(0.02,0.035,0.1),gDark,0,0.06,-0.08);
-    add(BX(0.012,0.04,0.012),gDark,0,0.05,-0.5); add(BX(0.065,0.065,0.18),gTan,0,-0.005,-0.24);
-    return finish([0,0.015,-0.6],[0.21,-0.2,-0.36],[0,-0.078,-0.3],0.26); },
-  sniper(){ const {add,finish}=gunKit();
-    add(BX(0.06,0.08,0.4),gOlive,0,0,0); add(CY(0.016,0.016,0.6),gDark,0,0.015,-0.48,P2);
-    add(CY(0.025,0.025,0.3,12),gDark,0,0.075,-0.03,P2); add(CY(0.033,0.033,0.04,12),gDark,0,0.075,-0.19,P2); add(CY(0.033,0.033,0.04,12),gDark,0,0.075,0.12,P2);
-    add(BX(0.055,0.11,0.26),gOlive,0,-0.03,0.3); add(BX(0.04,0.08,0.06),gDark,0,-0.07,-0.02); add(BX(0.04,0.1,0.045),gDark,0,-0.08,0.12,-0.3);
-    return finish([0,0.015,-0.79],[0.22,-0.21,-0.38],[0,-0.075,-0.25],0.3); },
-  lmg(){ const {add,finish}=gunKit();
-    add(BX(0.09,0.12,0.42),gDark,0,0,-0.02); add(CY(0.022,0.022,0.5),gDark,0,0.02,-0.45,P2); add(BX(0.065,0.065,0.25),gMetal,0,0.02,-0.33);
-    add(BX(0.11,0.12,0.11),gOlive,0,-0.12,-0.05); add(BX(0.02,0.04,0.12),gMetal,0,0.09,-0.1); add(BX(0.07,0.1,0.22),gDark,0,-0.02,0.3);
-    add(BX(0.012,0.12,0.012),gMetal,0.03,-0.07,-0.56,0.4); add(BX(0.012,0.12,0.012),gMetal,-0.03,-0.07,-0.56,0.4); add(BX(0.02,0.03,0.03),gDark,0,0.075,0.08);
-    return finish([0,0.02,-0.71],[0.23,-0.23,-0.4],[0,-0.09,-0.32],0.32); },
+  deagle(){ const {add,finish}=gunKit();
+    add(BX(0.052,0.06,0.27),gSteel,0,0.025,-0.075); add(BX(0.046,0.036,0.2),gMetal,0,-0.02,-0.05); add(BX(0.03,0.012,0.25),gSteel,0,0.061,-0.075);
+    add(BX(0.042,0.135,0.062),gDark,0,-0.088,0.04,-0.22); add(BX(0.012,0.036,0.05),gDark,0,-0.05,-0.035);
+    add(BX(0.008,0.016,0.01),gDark,0,0.073,-0.2); add(BX(0.032,0.016,0.012),gDark,0,0.073,0.04);
+    return finish([0,0.025,-0.215],[0.17,-0.18,-0.32],[0,-0.081,-0.3],0.28); },
+  smg11(){ const {add,finish,part}=gunKit();
+    add(BX(0.055,0.075,0.17),gDark,0,0,-0.03); add(CY(0.014,0.014,0.07),gMetal,0,0.012,-0.15,P2); add(CY(0.02,0.02,0.04,10),gDark,0,0.012,-0.19,P2);
+    add(BX(0.036,0.18,0.046),gPoly,0,-0.115,0.02,-0.12); add(BX(0.03,0.03,0.05),gDark,0,-0.21,0.035,-0.12);
+    add(BX(0.03,0.055,0.035),gDark,0,-0.05,-0.095,0.25); add(BX(0.05,0.05,0.012),gMetal,0,0.0,0.06);
+    const y=part.dot(0.0375,-0.03);
+    return finish([0,0.012,-0.21],[0.19,-0.18,-0.32],[0,-y,-0.29],0.2); },
+  mp5(){ const {add,finish,part}=gunKit();
+    add(BX(0.055,0.075,0.3),gDark,0,0,-0.06); add(BX(0.062,0.06,0.13),gPoly,0,-0.01,-0.26); add(CY(0.012,0.012,0.08),gMetal,0,0.01,-0.36,P2);
+    add(CY(0.011,0.011,0.24),gDark,0,0.03,-0.22,P2); add(BX(0.02,0.03,0.04),gDark,0,0.035,-0.13);
+    part.mag(gDark,-0.035,-0.12,0.03,0.07,0.034,3,0.14,0.06); part.grip(gPoly,0.05);
+    for(const x of [0.021,-0.021]) add(BX(0.01,0.01,0.17),gMetal,x,0.012,0.17); add(BX(0.052,0.08,0.02),gPoly,0,-0.006,0.26);
+    add(BX(0.03,0.02,0.02),gDark,0,0.0475,0.05); add(BX(0.007,0.022,0.007),gDark,0,0.0465,-0.3); add(TOR(0.012,0.003),gDark,0,0.048,-0.3);
+    return finish([0,0.01,-0.4],[0.2,-0.19,-0.34],[0,-0.0575,-0.3],0.22); },
+  mp7(){ const {add,finish,part}=gunKit();
+    add(BX(0.055,0.08,0.24),gPoly,0,0,-0.04); add(BX(0.05,0.03,0.08),gPoly,0,-0.035,-0.19); add(CY(0.012,0.012,0.06),gMetal,0,0.012,-0.19,P2);
+    add(BX(0.036,0.19,0.05),gPoly,0,-0.12,0.02,-0.1); add(BX(0.03,0.07,0.034),gPoly,0,-0.075,-0.15,0.12);
+    for(const x of [0.022,-0.022]) add(BX(0.01,0.01,0.12),gDark,x,0,0.13); add(BX(0.05,0.06,0.016),gPoly,0,-0.005,0.19);
+    const t=part.rail(0.04,-0.04,0.2), y=part.holo(t,-0.03);
+    return finish([0,0.012,-0.23],[0.19,-0.19,-0.32],[0,-y,-0.3],0.2); },
+  p90(){ const {add,finish,part}=gunKit();
+    add(BX(0.065,0.1,0.4),gPoly,0,-0.01,-0.02); add(BX(0.05,0.022,0.3),gTan,0,0.051,-0.04); add(BX(0.044,0.012,0.27),gDark,0,0.066,-0.04);
+    add(BX(0.03,0.06,0.07),gPoly,0,-0.085,-0.17,0.25); add(BX(0.04,0.05,0.06),gPoly,0,-0.08,-0.05); add(BX(0.062,0.06,0.12),gPoly,0,-0.07,0.14);
+    add(CY(0.012,0.012,0.06),gMetal,0,0.0,-0.24,P2);
+    const y=part.dot(0.07,-0.15);
+    return finish([0,0,-0.27],[0.2,-0.2,-0.33],[0,-y,-0.3],0.22); },
+  ppsh(){ const {add,finish,part}=gunKit();
+    add(BX(0.06,0.07,0.22),gMetal,0,0.01,-0.08); add(CY(0.026,0.026,0.22,10),gDark,0,0.015,-0.29,P2); add(CY(0.01,0.01,0.04),gDark,0,0.015,-0.42,P2);
+    for(let z=-0.36;z<-0.2;z+=0.04) add(BX(0.054,0.012,0.016),gMetal,0,0.015,z);
+    add(BX(0.056,0.085,0.3),gWood,0,-0.04,0.15,0.12); add(BX(0.05,0.05,0.17),gWood,0,-0.03,-0.05);
+    part.drum(gMetal,-0.1,-0.11,0.072,0.05);
+    add(BX(0.026,0.018,0.02),gDark,0,0.054,0.0); add(BX(0.006,0.024,0.006),gDark,0,0.05,-0.38);
+    return finish([0,0.015,-0.44],[0.21,-0.2,-0.36],[0,-0.063,-0.36],0.24); },
+  m16(){ const {add,finish,part}=gunKit();
+    add(BX(0.06,0.085,0.3),gDark,0,0,-0.02); add(CY(0.035,0.032,0.24,8),gDark,0,0.0,-0.29,P2); add(CY(0.012,0.012,0.16),gDark,0,0.005,-0.48,P2); add(CY(0.016,0.016,0.04),gDark,0,0.005,-0.57,P2);
+    for(const z of [0.05,-0.1]) add(BX(0.02,0.045,0.02),gDark,0,0.065,z); add(BX(0.03,0.012,0.17),gDark,0,0.094,-0.02); add(BX(0.025,0.022,0.022),gDark,0,0.109,0.05);
+    add(BX(0.016,0.09,0.016),gDark,0,0.06,-0.42); add(BX(0.005,0.016,0.005),gDark,0,0.112,-0.42);
+    part.mag(gDark,-0.04,-0.06,0.03,0.07,0.056,2,0.08,0.05); part.grip(gDark,0.08);
+    add(BX(0.052,0.085,0.27),gDark,0,-0.022,0.25,0.06);
+    return finish([0,0.005,-0.6],[0.21,-0.2,-0.36],[0,-0.12,-0.3],0.26); },
+  famas(){ const {add,finish,part}=gunKit();
+    add(BX(0.06,0.1,0.5),gDark,0,-0.01,0.0); add(CY(0.013,0.013,0.12),gDark,0,0.01,-0.3,P2); add(CY(0.018,0.018,0.04),gDark,0,0.01,-0.37,P2);
+    for(const z of [0.13,-0.21]) add(BX(0.022,0.06,0.03),gDark,0,0.07,z); add(BX(0.026,0.014,0.4),gDark,0,0.1,-0.04);
+    add(BX(0.024,0.018,0.02),gDark,0,0.116,0.13); add(BX(0.006,0.018,0.006),gDark,0,0.116,-0.21);
+    part.grip(gDark,-0.07,-0.1); part.mag(gDark,-0.06,0.12,0.03,0.06,0.05,2,0.08,0.05);
+    for(const x of [0.025,-0.025]) add(BX(0.01,0.01,0.12),gMetal,x,-0.045,-0.2);
+    return finish([0,0.01,-0.4],[0.21,-0.2,-0.36],[0,-0.125,-0.3],0.24); },
+  ak47(){ const {add,finish,part}=gunKit();
+    add(BX(0.064,0.08,0.34),gMetal,0,0,-0.03); add(BX(0.06,0.062,0.17),gWood,0,-0.012,-0.27); add(BX(0.046,0.03,0.15),gWood,0,0.042,-0.27);
+    add(CY(0.013,0.013,0.2),gDark,0,0.012,-0.44,P2); add(BX(0.022,0.04,0.024),gDark,0,0.028,-0.51); add(CY(0.016,0.016,0.03),gDark,0,0.012,-0.545,P2);
+    part.iron(-0.12,-0.51,0.07); add(BX(0.036,0.016,0.04),gDark,0,0.048,-0.12);
+    part.mag(gBake,-0.04,-0.08,0.036,0.06,0.06,3,0.2,0.08); add(BX(0.04,0.1,0.05),gWood,0,-0.085,0.07,-0.35);
+    add(BX(0.054,0.085,0.27),gWood,0,-0.042,0.27,0.14);
+    return finish([0,0.012,-0.56],[0.21,-0.2,-0.36],[0,-0.07,-0.36],0.28); },
+  m4a1(){ const {add,finish,part}=gunKit();
+    add(BX(0.06,0.085,0.3),gDark,0,0,-0.02); add(BX(0.062,0.066,0.22),gPoly,0,0.004,-0.28); for(const x of [0.034,-0.034]) add(BX(0.008,0.014,0.22),gDark,x,0.004,-0.28);
+    add(CY(0.012,0.012,0.14),gDark,0,0.01,-0.45,P2); add(CY(0.016,0.016,0.05),gDark,0,0.01,-0.54,P2); add(BX(0.016,0.05,0.02),gDark,0,0.04,-0.42);
+    part.mag(gDark,-0.04,-0.06,0.03,0.07,0.056,2,0.08,0.05); part.grip(gDark,0.08);
+    add(CY(0.016,0.016,0.18),gDark,0,0.0,0.2,P2); add(BX(0.05,0.075,0.12),gPoly,0,-0.02,0.28);
+    const t=part.rail(0.0425,-0.06,0.3), y=part.dot(t,-0.04);
+    return finish([0,0.01,-0.57],[0.21,-0.2,-0.36],[0,-y,-0.3],0.26); },
+  galil(){ const {add,finish,part}=gunKit();
+    add(BX(0.064,0.082,0.34),gMetal,0,0,-0.03); add(BX(0.062,0.064,0.18),gWood,0,-0.01,-0.28); add(CY(0.013,0.013,0.2),gDark,0,0.012,-0.45,P2);
+    add(CY(0.017,0.017,0.04),gDark,0,0.012,-0.56,P2); add(BX(0.016,0.05,0.02),gDark,0,0.04,-0.49);
+    part.mag(gDark,-0.04,-0.08,0.036,0.068,0.058,3,0.12,0.05); part.grip(gPoly,0.07);
+    for(const y of [0.0,-0.06]) add(BX(0.012,0.012,0.24),gMetal,0.02,y,0.24); for(const y of [0.0,-0.06]) add(BX(0.012,0.012,0.24),gMetal,-0.02,y,0.24); add(BX(0.05,0.09,0.02),gDark,0,-0.03,0.36);
+    const y=part.holo(0.041,-0.06);
+    return finish([0,0.012,-0.58],[0.21,-0.2,-0.36],[0,-y,-0.3],0.27); },
+  aug(){ const {add,finish,part}=gunKit();
+    add(BX(0.07,0.1,0.42),gOlive,0,-0.01,0.03); add(CY(0.014,0.014,0.2),gDark,0,0.01,-0.28,P2); add(CY(0.019,0.019,0.04),gDark,0,0.01,-0.4,P2);
+    add(BX(0.03,0.085,0.045),gOlive,0,-0.085,-0.13,0.25); add(BX(0.08,0.05,0.12),gOlive,0,-0.08,-0.05); part.grip(gOlive,-0.03,-0.1);
+    part.mag(gDark,-0.06,0.1,0.034,0.06,0.054,2,0.06,0.04);
+    add(BX(0.03,0.05,0.16),gOlive,0,0.064,-0.04); add(CY(0.02,0.02,0.15,12),gOlive,0,0.105,-0.04,P2); add(CY(0.02,0.026,0.04,12),gOlive,0,0.105,-0.13,P2); add(CY(0.023,0.02,0.03,12),gDark,0,0.105,0.05,P2);
+    return finish([0,0.01,-0.42],[0.2,-0.2,-0.36],[0,-0.105,-0.3],0.26); },
+  scarh(){ const {add,finish,part}=gunKit();
+    add(BX(0.065,0.09,0.3),gSand,0,0,-0.02); add(BX(0.062,0.07,0.2),gSand,0,0.004,-0.27); add(BX(0.06,0.04,0.14),gPoly,0,-0.05,0.0);
+    add(CY(0.014,0.014,0.14),gDark,0,0.012,-0.43,P2); add(CY(0.019,0.019,0.05),gDark,0,0.012,-0.52,P2);
+    part.mag(gDark,-0.07,-0.06,0.036,0.07,0.06,1,0,0.1); part.grip(gPoly,0.07);
+    add(BX(0.05,0.09,0.2),gSand,0,-0.02,0.22); add(BX(0.045,0.02,0.12),gPoly,0,0.035,0.2);
+    const t=part.rail(0.045,-0.08,0.42), y=part.acog(t,-0.05);
+    return finish([0,0.012,-0.55],[0.21,-0.2,-0.36],[0,-y,-0.3],0.28); },
+  dbl(){ const {add,finish}=gunKit();
+    for(const x of [0.021,-0.021]) add(CY(0.02,0.02,0.5),gDark,x,0.02,-0.36,P2); add(BX(0.03,0.01,0.48),gDark,0,0.042,-0.36);
+    add(BX(0.075,0.08,0.13),gMetal,0,0.0,-0.06); add(BX(0.07,0.05,0.2),gWood,0,-0.02,-0.22); add(BX(0.056,0.1,0.32),gWood,0,-0.05,0.18,0.16);
+    add(BX(0.012,0.03,0.04),gMetal,0,-0.05,-0.02); add(BX(0.008,0.008,0.008),gSilver,0,0.051,-0.6);
+    return finish([0,0.02,-0.62],[0.22,-0.21,-0.36],[0,-0.055,-0.38],0.46); },
+  spas12(){ const {add,finish}=gunKit();
+    add(BX(0.07,0.1,0.28),gDark,0,0,0); add(CY(0.022,0.022,0.5),gDark,0,0.025,-0.39,P2); add(BX(0.05,0.02,0.4),gMetal,0,0.05,-0.36);
+    for(let z=-0.52;z<-0.2;z+=0.05) add(BX(0.052,0.008,0.02),gDark,0,0.062,z);
+    add(CY(0.02,0.02,0.36,8),gDark,0,-0.02,-0.33,P2); add(BX(0.076,0.066,0.16),gPoly,0,-0.025,-0.29); add(BX(0.035,0.09,0.05),gDark,0,-0.09,0.1,-0.35);
+    for(const x of [0.022,-0.022]) add(BX(0.012,0.012,0.22),gMetal,x,-0.02,0.24); add(BX(0.06,0.09,0.015),gDark,0,-0.04,0.355); add(BX(0.012,0.05,0.012),gMetal,0,-0.11,0.33);
+    add(BX(0.008,0.02,0.008),gDark,0,0.07,-0.6); add(BX(0.03,0.02,0.02),gDark,0,0.07,-0.06);
+    return finish([0,0.025,-0.65],[0.22,-0.21,-0.36],[0,-0.08,-0.32],0.42); },
+  aa12(){ const {add,finish,part}=gunKit();
+    add(BX(0.075,0.1,0.42),gDark,0,0,-0.04); add(BX(0.07,0.06,0.2),gPoly,0,0.01,-0.32); add(CY(0.022,0.022,0.12),gDark,0,0.02,-0.48,P2); add(CY(0.027,0.027,0.05),gMetal,0,0.02,-0.56,P2);
+    part.drum(gDark,-0.13,-0.1,0.08,0.075); part.grip(gPoly,0.08); add(BX(0.06,0.09,0.18),gPoly,0,-0.02,0.25);
+    for(const z of [0.1,-0.22]) add(BX(0.02,0.035,0.02),gDark,0,0.065,z); add(BX(0.04,0.012,0.36),gDark,0,0.086,-0.05);
+    const y=part.holo(0.092,-0.05);
+    return finish([0,0.02,-0.6],[0.22,-0.21,-0.36],[0,-y,-0.32],0.42); },
+  kar98k(){ const {add,finish,part}=gunKit();
+    add(BX(0.055,0.07,0.32),gWood,0,-0.012,-0.22); add(BX(0.05,0.06,0.18),gMetal,0,0.0,0.0); add(CY(0.013,0.013,0.42),gDark,0,0.02,-0.5,P2);
+    add(BX(0.056,0.1,0.3),gWood,0,-0.042,0.22,0.14); add(CY(0.006,0.006,0.06),gSilver,0.04,0.025,0.06,0,0,P2); add(new THREE.SphereGeometry(0.012,8,6),gSilver,0.075,0.025,0.06);
+    const y=part.scope(0.03,-0.03,0.22,0.018,0.026);
+    return finish([0,0.02,-0.72],[0.22,-0.21,-0.38],[0,-y,-0.25],0.3); },
+  dragunov(){ const {add,finish,part}=gunKit();
+    add(BX(0.055,0.08,0.3),gMetal,0,0,-0.04); add(BX(0.056,0.062,0.2),gWood,0,0.0,-0.28); add(CY(0.012,0.012,0.36),gDark,0,0.012,-0.56,P2); add(CY(0.017,0.017,0.07),gDark,0,0.012,-0.77,P2);
+    part.mag(gDark,-0.04,-0.1,0.034,0.09,0.06,1,0,0.12);
+    add(BX(0.045,0.03,0.28),gWood,0,0.0,0.24); add(BX(0.045,0.028,0.25),gWood,0,-0.09,0.26,-0.08); add(BX(0.045,0.13,0.03),gWood,0,-0.04,0.375);
+    add(BX(0.04,0.11,0.034),gWood,0,-0.06,0.12,-0.22); add(BX(0.04,0.024,0.1),gPoly,0,0.026,0.24);
+    const y=part.scope(0.04,-0.06,0.2,0.019,0.027);
+    return finish([0,0.012,-0.81],[0.22,-0.21,-0.38],[0,-y,-0.25],0.3); },
+  intervention(){ const {add,finish,part}=gunKit();
+    add(BX(0.06,0.08,0.36),gOlive,0,0,-0.02); add(CY(0.016,0.016,0.6),gDark,0,0.015,-0.5,P2); add(BX(0.04,0.026,0.07),gDark,0,0.015,-0.83);
+    add(BX(0.055,0.05,0.25),gOlive,0,-0.01,-0.32); add(CY(0.006,0.006,0.06),gDark,0.045,0.025,0.07,0,0,P2); add(new THREE.SphereGeometry(0.013,8,6),gDark,0.08,0.025,0.07);
+    add(BX(0.04,0.06,0.07),gDark,0,-0.06,0.0); add(BX(0.04,0.1,0.05),gDark,0,-0.08,0.12,-0.3);
+    add(BX(0.045,0.03,0.24),gOlive,0,0.01,0.29); add(BX(0.04,0.025,0.2),gOlive,0,-0.08,0.3); add(BX(0.045,0.12,0.03),gDark,0,-0.03,0.41);
+    part.bipod(-0.46,-0.045,false);
+    const y=part.scope(0.04,-0.02,0.3,0.022,0.034);
+    return finish([0,0.015,-0.87],[0.22,-0.21,-0.4],[0,-y,-0.25],0.32); },
+  barrett(){ const {add,finish,part}=gunKit();
+    add(BX(0.075,0.1,0.42),gDark,0,0,-0.02); add(BX(0.062,0.062,0.25),gDark,0,0.0,-0.32); add(CY(0.02,0.02,0.5),gDark,0,0.015,-0.47,P2);
+    add(BX(0.075,0.036,0.1),gMetal,0,0.015,-0.75); for(const z of [-0.73,-0.77]) add(BX(0.082,0.03,0.012),gDark,0,0.015,z);
+    part.mag(gDark,-0.05,-0.02,0.045,0.08,0.09,1,0,0); part.grip(gDark,0.1); add(BX(0.06,0.1,0.2),gDark,0,-0.02,0.28); add(BX(0.065,0.12,0.03),gPoly,0,-0.02,0.39);
+    part.bipod(-0.55,-0.03,true);
+    const t=part.rail(0.05,-0.06,0.4), y=part.scope(t,-0.04,0.28,0.022,0.035);
+    return finish([0,0.015,-0.81],[0.22,-0.22,-0.4],[0,-y,-0.25],0.42); },
+  rpk(){ const {add,finish,part}=gunKit();
+    add(BX(0.064,0.08,0.34),gMetal,0,0,-0.03); add(BX(0.06,0.062,0.17),gWood,0,-0.012,-0.27); add(BX(0.046,0.03,0.15),gWood,0,0.042,-0.27);
+    add(CY(0.014,0.014,0.34),gDark,0,0.012,-0.52,P2); add(BX(0.022,0.04,0.024),gDark,0,0.028,-0.63); add(CY(0.016,0.016,0.03),gDark,0,0.012,-0.7,P2);
+    part.iron(-0.12,-0.63,0.07); part.drum(gDark,-0.1,-0.09,0.068,0.07); add(BX(0.04,0.1,0.05),gWood,0,-0.085,0.07,-0.35);
+    add(BX(0.056,0.1,0.28),gWood,0,-0.05,0.27,0.12); add(BX(0.05,0.05,0.08),gWood,0,-0.1,0.35);
+    part.bipod(-0.52,-0.01,false);
+    return finish([0,0.012,-0.72],[0.22,-0.21,-0.38],[0,-0.07,-0.36],0.3); },
+  m60(){ const {add,finish,part}=gunKit();
+    add(BX(0.085,0.11,0.42),gDark,0,0,-0.02); add(CY(0.022,0.022,0.5),gDark,0,0.02,-0.47,P2); add(BX(0.06,0.06,0.2),gDark,0,0.0,-0.3);
+    add(CY(0.02,0.02,0.05),gDark,0,0.02,-0.74,P2); add(BX(0.1,0.11,0.12),gOlive,-0.02,-0.11,-0.05); add(BX(0.014,0.05,0.04),gCopper,-0.05,-0.04,-0.05);
+    for(let k=0;k<4;k++) add(BX(0.012,0.012,0.03),gCopper,-0.055,-0.07-k*0.012,-0.05);
+    add(BX(0.012,0.045,0.09),gDark,0.045,0.04,-0.42); part.grip(gDark,0.08); add(BX(0.07,0.1,0.22),gDark,0,-0.02,0.3);
+    part.bipod(-0.6,-0.02,true); part.iron(0.08,-0.68,0.085); add(BX(0.016,0.03,0.016),gDark,0,0.05,-0.68);
+    return finish([0,0.02,-0.77],[0.23,-0.23,-0.4],[0,-0.085,-0.32],0.32); },
   raygun(){ const {add,finish}=gunKit();
     add(CY(0.045,0.055,0.24,14),gSilver,0,0,-0.08,P2); add(CY(0.025,0.025,0.18),gSilver,0,0,-0.27,P2);
     const tg=new THREE.TorusGeometry(0.038,0.008,6,16); for(const z of [-0.21,-0.26,-0.31]) add(tg,gGreenGlow,0,0,z);
@@ -747,11 +921,28 @@ const PAP_COLORS=[0,0x2a6aff,0xa83aff,0xffb21a], PAP_CSS=['','#6a9aff','#c47aff'
 const PAP_DMG=[1,2,3,4.5], PAP_MAG=[1,1.5,2,2.5], PAP_RELOAD=[1,1,0.8,0.65], PAP_RATE=[1,1,1,1/1.15];
 const PAP={
   pistol:[{name:'Hot Rod',d:'Double damage, bigger magazine'},{name:'Twin Exhaust',pellets:2,spread:0.01,d:'Fires two shots per pull'},{name:'Afterburner',boomR:2,boomMul:0.6,d:'Explosive rounds'}],
-  smg:[{name:'Hornet',d:'Double damage, bigger magazine'},{name:'Swarm',ricochet:true,d:'Bullets ricochet into a nearby zombie'},{name:'Killer Bees',poison:true,d:'Poison that spreads when zombies die'}],
-  shotgun:[{name:'Boomstick',falloffR:16,falloffMin:0.65,spread:0.0213,d:'Double damage, bigger magazine, longer range'},{name:"Dragon's Breath",burn:true,falloffR:20,falloffMin:0.7,spread:0.0175,d:'Pellets set zombies on fire, longer range'},{name:'Hellfire',rate:0.3,mag:20,knock:true,burnSlow:true,falloffR:25,falloffMin:0.75,spread:0.015,d:'Full-auto 20-shell drum, knockback, and burning zombies are slowed'}],
-  rifle:[{name:'Patriot',d:'Double damage, bigger magazine'},{name:'Overdrive',rateMul:1/1.3,ap:true,d:'Faster fire, cuts through armor'},{name:'Thunderclap',every5:true,d:'Every 5th bullet explodes'}],
-  sniper:[{name:'Longshot',d:'Double damage, bigger magazine'},{name:'Rail Gun',pierce:99,wallPierce:true,d:'Pierces every zombie and wall'},{name:'Judgment',rateMul:0.6,headBoom:true,d:'Headshot kills explode, faster fire'}],
-  lmg:[{name:'Belt Fed',d:'Double damage, 150-round belt'},{name:'Grinder',heavy:1,reloadMul:0.5,d:'No slowdown, much faster reload'},{name:'Meat Grinder',spin:true,pierce:2,d:'Spins up faster the longer you fire, pierces'}],
+  deagle:[{name:'Hand Cannon',d:'Double damage, bigger magazine'},{name:'Bone Breaker',pierce:3,stagger:0.5,d:'Punches through three zombies and staggers them'},{name:'Hammerfall',boomR:2,boomMul:0.3,d:'Explosive rounds'}],
+  smg11:[{name:'Pocket Rocket',d:'Double damage, bigger magazine'},{name:'Wasp Nest',ricochet:true,d:'Bullets ricochet into a nearby zombie'},{name:'Firecracker',burn:true,d:'Bullets set zombies on fire'}],
+  mp5:[{name:'Hornet',d:'Double damage, bigger magazine'},{name:'Swarm',ricochet:true,d:'Bullets ricochet into a nearby zombie'},{name:'Killer Bees',poison:true,d:'Poison that spreads when zombies die'}],
+  mp7:[{name:'Stingray',d:'Double damage, bigger magazine'},{name:'Needlepoint',pierce:3,ap:true,d:'Punches through three zombies, cuts through armor'},{name:'Venom',poison:true,d:'Poison that spreads when zombies die'}],
+  p90:[{name:'Hive',d:'Double damage, bigger magazine'},{name:'Overclock',rateMul:1/1.25,ap:true,d:'Faster fire, cuts through armor'},{name:'Pinball',ricochet:true,d:'Bullets ricochet into a nearby zombie'}],
+  ppsh:[{name:'Red Banner',d:'Double damage, bigger drum'},{name:'Burp Gun',rateMul:1/1.2,reloadMul:0.7,d:'Faster fire, faster reload'},{name:'Firestorm',burn:true,burnSlow:true,d:'Bullets set zombies on fire and slow them'}],
+  m16:[{name:'Liberty',d:'Double damage, bigger magazine'},{name:'Triple Threat',pierce:2,ap:true,d:'Punches through two zombies, cuts through armor'},{name:'Skullsplitter',rateMul:1/1.3,headBoom:true,d:'Faster bursts, and headshot kills explode'}],
+  famas:[{name:'Clarion',d:'Double damage, bigger magazine'},{name:'Fleur',ricochet:true,d:'Bullets ricochet into a nearby zombie'},{name:'Bastille',burn:true,d:'Bullets set zombies on fire'}],
+  ak47:[{name:'Red Star',d:'Double damage, bigger magazine'},{name:'Iron Curtain',pierce:2,ap:true,d:'Punches through two zombies, cuts through armor'},{name:'Firebird',burn:true,d:'Bullets set zombies on fire'}],
+  m4a1:[{name:'Patriot',d:'Double damage, bigger magazine'},{name:'Overdrive',rateMul:1/1.3,ap:true,d:'Faster fire, cuts through armor'},{name:'Thunderclap',every5:true,d:'Every 5th bullet explodes'}],
+  galil:[{name:"Lion's Roar",d:'Double damage, bigger magazine'},{name:'Pride',pierce:2,ap:true,d:'Punches through two zombies, cuts through armor'},{name:'Desert Storm',every5:true,d:'Every 5th bullet explodes'}],
+  aug:[{name:'Edelweiss',d:'Double damage, bigger magazine'},{name:'Alpine',pierce:2,ap:true,d:'Punches through two zombies, cuts through armor'},{name:'Avalanche',headBoom:true,ricochet:true,d:'Ricochets, and headshot kills explode'}],
+  scarh:[{name:'Heavy Hitter',d:'Double damage, bigger magazine'},{name:'Juggernaut',pierce:3,stagger:0.25,d:'Punches through three zombies and staggers them'},{name:'Bunker Buster',wallPierce:true,headBoom:true,d:'Shoots through walls, headshot kills explode'}],
+  dbl:[{name:'Two Bits',mag:2,falloffR:13,falloffMin:0.6,spread:0.026,d:'Double damage, longer range'},{name:'Buckshot Bash',mag:2,knock:true,d:'Blasts zombies backward'},{name:"Dragon's Jaw",mag:2,burn:true,burnSlow:true,d:'Pellets set zombies on fire and slow them'}],
+  spas12:[{name:'Boomstick',falloffR:16,falloffMin:0.65,spread:0.0213,d:'Double damage, bigger magazine, longer range'},{name:"Dragon's Breath",burn:true,falloffR:20,falloffMin:0.7,spread:0.0175,d:'Pellets set zombies on fire, longer range'},{name:'Hellfire',rate:0.3,mag:20,knock:true,burnSlow:true,falloffR:25,falloffMin:0.75,spread:0.015,d:'Full-auto 20-shell drum, knockback, and burning zombies are slowed'}],
+  aa12:[{name:'Street Sweeper',falloffR:14,falloffMin:0.6,d:'Double damage, bigger drum, longer range'},{name:'Riot Control',rateMul:1/1.2,knock:true,d:'Faster fire, blasts zombies backward'},{name:'Hellstorm',burn:true,burnSlow:true,d:'Pellets set zombies on fire and slow them'}],
+  kar98k:[{name:'Old Faithful',d:'Double damage, bigger magazine'},{name:'Marksman',pierce:6,rateMul:0.75,d:'Faster bolt, punches through six zombies'},{name:'Headhunter',headBoom:true,d:'Headshot kills explode'}],
+  dragunov:[{name:'Red Eye',d:'Double damage, bigger magazine'},{name:'Siberian',pierce:4,wallPierce:true,d:'Shoots through walls and four zombies'},{name:'Tunguska',boomR:2.2,boomMul:0.3,d:'Explosive rounds'}],
+  intervention:[{name:'Longshot',d:'Double damage, bigger magazine'},{name:'Rail Gun',pierce:99,wallPierce:true,d:'Pierces every zombie and wall'},{name:'Judgment',rateMul:0.6,headBoom:true,d:'Headshot kills explode, faster fire'}],
+  barrett:[{name:'Big Fifty',d:'Double damage, bigger magazine'},{name:'Anti-Materiel',pierce:99,wallPierce:true,d:'Pierces every zombie and wall'},{name:'Thunderbolt',boomR:2.5,boomMul:0.3,d:'Explosive rounds'}],
+  rpk:[{name:'Bear Hug',d:'Double damage, bigger drum'},{name:'Drum Roll',heavy:1,reloadMul:0.5,d:'No slowdown, much faster reload'},{name:'Iron Bear',rateMul:1/1.2,ricochet:true,d:'Faster fire, bullets ricochet into a nearby zombie'}],
+  m60:[{name:'Belt Fed',d:'Double damage, 150-round belt'},{name:'Grinder',heavy:1,reloadMul:0.5,d:'No slowdown, much faster reload'},{name:'Meat Grinder',spin:true,pierce:2,d:'Spins up faster the longer you fire, pierces'}],
   raygun:[{name:'Ray Gun X',red:true,flash:0xff4a2a,d:'Red bolts, double damage and splash'},{name:'Ray Gun XX',burst:3,d:'Fires a 3-bolt burst'},{name:'Ray Gun Omega',homing:true,pool:true,d:'Homing bolts that leave plasma pools'}],
   thumper:[{name:'Big Thump',blastR:7,mag:2,d:'Double damage, bigger blast, 2 rounds'},{name:'Cluster Thump',cluster:true,mag:3,d:'Rounds burst into 4 bomblets, 3 rounds'},{name:'Doomsday',blastR:9,crater:true,bossBonus:1.5,mag:5,d:'Huge blast, burning craters, bosses take 50% more, 5 rounds'}],
   flamer:[{name:'Full Service',flameV:24,poolT:7,d:'Double damage, longer range, longer-lasting pools'},{name:'Sticky Fire',sticky:true,d:'Burning zombies drip trails of fire'},{name:'Premium Inferno',inferno:true,blue:true,slow:true,flash:0x4ab0ff,d:'Blue fire that slows zombies, and burning kills explode'}],
@@ -964,7 +1155,8 @@ function saveRun(){
 }
 function loadRun(){
   try{ const d=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');
-    if(d&&d.v===1&&d.wave>0&&Array.isArray(d.inv)&&d.inv.some(s=>s&&W(s))) return d; }catch(e){}
+    if(d&&Array.isArray(d.inv)){ for(const x of d.inv) if(x&&LEGACY_GUNS[x.id]) x.id=LEGACY_GUNS[x.id]; if(LEGACY_GUNS[d.box]) d.box=LEGACY_GUNS[d.box]; }
+    if(d&&d.v===1&&d.wave>0&&Array.isArray(d.inv)&&d.inv.some(s=>s&&WEAPONS[s.id]&&W(s))) return d; }catch(e){}
   return null;
 }
 function clearRun(){ try{ localStorage.removeItem(SAVE_KEY); }catch(e){} }
@@ -999,7 +1191,8 @@ function gAdd(g,geo,mat,x,y,z,solid){ const o=new THREE.Mesh(geo,mat); o.positio
 function signTex(w,h,draw){ const c=document.createElement('canvas'); c.width=w; c.height=h; draw(c.getContext('2d'),w,h); return new THREE.CanvasTexture(c); }
 
 const BOX_PRICE=950, BOX_SPIN=3.2, BOX_OFFER=9;
-const BOX_POOL=[['smg',12],['shotgun',12],['rifle',12],['sniper',9],['lmg',9],['raygun',3]];
+/* every shop gun can come out of the crate; the Ray Gun keeps about the same 1-in-20 odds it had */
+const BOX_POOL=[...SHOP_ORDER.filter(id=>WEAPONS[id].optic).map(id=>[id,WEAPONS[id].price<=1000?8:10]),['raygun',12]];
 function buildBox(x,z,ry){
   const g=placeGroup(x,z,ry), M=curBuild();
   const wood=lam(0x4a3220), band=lam(0x2a2a2e);
@@ -1778,7 +1971,7 @@ function needMore(n){ sfx.deny(); popup(`Need $${n.toLocaleString()} more`,'head
 function boxPick(){
   const pool=BOX_POOL.filter(([id])=>ownsGun(id)<0); let tot=0; pool.forEach(p=>tot+=p[1]); let r=Math.random()*tot;
   for(const p of pool){ r-=p[1]; if(r<=0) return p[0]; }
-  return pool.length?pool[pool.length-1][0]:'smg';
+  return pool.length?pool[pool.length-1][0]:'mp5';
 }
 function armorAction(){
   const lv=armorLv, A=ARMOR[lv];
@@ -1875,7 +2068,16 @@ let shake=0, hurtFlash=0, gameTime=0, titleT=0, deathT=0, groanT=2, hitT=0;
 let armorLv=0, armorHp=0, inv=[null,null], cur=0, cash=0, pendingBuy=null, reloading=false, reloadT=0, fireCd=0, swapT=0, ads=false, adsT=0, mouseDown=false, gunKick=0, flashT=0;
 let aliveN=0;
 const zombies=[], projectiles=[], pickups=[], particles=[], effects=[];
-const scopeEl=document.getElementById('scope');
+const scopeEl=document.getElementById('scope'), reticleEl=document.getElementById('reticle');
+/* scope reticles, drawn across the lens (radius 100) */
+const SCOPES=(()=>{ const ring='<circle r="99" fill="none" stroke="#111" stroke-width="4"/>', wrap=b=>`<svg viewBox="-100 -100 200 200">${b}${ring}</svg>`;
+  let dots=''; for(let k=1;k<=5;k++) for(const [x,y] of [[k*10,0],[-k*10,0],[0,k*10],[0,-k*10]]) dots+=`<circle cx="${x}" cy="${y}" r="1.5"/>`;
+  const cross='<path d="M-100 0H-4M4 0H100M0 -100V-4M0 4V100" stroke="#000" stroke-width="0.8"/><path d="M-100 0H-55M55 0H100M0 55V100M0 -100V-55" stroke="#000" stroke-width="4"/>';
+  return {sniper:wrap(cross),
+    mil:wrap(cross.replace('M-100 0H-4M4 0H100M0 -100V-4M0 4V100','M-100 0H100M0 -100V100')+`<g fill="#000">${dots}</g>`),
+    pso:wrap('<g fill="none" stroke="#000" stroke-width="1.4"><path d="M-6 7L0 0L6 7"/><path d="M-4 19L0 15L4 19M-4 29L0 25L4 29M-4 39L0 35L4 39"/><path d="M-70 0H-18M18 0H70"/><path d="M-60 -3V3M-48 -3V3M-36 -3V3M-24 -3V3M24 -3V3M36 -3V3M48 -3V3M60 -3V3"/><path d="M-82 44Q-62 32 -40 34" stroke-width="1"/></g>'),
+    acog:wrap('<path d="M0 9V62M-6 22H6M-5 34H5M-4 46H4M-3 58H3" stroke="#000" stroke-width="1.2"/><path d="M-9 8L0 -4L9 8" fill="none" stroke="#ff3a2a" stroke-width="3"/>'),
+    aug:wrap('<circle r="16" fill="none" stroke="#000" stroke-width="2.2"/><circle r="1.6" fill="#000"/>')}; })();
 function newSlot(id){ const w=WEAPONS[id]; return {id,mag:w.mag,res:w.reserve,tier:0}; }
 function showGun(){ for(const id in guns) guns[id].g.visible=(state==='playing'||state==='paused')&&!!inv[cur]&&inv[cur].id===id; }
 
@@ -1928,6 +2130,18 @@ const sfx={
   door(){ nz(0.9,500,0.5,'lowpass'); tn(140,60,0.7,'sawtooth',0.12); setTimeout(()=>tn(900,1350,0.18,'triangle',0.14),350); },
   boxLand(j){ if(j){ [0,100,200,300,450].forEach((ms,i)=>setTimeout(()=>tn(500*(1+i*0.25),1000*(1+i*0.25),0.22,'sine',0.2),ms)); } else { tn(520,780,0.18,'triangle',0.18); } },
   shotgun(){ nz(0.38,1100,0.95); tn(110,35,0.24,'square',0.28); },
+  deagle(){ nz(0.24,1700,0.85); tn(130,40,0.18,'square',0.26); },
+  smg11(){ nz(0.06,3300,0.3); tn(250,95,0.04,'square',0.08); },
+  p90(){ nz(0.07,3000,0.3); tn(210,80,0.045,'square',0.09); },
+  ppsh(){ nz(0.07,2400,0.34); tn(170,65,0.05,'square',0.1); },
+  ak(){ nz(0.16,1900,0.62); tn(130,45,0.1,'square',0.18); },
+  burst(){ nz(0.11,2500,0.5); tn(185,60,0.07,'square',0.14); },
+  scar(){ nz(0.18,1700,0.66); tn(115,40,0.12,'square',0.2); },
+  dbl(){ nz(0.5,900,1.0); tn(95,30,0.3,'square',0.3); },
+  aa12(){ nz(0.26,1200,0.75); tn(120,40,0.16,'square',0.22); },
+  marksman(){ nz(0.36,1500,0.85); tn(105,35,0.3,'square',0.26); },
+  fifty(){ nz(0.75,1000,1.1); tn(70,25,0.6,'square',0.36); },
+  bolt(){ tn(700,500,0.05,'square',0.07); setTimeout(()=>tn(1100,800,0.05,'square',0.07),170); },
   empty(){ tn(1800,1600,0.03,'square',0.08); },
   reload(){ tn(900,700,0.05,'square',0.08); setTimeout(()=>tn(1300,900,0.05,'square',0.08),260); },
   hit(head){ tn(head?1500:950,head?1900:1100,0.05,'square',0.05); },
@@ -2642,8 +2856,11 @@ function magnetQuat(){
 function fire(){
   const slot=inv[cur], w=W(slot);
   if(fireCd>0||reloading||swapT>0||papT>0||state!=='playing') return;
-  if(slot.mag<=0){ sfx.empty(); fireCd=0.25; startReload(); return; }
-  slot.mag--; fireCd=w.rate*(w.spin?1-0.55*spinT/2:1)*(hasPerk('rapid')?0.75:1); sfx[w.sound]();
+  if(slot.mag<=0){ slot.bq=0; sfx.empty(); fireCd=0.25; startReload(); return; }
+  /* burst guns fire burstN quick shots per pull, then wait the full rate */
+  let gap=w.rate; if(w.burstN){ slot.bq=(slot.bq>0?slot.bq:w.burstN)-1; if(slot.bq>0) gap=w.burstGap; }
+  slot.mag--; fireCd=gap*(w.spin?1-0.4*spinT/2:1)*(hasPerk('rapid')?0.75:1); sfx[w.sound]();
+  if(w.bolt&&slot.mag>0) setTimeout(()=>{ if(state==='playing'&&inv[cur]===slot) sfx.bolt(); },Math.min(380,fireCd*500));
   camera.updateMatrixWorld(); const gn=guns[slot.id]; gn.muzzle.getWorldPosition(_muz);
   const spread=w.spread*(1+moveAmt*1.2+(player.onGround?0:1.5))*(1-adsT*(1-w.adsSpread));
   if(w.projectile){
@@ -2685,7 +2902,7 @@ function fire(){
       if(!end) end=_end.copy(camera.position).addScaledVector(_dir,120);
       tracerC(_muz,end,tc);
       if(impact&&w.boomR) papBoom(impact,w.boomR,w.dmg*w.boomMul,0xff8a30,false);
-      if(impact&&boomShot&&i===0) papBoom(impact,3.5,250*(w.tier>=3?1:0)+w.dmg*1.5,0xffb21a,true);
+      if(impact&&boomShot&&i===0) papBoom(impact,3.5,120*(w.tier>=3?1:0)+w.dmg*1.5,0xffb21a,true);
     }
     hitsPer.forEach((rec,z)=>{
       damageZombie(z,rec.dmg,rec.head,null,true);
@@ -2707,12 +2924,12 @@ function fire(){
 function startReload(){
   const s=inv[cur], w=W(s);
   if(reloading||swapT>0||s.mag===w.mag||s.res<=0||state!=='playing') return;
-  reloading=true; reloadT=reloadMax=w.reload*(hasPerk('quick')?0.5:1); sfx.reload();
+  s.bq=0; reloading=true; reloadT=reloadMax=w.reload*(hasPerk('quick')?0.5:1); sfx.reload();
 }
 function swapWeapon(i){
   if(i===undefined) i=1-cur;
   if(i===cur||!inv[i]||papT>0||state!=='playing') return;
-  cur=i; reloading=false; swapT=0.35; sfx.empty(); showGun();
+  if(inv[cur]) inv[cur].bq=0; cur=i; reloading=false; swapT=0.35; sfx.empty(); showGun();
 }
 function updateWeapon(dt){
   if(papT>0){ papT-=dt; if(papT<=0) finishPap(); }
@@ -2720,7 +2937,7 @@ function updateWeapon(dt){
   const s=inv[cur], w=W(s), gn=guns[s.id];
   if(reloading){ reloadT-=dt; if(reloadT<=0){ reloading=false; const take=Math.min(w.mag-s.mag,s.res); s.mag+=take; if(s.res!==Infinity) s.res-=take; } }
   if(w.spin&&mouseDown&&s.mag>0&&!reloading) spinT=Math.min(2,spinT+dt); else spinT=Math.max(0,spinT-dt*2);
-  if(mouseDown) fire();
+  if(mouseDown||s.bq>0) fire();
   adsT=clamp(adsT+((ads&&!reloading&&swapT<=0)?1:-1)*dt*(hasPerk('dead')?12:7),0,1);
   const fov=75+(w.adsFov-75)*adsT; if(Math.abs(camera.fov-fov)>0.01){ camera.fov=fov; camera.updateProjectionMatrix(); }
   gunKick=Math.max(0,gunKick-dt*0.6);
@@ -2735,7 +2952,11 @@ function updateWeapon(dt){
   flashT-=dt; gn.fl.material.opacity=flashT>0?1:0;
   muzzleLight.intensity=Math.max(0,muzzleLight.intensity-dt*40);
   const scoped=!!w.scope&&adsT>0.85;
+  if(scoped&&scopeEl.dataset.k!==w.scope){ scopeEl.dataset.k=w.scope; scopeEl.className=w.scope; scopeEl.innerHTML=SCOPES[w.scope]||SCOPES.sniper; }
   scopeEl.hidden=!scoped; gn.g.visible=!scoped;
+  /* red dot and holo sights: the glowing reticle fades in as the sight comes up to the eye */
+  const ro=(w.optic==='dot'||w.optic==='holo')?clamp((adsT-0.55)/0.35,0,1):0, rk=ro>0?w.optic+'|'+ro.toFixed(2):'';
+  if(reticleEl.dataset.k!==rk){ reticleEl.dataset.k=rk; reticleEl.hidden=ro<=0; if(ro>0){ reticleEl.className=w.optic; reticleEl.style.opacity=ro.toFixed(2); } }
 }
 
 function updateCamera(dt){
@@ -2775,7 +2996,7 @@ function updateHud(){
   if(boss){ setT('bossName',boss.d.name); const bp=Math.max(0,boss.hp/boss.maxHp*100).toFixed(1)+'%'; if(cache.bw!==bp){ cache.bw=bp; el.bossFill.style.width=bp; } }
   const gap=6+w.spread*260*(1+moveAmt)*(1-adsT*0.6);
   el.cross.style.setProperty('--g',gap.toFixed(1)+'px');
-  el.cross.style.opacity=(w.scope?(1-adsT):(1-adsT*0.75)).toFixed(2);
+  el.cross.style.opacity=(w.scope||w.optic==='dot'||w.optic==='holo'?(1-adsT):(1-adsT*0.75)).toFixed(2);
   el.hit.style.opacity=hitT>0?'1':'0';
   const wc=PAP_CSS[w.tier||0]; if(cache.wc!==wc){ cache.wc=wc; el.weapName.style.color=wc; }
   const near=nearPap(), pm=near?null:nearPerk(), u=(near||pm)?null:nearUse();
@@ -2908,7 +3129,7 @@ function resetGame(){
   papT=0; papSlot=null; spinT=0; resetBox(); resetDoors(); cheat=false; cheatUsed=false; perks=[]; lastHurtT=-99; wireReadyT=0; dropArm={id:null,t:0}; renderPerks();
   inv=[newSlot('pistol'),null]; cur=0; cash=500; pendingBuy=null; reloading=false; fireCd=0; swapT=0; adsT=0; ads=false; mouseDown=false;
   hurtFlash=0; shake=0; gameTime=0; aliveN=0;
-  scopeEl.hidden=true;
+  scopeEl.hidden=true; reticleEl.hidden=true; reticleEl.dataset.k='';
   camera.fov=75; camera.updateProjectionMatrix();
   $('tAim').classList.remove('on');
   syncCamo();
@@ -2955,7 +3176,7 @@ function startGame(){
 }
 function pause(){
   if(state!=='playing') return;
-  state='paused'; mouseDown=false; scopeEl.hidden=true; $('pauseScreen').hidden=false; document.body.classList.remove('playing'); $('touchUI').hidden=true;
+  state='paused'; mouseDown=false; scopeEl.hidden=true; reticleEl.hidden=true; reticleEl.dataset.k=''; $('pauseScreen').hidden=false; document.body.classList.remove('playing'); $('touchUI').hidden=true;
   if(document.pointerLockElement) document.exitPointerLock();
 }
 function resume(){
@@ -2965,7 +3186,7 @@ function resume(){
   clock.getDelta();
 }
 function die(){
-  state='dead'; deathT=0; mouseDown=false; ads=false; scopeEl.hidden=true;
+  state='dead'; deathT=0; mouseDown=false; ads=false; scopeEl.hidden=true; reticleEl.hidden=true; reticleEl.dataset.k='';
   if(document.pointerLockElement) document.exitPointerLock();
   document.body.classList.remove('playing'); $('touchUI').hidden=true;
   clearRun();
@@ -2993,7 +3214,7 @@ document.addEventListener('visibilitychange',()=>{ if(document.hidden) pause(); 
 const shopEl=$('shopScreen'), swapDlg=$('swapDlg');
 function openShop(resumed){
   if(papT>0) finishPap();
-  state='shop'; mouseDown=false; ads=false; adsT=0; reloading=false; scopeEl.hidden=true;
+  state='shop'; mouseDown=false; ads=false; adsT=0; reloading=false; scopeEl.hidden=true; reticleEl.hidden=true; reticleEl.dataset.k='';
   if(document.pointerLockElement) document.exitPointerLock();
   document.body.classList.remove('playing'); $('touchUI').hidden=true; $('hud').hidden=true;
   for(const id in guns) guns[id].g.visible=false;
@@ -3035,13 +3256,13 @@ function renderShop(){
     <div class="slotAmmo">${perks.length?perks.map(id=>PERKS[id].name).join(', '):'Buy them from the perk machines'}</div></div>`;
   $('slots').innerHTML=h;
   let b='';
-  SHOP_ORDER.forEach(id=>{
-    const w=WEAPONS[id], owned=inv.some(s=>s&&s.id===id), afford=cash>=w.price;
+  SHOP_GROUPS.forEach(([title,ids])=>{ b+=`<div class="ghead">${title}</div>`; ids.forEach(id=>{
+    const w=WEAPONS[id], owned=inv.some(s=>s&&s.id===id), afford=cash>=w.price, info=gunInfo(w);
     const label=owned?'Owned':(afford?'Buy':`Need $${(w.price-cash).toLocaleString()} more`);
-    b+=`<div class="item${owned?' owned':''}"><div><div class="iname">${w.name}</div><div class="idesc">${w.desc}</div></div>
+    b+=`<div class="item${owned?' owned':''}"><div><div class="iname">${w.name}</div><div class="idesc">${w.desc}</div>${info?`<div class="ichips">${info}</div>`:''}</div>
       <div class="stats3">${bars(w.bars)}</div><div class="price">$${w.price.toLocaleString()}</div>
       <button class="sbtn${!owned&&afford?' buy':''}" data-buy="${id}" ${owned||!afford?'disabled':''}>${label}</button></div>`;
-  });
+  }); });
   b+=`<div class="item"><div><div class="iname">${WEAPONS.raygun.name}</div><div class="idesc">${WEAPONS.raygun.desc} Only from the Mystery Crate.</div></div>
       <div class="stats3">${bars(WEAPONS.raygun.bars)}</div><div class="price">$${BOX_PRICE}</div>
       <button class="sbtn" disabled>${inv.some(s=>s&&s.id==='raygun')?'Owned':'Mystery Crate'}</button></div>`;
