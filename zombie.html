@@ -211,7 +211,7 @@
   body.touch #papPrompt{bottom:calc(214px + var(--safe-b))}
   #tPap{left:50%;transform:translateX(-50%);bottom:calc(150px + var(--safe-b));width:132px;height:54px;border-radius:27px;background:rgba(176,74,255,.72);font-size:18px}
   .btnRow{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-  .mapPick{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 16px;max-width:560px}
+  .mapPick{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 0 16px;max-width:560px}
   .diffPick{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 0 16px;max-width:560px}
   .mapBtn,.diffBtn{font:inherit;text-align:left;cursor:pointer;background:rgba(0,0,0,.35);color:var(--paper);border:0;border-radius:4px;padding:10px 12px;box-shadow:inset 0 0 0 2px rgba(241,236,226,.18)}
   .mapBtn b,.diffBtn b{display:block;font-family:Bungee,Impact,sans-serif;font-weight:400;font-size:17px;letter-spacing:.02em}
@@ -284,6 +284,7 @@
     <div class="mapPick" role="group" aria-label="Choose a map">
       <button class="mapBtn" data-map="station"><b>Last Stop</b><span>The all-night gas station</span></button>
       <button class="mapBtn" data-map="engine"><b>Dead Engine</b><span>A frozen research site with a machine that hums</span></button>
+      <button class="mapBtn" data-map="prison"><b>Lockwater</b><span>A prison island lost in the fog</span></button>
     </div>
     <div class="diffPick" role="group" aria-label="Choose a difficulty">
       <button class="diffBtn" data-diff="easy"><b>Easy</b><span>Fewer, slower, weaker zombies</span></button>
@@ -1061,6 +1062,14 @@ function buildDoor(o){
       c.strokeStyle='#2c3036'; c.lineWidth=6; for(let y=24;y<H*0.8;y+=36){ c.beginPath(); c.moveTo(0,y); c.lineTo(W2,y); c.stroke(); } });
     const sm=new THREE.MeshLambertMaterial({map:stripe});
     meshAdd(bgeo(w,h,0.3),sm,0,h/2,0);
+  }else if(o.type==='bars'){
+    const bar=lam(0x2e3238), lock=lam(0x5a3424), n=Math.round(w/0.3);
+    for(const sx of [-1,1]) meshAdd(bgeo(0.16,h,0.16),bar,sx*(w/2-0.08),h/2,0);
+    for(const y of [0.12,h*0.52,h-0.08]) meshAdd(bgeo(w,0.12,0.1),bar,0,y,0);
+    const im=new THREE.InstancedMesh(new THREE.CylinderGeometry(0.035,0.035,h,6),bar,n), m4=new THREE.Matrix4();
+    for(let i=0;i<n;i++){ m4.makeTranslation(-w/2+(i+0.5)*w/n,h/2,0); im.setMatrixAt(i,m4); }
+    im.castShadow=true; g.add(im); sol.push(im);
+    meshAdd(bgeo(0.42,0.5,0.22),lock,w/2-0.45,h*0.52,0);
   }else{
     const wood=lam(0x5a4430), woodD=lam(0x3a2a1c), sand=lam(0x8a7a58), olive=lam(0x3e4a32), rust=lam(0x6a3a26);
     meshAdd(bgeo(1.3,1.3,1.2),wood,-1.2,0.65,0,0,0.2); meshAdd(bgeo(1.2,1.2,1.1),olive,0.3,0.6,0.1,0,-0.15); meshAdd(bgeo(1.1,1.1,1.1),wood,1.4,0.55,-0.1,0,0.3);
@@ -1069,13 +1078,13 @@ function buildDoor(o){
     meshAdd(bgeo(w,0.5,0.7),sand,0,0.25,0.75); meshAdd(new THREE.CylinderGeometry(0.42,0.42,1.2,10),rust,-1.5,1.9,0.2,0,0).rotation.z=1.4;
     meshAdd(bgeo(0.15,h,0.15),woodD,-1.9,h/2,0.2); meshAdd(bgeo(0.15,h,0.15),woodD,1.9,h/2,-0.2);
   }
-  const verb=o.type==='metal'?'OPEN':'CLEAR';
+  const verb=o.type==='debris'?'CLEAR':'OPEN';
   const tex=signTex(256,128,(c,W2,H)=>{ c.fillStyle='#16181b'; c.fillRect(0,0,W2,H); c.strokeStyle='#ffd27a'; c.lineWidth=6; c.strokeRect(4,4,W2-8,H-8);
     c.textAlign='center'; c.textBaseline='middle'; c.fillStyle='#f1ece2'; c.font='bold 34px Impact, "Arial Black", sans-serif'; c.fillText(verb+' $'+o.price.toLocaleString(),W2/2,44);
     c.fillStyle='#ffd27a'; c.font='bold 22px "Arial Narrow", Arial, sans-serif'; c.fillText('TO '+o.label.toUpperCase(),W2/2,90); });
   for(const sd of [1,-1]){ const sg=new THREE.Mesh(new THREE.PlaneGeometry(1.6,0.8),new THREE.MeshBasicMaterial({map:tex})); sg.position.set(0,h+0.55,sd*0.2); if(sd<0) sg.rotation.y=Math.PI; g.add(sg); sol.push(sg); }
-  const dep=o.type==='metal'?0.4:1.1, hw=o.axis==='z'?w/2:dep, hd=o.axis==='z'?dep:w/2;
-  const D={id:o.id,price:o.price,label:o.label,type:o.type,x:o.x,z:o.z,g,sol,open:false,anim:0,col:{minX:o.x-hw,maxX:o.x+hw,minZ:o.z-hd,maxZ:o.z+hd,h:h+1}};
+  const dep=o.type==='debris'?1.1:0.4, hw=o.axis==='z'?w/2:dep, hd=o.axis==='z'?dep:w/2;
+  const D={id:o.id,price:o.price,label:o.label,type:o.type,x:o.x,z:o.z,w,sx:Math.cos(along),sz:-Math.sin(along),g,sol,open:false,anim:0,col:{minX:o.x-hw,maxX:o.x+hw,minZ:o.z-hd,maxZ:o.z+hd,h:h+1}};
   M.doors.push(D); M.portals.push({a:o.a,b:o.b,x:o.x,z:o.z,axis:o.axis,door:D});
   for(const sd of [1,-1]){ const ux=o.axis==='z'?o.x:o.x+sd*1.7, uz=o.axis==='z'?o.z+sd*1.7:o.z;
     M.uses.push({kind:'door',door:D,x:ux,z:uz,ry:Math.atan2(o.x-ux,o.z-uz)+Math.PI}); }
@@ -1091,18 +1100,20 @@ function refreshZones(){
   while(q.length){ const c=q.shift(); for(const P of m.portals){ if(P.door&&!P.door.open) continue; const n=P.ai===c?P.bi:(P.bi===c?P.ai:-1); if(n<0||m.zones[n].open) continue; m.zones[n].open=true; q.push(n); } }
 }
 function resetDoors(){
-  const m=curMap; if(m.doors) for(const D of m.doors){ D.open=false; D.anim=0; D.g.visible=true; D.g.position.y=0; }
+  const m=curMap; if(m.doors) for(const D of m.doors){ D.open=false; D.anim=0; D.g.visible=true; D.g.position.set(D.x,0,D.z); }
   rebuildBlockers(); refreshZones();
 }
 function openDoor(D,silent){
   if(D.open) return; D.open=true; rebuildBlockers(); refreshZones();
   if(silent){ D.g.visible=false; return; }
-  D.anim=0.001; sfx.door(); shake+=0.25; banner(D.type==='metal'?'Door open':'Path cleared',D.label);
+  D.anim=0.001; sfx.door(); shake+=0.25; banner(D.type==='debris'?'Path cleared':(D.type==='bars'?'Gate open':'Door open'),D.label);
   burst(new THREE.Vector3(D.x,1.2,D.z),26,'dust',4,3,0.9,0.18);
 }
 function updateDoors(dt){
   const m=curMap; if(!m.doors) return;
-  for(const D of m.doors){ if(!D.open||D.anim<=0||!D.g.visible) continue; D.anim+=dt; D.g.position.y=-D.anim*D.anim*5; if(D.anim>1.1) D.g.visible=false; }
+  for(const D of m.doors){ if(!D.open||D.anim<=0||!D.g.visible) continue; D.anim+=dt;
+    if(D.type==='bars'){ const k=Math.min(1,D.anim/0.9)*D.w; D.g.position.set(D.x+D.sx*k,0,D.z+D.sz*k); } else D.g.position.y=-D.anim*D.anim*5;
+    if(D.anim>1.1) D.g.visible=false; }
 }
 function zoneAt(x,z){ const zs=curMap.zones; if(!zs) return -1; for(let i=0;i<zs.length;i++){ const r=zs[i]; if(x>=r.x0&&x<=r.x1&&z>=r.z0&&z<=r.z1) return i; } return -1; }
 function zoneHops(from){
@@ -1358,6 +1369,331 @@ beginMap('engine',{note:'Buy doors and clear debris to push out from the courtya
 }
 { const E=MAPS.engine; E.portals.forEach(P=>{ P.ai=zoneOf(E,P.a); P.bi=zoneOf(E,P.b); }); E.spawns.forEach(s=>s.zi=zoneOf(E,s.zone)); E.zoneStart=zoneOf(E,'court'); }
 endMap('engine');
+
+/* map 3: Lockwater, a prison island out in the fog */
+beginMap('prison',{note:'Buy the barred gates to break out of the cell block. The Mess Hall and the Showers open first, then the Warden\'s Office, the Rec Yard, the Citadel and the Docks. Perk machines are spread through every wing, and Pump-a-Punch waits at the end of the Pier, the farthest point on the island.',name:'Lockwater',sub:'A prison island lost in the fog',sky:0x0b1418,fog:0.026,hemi:[0x6a8a9c,0x3c4448,0.95],moon:[0x9fbcd0,0.42],start:[0,8],yaw:0,cam:[8,4.6],tag:'Nobody leaves the island. Not even the dead.',
+  doors:[],portals:[],
+  zones:[{id:'cell',name:'Cell Block',x0:-12.25,x1:12.25,z0:-16,z1:16,roof:true},{id:'mess',name:'Mess Hall',x0:12.25,x1:34,z0:-16,z1:16,roof:true},{id:'showers',name:'Showers',x0:-34,x1:-12.25,z0:-16,z1:16,roof:true},
+    {id:'warden',name:"Warden's Office",x0:12,x1:34,z0:-34,z1:-16,roof:true},{id:'citadel',name:'Citadel',x0:-12,x1:12,z0:-34,z1:-16,roof:true},{id:'yard',name:'Rec Yard',x0:-34,x1:-12,z0:-34,z1:-16},
+    {id:'docks',name:'Docks',x0:-34,x1:34,z0:16,z1:32},{id:'pier',name:'Pier',x0:-4,x1:4,z0:32,z1:54}],
+  /* each spawn sits 1.1m in from the wall it climbs through, on the side named */
+  spawns:[['cell',-6,-14.6,'n'],['cell',4.5,-14.6,'n'],['cell',-10.5,-14.6,'n'],['cell',-10,14.6,'s'],['cell',10,14.6,'s'],
+    ['mess',17,14.6,'s'],['mess',30,-14.6,'n'],['mess',17,-14.6,'n'],['mess',32.6,-8.5,'e'],
+    ['showers',-17,-14.6,'n'],['showers',-32.6,-6,'w'],['showers',-30,14.6,'s'],['showers',-17,14.6,'s'],
+    ['warden',32.6,-19.5,'e'],['warden',16,-32.6,'n'],['citadel',-9.5,-32.6,'n'],['citadel',9.5,-32.6,'n'],['yard',-20,-32.6,'n'],['yard',-32.6,-20.5,'w'],
+    ['docks',32.6,28,'e'],['docks',-32.6,28,'w'],['docks',12,30.6,'s'],['docks',-12,30.6,'s'],['pier',-2.75,40,'w'],['pier',2.75,46,'e']].map(([zone,x,z,side])=>({zone,x,z,side})),
+  radar:[[[[-60,32],[60,32],[60,100],[-60,100]],'rgba(60,120,140,.22)'],[[[-14.5,-16],[14.5,-16],[14.5,16],[-14.5,16]],'rgba(241,236,226,.24)'],
+    [[[14.5,-16],[34,-16],[34,16],[14.5,16]],'rgba(241,236,226,.13)'],[[[-34,-16],[-14.5,-16],[-14.5,16],[-34,16]],'rgba(241,236,226,.13)'],
+    [[[12,-34],[34,-34],[34,-16],[12,-16]],'rgba(150,120,80,.28)'],[[[-12,-34],[12,-34],[12,-16],[-12,-16]],'rgba(120,170,220,.22)'],[[[-4,32],[4,32],[4,54],[-4,54]],'rgba(150,120,80,.32)']],
+  ready:'The cells are rattling',first:'The inmates are loose',hold:'Hold the island',held:'You held the island until wave ',empty:'No runs yet. The fog horn is sounding and the cells are locked.'});
+{
+  const P=MAPS.prison, H=8.6, HW=6;
+  const wallC=lam(0x8a8478), wallD=lam(0x5f5b53), wallG=lam(0x4a6052), trim=lam(0x3a3834), steel=lam(0x4a4f56), iron=lam(0x2e3238),
+        rust=lam(0x6a3a26), wood=lam(0x5a4430), woodD=lam(0x3a2a1c), roofM=lam(0x34383a), rock=lam(0x4a4c48), rockD=lam(0x34362f),
+        white=lam(0xc4c8c4), crateM=lam(0x6a5434), olive=lam(0x3e4a32), stoneM=lam(0x56524c);
+
+  /* hazy moon behind the fog */
+  { const moon=new THREE.Mesh(new THREE.CircleGeometry(8,32),new THREE.MeshBasicMaterial({color:0xc8d8e0,fog:false,transparent:true,opacity:0.5}));
+    moon.position.set(-110,110,-190); moon.lookAt(0,0,0); world.add(moon); }
+
+  /* the island, the quay and the sea */
+  const rockC=noiseCanvas(256,60,62,56,30,80), concC=noiseCanvas(256,98,96,90,16,24,true), tileC=noiseCanvas(128,176,182,178,10,3,true),
+        plankC=noiseCanvas(256,82,62,42,26,20,true), dockC=noiseCanvas(256,72,60,46,24,24,true), yardC=noiseCanvas(256,74,74,70,20,40), stoneC=noiseCanvas(256,66,62,60,18,26,true);
+  const checkC=document.createElement('canvas'); checkC.width=checkC.height=128;
+  { const x=checkC.getContext('2d'); for(let i=0;i<2;i++) for(let j=0;j<2;j++){ x.fillStyle=(i+j)%2?'#2c2e30':'#8c8a80'; x.fillRect(i*64,j*64,64,64); } }
+  solids.push(flat(124,82,rockC,8,0,0,-25), flat(72,16,rockC,8,0,0,24));
+  const waterC=noiseCanvas(256,26,52,58,26,0);
+  { const x=waterC.getContext('2d'); for(let i=0;i<70;i++){ x.strokeStyle=`rgba(170,210,215,${rand(0.05,0.16)})`; x.lineWidth=1.5; const y=rand(0,256), x0=rand(0,256); x.beginPath(); x.moveTo(x0,y); x.lineTo(x0+rand(10,40),y+rand(-2,2)); x.stroke(); } }
+  const waterTex=texFrom(waterC,70,70);
+  { const w=new THREE.Mesh(new THREE.PlaneGeometry(640,640),new THREE.MeshLambertMaterial({map:waterTex})); w.rotation.x=-Math.PI/2; w.position.y=-1.2; w.receiveShadow=true; world.add(w); solids.push(w); }
+  for(const [w,d,x,z] of [[72.6,0.6,0,32],[0.6,16,36,24],[0.6,16,-36,24],[26.6,0.6,49,16],[26.6,0.6,-49,16],[0.6,82.6,62,-25],[0.6,82.6,-62,-25],[124.6,0.6,0,-66]]) addBox(w,3.4,d,rockD,x,-1.7,z,{cast:false});
+
+  /* floors */
+  flat(29,32,concC,4,0,0.02,0); flat(19.5,32,checkC,1.6,24.25,0.02,0); flat(19.5,32,tileC,1.2,-24.25,0.02,0);
+  flat(22,18,plankC,3,23,0.02,-25); flat(24,18,stoneC,3,0,0.02,-25); flat(22,18,yardC,5,-23,0.02,-25); flat(68,16,dockC,3,0,0.02,24);
+  for(const x of [-9.5,9.5]) addBox(0.12,0.01,31,lam(0x9a8a3a),x,0.03,0,{cast:false,solid:false});
+
+  /* walls: the cell block in the middle, the wings either side, the Warden, Citadel and Yard to the north, the Docks to the south */
+  wallLine('z',-34,-34.3,-12,[],HW,wallD); wallLine('z',-34,-12,12,[],7.5,wallD); wallLine('z',-34,12,34.3,[],HW,wallD); wallLine('x',-34,-34,16,[],HW,wallD); wallLine('x',34,-34,16,[],HW,wallD);
+  wallLine('z',-16,-14.5,14.5,[],H,wallC); wallLine('z',-16,14.5,34,[[21,25]],HW,wallC); wallLine('z',-16,-34,-14.5,[[-25,-21]],HW,wallC);
+  wallLine('x',12,-34,-16,[[-27,-23]],7.5,wallC); wallLine('x',-12,-34,-16,[[-27,-23]],7.5,wallC);
+  wallLine('z',16,-14.5,14.5,[],H,wallC); wallLine('z',16,14.5,34.3,[[21,25]],HW,wallC); wallLine('z',16,-34.3,-14.5,[[-25,-21]],HW,wallC);
+  for(const x of [-23,23]){ addBox(4,1.5,0.6,wallC,x,5.25,-16,{cast:false}); addBox(4,1.5,0.6,wallC,x,5.25,16,{cast:false}); }
+  for(const x of [-12,12]) addBox(0.6,3,4,wallC,x,6,-25,{cast:false});
+  /* institutional green band low on the inside walls */
+  for(const [w,d,x,z] of [[28.4,0.04,0,-15.68],[28.4,0.04,0,15.68],[19,0.04,24.4,-15.68],[19,0.04,-24.4,-15.68],[19,0.04,24.4,15.68],[19,0.04,-24.4,15.68],[0.04,31.4,33.68,0],[0.04,9.7,14.82,-10.85],[0.04,17.7,14.82,6.85]])
+    addBox(w,1.1,d,wallG,x,0.55,z,{cast:false,solid:false});
+  /* roofs */
+  addBox(29.6,0.5,32.6,roofM,0,H+0.25,0); addBox(19.8,0.4,32.6,roofM,24.4,HW+0.2,0); addBox(19.8,0.4,32.6,roofM,-24.4,HW+0.2,0);
+  addBox(22.6,0.4,18,roofM,23,HW+0.2,-25.3); addBox(24.6,0.4,18,roofM,0,7.7,-25.3);
+
+  /* the cell block: two tiers of cells behind bars down both long sides */
+  { const barGeo=new THREE.CylinderGeometry(0.035,0.035,1,6), slots=[];
+    for(const sx of [-1,1]){
+      addBox(0.6,H,10.3,wallC,sx*14.5,H/2,-11.15); addBox(0.6,H,18.3,wallC,sx*14.5,H/2,7.15); addBox(0.6,H-4.6,4,wallC,sx*14.5,4.6+(H-4.6)/2,-4,{cast:false});
+      colliders.push({minX:sx>0?11.9:-14.8,maxX:sx>0?14.8:-11.9,minZ:-16.3,maxZ:-6,h:H},{minX:sx>0?11.9:-14.8,maxX:sx>0?14.8:-11.9,minZ:-2,maxZ:16.3,h:H});
+      for(const z of [-14,-10,-6.1,-1.9,2,6,10,14]) addBox(2.2,H,0.2,wallD,sx*13.1,H/2,z,{cast:false});
+      addBox(2.2,0.2,10,wallD,sx*13.1,3.4,-11,{cast:false}); addBox(2.2,0.2,18,wallD,sx*13.1,3.4,7,{cast:false});
+      addBox(0.3,H-6.9,32,wallC,sx*12.05,6.9+(H-6.9)/2,0,{cast:false});
+      for(let k=0;k<106;k++){ const z=-15.85+k*0.3, gap=z>-6.1&&z<-1.9;
+        if(!gap) slots.push([sx*12,1.65,z,3.3]);
+        slots.push(gap?[sx*12,5.75,z,2.3]:[sx*12,5.2,z,3.4]); }
+      for(const y of [0.1,1.15,3.25]){ addBox(0.06,0.08,9.9,iron,sx*12,y,-11.05,{cast:false}); addBox(0.06,0.08,17.9,iron,sx*12,y,7.05,{cast:false}); }
+      for(const y of [3.55,5.0,6.85]) addBox(0.06,0.08,32,iron,sx*12,y,0,{cast:false});
+      addBox(0.1,0.12,4.2,iron,sx*12,4.55,-4,{cast:false});
+      /* cantilevered catwalk along the upper tier, broken where the cell below was smashed through */
+      for(const [z0,z1] of [[-16,-6.1],[-1.9,16]]){ const len=z1-z0, zc=(z0+z1)/2;
+        addBox(1.4,0.12,len,steel,sx*11.3,3.44,zc,{cast:false}); addBox(0.06,0.06,len,iron,sx*10.65,4.45,zc,{cast:false}); addBox(0.05,0.05,len,iron,sx*10.65,3.95,zc,{cast:false});
+        for(let z=z0+0.3;z<z1;z+=2) addBox(0.06,1.0,0.06,iron,sx*10.65,3.95,z,{cast:false}); }
+    }
+    const bars=new THREE.InstancedMesh(barGeo,iron,slots.length), m4=new THREE.Matrix4();
+    slots.forEach(([x,y,z,h],i)=>{ m4.makeScale(1,h,1); m4.setPosition(x,y,z); bars.setMatrixAt(i,m4); });
+    bars.castShadow=true; world.add(bars);
+    /* bunks and toilets in each cell, both tiers */
+    const cz=[-12,-8.05,0.05,4,8,12], bunk=new THREE.InstancedMesh(bgeo(0.8,0.45,1.9),lam(0x5a5e5a),cz.length*4), loo=new THREE.InstancedMesh(bgeo(0.45,0.5,0.5),white,cz.length*4);
+    let n=0; for(const sx of [-1,1]) for(const y of [0,3.5]) for(const z of cz){ m4.makeTranslation(sx*13.7,y+0.5,z-0.6); bunk.setMatrixAt(n,m4); m4.makeTranslation(sx*13.9,y+0.25,z+1.3); loo.setMatrixAt(n,m4); n++; }
+    world.add(bunk); world.add(loo);
+  }
+  /* sign helper */
+  function plaque(text,w,h,x,y,z,ry,col,sub){ const tex=signTex(512,Math.max(64,Math.round(512*h/w)),(c,W2,H2)=>{ c.fillStyle='#1a1c1e'; c.fillRect(0,0,W2,H2); c.strokeStyle=col||'#b8a87a'; c.lineWidth=6; c.strokeRect(5,5,W2-10,H2-10);
+      c.fillStyle='#e6dccb'; c.textAlign='center'; c.textBaseline='middle'; let fs=Math.round(H2*(sub?0.42:0.56)); const ft=()=>c.font=`bold ${fs}px Impact, "Arial Black", sans-serif`; ft();
+      while(c.measureText(text).width>W2-36&&fs>10){ fs-=2; ft(); } c.fillText(text,W2/2,sub?H2*0.38:H2/2+3);
+      if(sub){ c.fillStyle=col||'#b8a87a'; c.font=`bold ${Math.round(H2*0.2)}px "Arial Narrow", Arial, sans-serif`; c.fillText(sub,W2/2,H2*0.78); } });
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:tex})); m.position.set(x,y,z); m.rotation.y=ry; world.add(m); return m; }
+  /* the main gate, welded shut, inside and out */
+  { const plate=new THREE.MeshLambertMaterial({map:signTex(256,256,(c,W2,H2)=>{ c.fillStyle='#3e4248'; c.fillRect(0,0,W2,H2); c.fillStyle='#2a2d31'; for(let y=16;y<H2;y+=40) for(let x=16;x<W2;x+=40){ c.beginPath(); c.arc(x,y,4,0,6.283); c.fill(); }
+      c.strokeStyle='#23262a'; c.lineWidth=6; c.strokeRect(3,3,W2-6,H2-6); c.beginPath(); c.moveTo(W2/2,0); c.lineTo(W2/2,H2); c.stroke();
+      c.strokeStyle='rgba(255,170,60,.6)'; c.lineWidth=5; c.beginPath(); c.moveTo(W2/2,10); for(let y=10;y<H2-10;y+=12) c.lineTo(W2/2+((y/12)%2?5:-5),y); c.stroke(); })});
+    for(const [z,ry] of [[15.66,Math.PI],[16.34,0]]){ const m=new THREE.Mesh(new THREE.PlaneGeometry(4.2,4.6),plate); m.position.set(0,2.3,z); m.rotation.y=ry; world.add(m); }
+    plaque('CELL BLOCK C',6,0.9,0,6,15.67,Math.PI); plaque('LOCKWATER',10,1.8,0,6.6,16.33,0,'#c8a860','STATE PENITENTIARY  .  NO VISITORS'); }
+  /* guard desk in the middle of the block */
+  addBox(3.2,1.05,1.5,woodD,0,0.525,0,{collide:true}); addBox(3.4,0.08,1.7,wood,0,1.09,0);
+  addBox(0.5,0.3,0.4,steel,-0.9,1.28,0.1); addBox(0.1,0.5,0.1,iron,1.1,1.38,-0.3); addBox(0.34,0.16,0.34,lam(0x2a3a2a),1.1,1.66,-0.3,{cast:false});
+  /* ceiling lamp: a dark housing with a softly glowing panel */
+  function lamp(x,z,c){ addBox(1.0,0.12,0.4,trim,x,5.94,z,{cast:false,solid:false}); addBox(0.85,0.04,0.26,lam(0x404040,{emissive:c,emissiveIntensity:0.9}),x,5.87,z,{cast:false,solid:false}); }
+  /* hanging lamps */
+  for(const z of [-8,8]){ const l=new THREE.PointLight(0xffe2b0,1.1,28,1.4); l.position.set(0,7.2,z); world.add(l);
+    addBox(0.04,1.0,0.04,iron,0,8.1,z,{cast:false,solid:false}); addBox(0.9,0.2,0.9,lam(0x2a3a2a),0,7.55,z,{cast:false,solid:false}); addBox(0.5,0.08,0.5,bulbMat,0,7.42,z,{cast:false,solid:false}); }
+
+  /* mess hall */
+  function messTable(x,z){ addBox(1.2,0.08,6,wood,x,0.8,z); addBox(0.1,0.76,5.4,iron,x,0.38,z,{cast:false});
+    for(const s of [-1,1]){ addBox(0.4,0.08,6,woodD,x+s*1.0,0.46,z); addBox(0.06,0.42,5.6,iron,x+s*1.0,0.21,z,{cast:false}); }
+    colliders.push({minX:x-1.3,maxX:x+1.3,minZ:z-3,maxZ:z+3,h:0.9}); }
+  for(const x of [20,27]) for(const z of [-7,7]) messTable(x,z);
+  addBox(0.8,1.0,12,steel,33.3,0.5,0,{collide:true}); addBox(0.9,0.06,12.2,lam(0x9aa0a6),33.3,1.03,0);
+  { const potGeo=new THREE.CylinderGeometry(0.28,0.24,0.42,12); for(const z of [-4,-1.5,1.5,4]){ const m=new THREE.Mesh(potGeo,lam(0x8a8e94)); m.position.set(33.25,1.27,z); m.castShadow=true; world.add(m); } }
+  plaque('MESS HALL',5,0.8,33.67,4.4,0,-Math.PI/2); plaque('MESS HALL',4,0.65,14.83,4.6,9,Math.PI/2);
+  for(const z of [-7,7]){ const l=new THREE.PointLight(0xffd9a0,1.2,24,1.5); l.position.set(24,5.4,z); world.add(l); lamp(24,z,0xfff0d0); }
+
+  /* showers */
+  addBox(0.05,2.4,31.4,lam(0xb8c0bc),-33.68,1.2,0,{cast:false});
+  for(let z=-12;z<=9;z+=3){ addBox(0.08,1.4,0.08,steel,-33.6,1.9,z,{cast:false}); addBox(0.3,0.08,0.18,steel,-33.5,2.6,z,{cast:false}); }
+  for(const z of [-6,6]){ const m=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.2,3,10),steel); m.position.set(-24,1.5,z); m.castShadow=true; world.add(m); solids.push(m);
+    colliders.push({minX:-24.25,maxX:-23.75,minZ:z-0.25,maxZ:z+0.25,h:3});
+    for(let k=0;k<4;k++){ const a=k*Math.PI/2; addBox(0.5,0.06,0.06,steel,-24+Math.cos(a)*0.3,2.8,z+Math.sin(a)*0.3,{ry:a,cast:false}); }
+    const dr=new THREE.Mesh(new THREE.CircleGeometry(0.9,16),lam(0x3a3e40)); dr.rotation.x=-Math.PI/2; dr.position.set(-24,0.03,z); world.add(dr); }
+  addBox(0.6,0.45,6,wood,-15.1,0.45,9,{collide:true});
+  addBox(5,2.2,0.5,lam(0x4a5a5e),-29.5,1.1,-15.45,{collide:true});
+  plaque('SHOWERS',4.4,0.7,-33.64,4.4,0,Math.PI/2); plaque('SHOWERS',4,0.65,-14.83,4.6,9,-Math.PI/2);
+  for(const z of [-7,7]){ const l=new THREE.PointLight(0xbfe0ff,1.15,24,1.5); l.position.set(-24,5.4,z); world.add(l); lamp(-24,z,0xe0f4ff); }
+
+  /* the warden's office */
+  addBox(3,0.8,1.4,woodD,23,0.4,-26,{collide:true}); addBox(3.2,0.08,1.6,wood,23,0.84,-26);
+  addBox(0.8,1.1,0.8,lam(0x3a2420),23,0.55,-27.3); addBox(0.6,0.5,0.4,lam(0x2a2e2a),22.2,1.13,-26.1); addBox(0.4,0.1,0.3,lam(0xd8d0b8),23.6,0.92,-25.9,{cast:false});
+  addBox(6.7,2.6,0.6,woodD,30.35,1.3,-33.4,{collide:true});
+  for(let i=0;i<3;i++) addBox(6.4,0.06,0.5,wood,30.35,0.55+i*0.75,-33.2,{cast:false});
+  { const rug=new THREE.Mesh(new THREE.PlaneGeometry(6,4),lam(0x5a1e1a)); rug.rotation.x=-Math.PI/2; rug.position.set(23,0.03,-25); world.add(rug); }
+  plaque('WARDEN',3,0.6,30,3.6,-33.66,0);
+  { const l=new THREE.PointLight(0xffc890,1.2,24,1.5); l.position.set(23,4.8,-25); world.add(l); lamp(23,-25,0xffe8c8); }
+  /* water tower on the Warden's roof */
+  { for(const [x,z] of [[27.6,-30.4],[30.4,-30.4],[27.6,-27.6],[30.4,-27.6]]) addBox(0.25,4,0.25,iron,x,HW+2.4,z,{cast:false});
+    const tank=new THREE.Mesh(new THREE.CylinderGeometry(1.8,1.8,2.8,16),lam(0x5a5048)); tank.position.set(29,HW+5.8,-29); tank.castShadow=true; world.add(tank);
+    const cap=new THREE.Mesh(new THREE.ConeGeometry(1.9,1,16),roofM); cap.position.set(29,HW+7.7,-29); world.add(cap); }
+
+  /* the citadel: pillars, the chair, and the Live Wire machine */
+  for(const x of [-6,6]) for(const z of [-20,-30]) addBox(1.2,7.4,1.2,stoneM,x,3.7,z,{collide:true});
+  addBox(3.2,0.3,2,stoneM,0,0.15,-17.3,{collide:true});
+  { const cw=lam(0x3a2a1e), strap=lam(0x1a1410);
+    addBox(1.0,0.12,0.9,cw,0,0.85,-17.6); addBox(1.0,1.3,0.12,cw,0,1.5,-17.1); for(const s of [-1,1]){ addBox(0.12,0.4,0.9,cw,s*0.5,1.05,-17.6); addBox(0.1,0.55,0.1,cw,s*0.4,0.57,-17.95); }
+    addBox(0.7,0.5,0.6,iron,0,2.35,-17.35); addBox(0.12,0.1,0.95,strap,0.5,1.28,-17.6,{cast:false}); addBox(0.12,0.1,0.95,strap,-0.5,1.28,-17.6,{cast:false});
+    addBox(1.6,2.2,0.3,iron,-3.2,2.2,-16.45); addBox(0.2,0.6,0.1,lam(0x8a2a20),-3.5,2.4,-16.62,{cast:false}); addBox(0.08,1.9,0.08,strap,-1.6,2.6,-16.5,{cast:false}); }
+  plaque('CITADEL',3.6,0.7,0,5.4,-16.32,Math.PI);
+  const citLight=new THREE.PointLight(0x9fd8ff,1.2,26,1.4); citLight.position.set(0,6.2,-25); world.add(citLight);
+  addBox(1.2,0.12,0.5,trim,0,7.44,-25,{cast:false,solid:false}); addBox(1.0,0.04,0.3,lam(0x404a50,{emissive:0xcfefff,emissiveIntensity:0.9}),0,7.37,-25,{cast:false,solid:false});
+
+  /* the rec yard: guard tower, bleachers and a hoop */
+  colliders.push({minX:-33.7,maxX:-30.7,minZ:-33.7,maxZ:-30.7,h:9});
+  addBox(3,0.3,3,stoneM,-32.2,0.15,-32.2);
+  for(const x of [-33.5,-30.9]) for(const z of [-33.5,-30.9]) addBox(0.3,6.4,0.3,iron,x,3.2,z);
+  for(const y of [2,4.2]){ addBox(2.9,0.12,0.12,iron,-32.2,y,-30.9,{cast:false}); addBox(0.12,0.12,2.9,iron,-30.9,y,-32.2,{cast:false}); }
+  addBox(3.6,0.3,3.6,woodD,-32.2,6.5,-32.2); addBox(3.6,0.9,3.6,wood,-32.2,7.1,-32.2);
+  for(const [x,z] of [[-33.9,-33.9],[-30.5,-33.9],[-33.9,-30.5],[-30.5,-30.5]]) addBox(0.16,1.4,0.16,woodD,x,8.25,z,{cast:false});
+  addBox(3.5,0.5,3.5,lam(0x2a2018,{emissive:0x5a4020,emissiveIntensity:0.5}),-32.2,8.0,-32.2,{cast:false,solid:false});
+  { const rf=new THREE.Mesh(new THREE.ConeGeometry(2.9,1.4,4),roofM); rf.position.set(-32.2,9.65,-32.2); rf.rotation.y=Math.PI/4; rf.castShadow=true; world.add(rf); }
+  const search=new THREE.Group(); search.position.set(-30.6,8.6,-30.6); world.add(search);
+  { const head=new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.36,0.6,12),steel); head.rotation.x=Math.PI/2; search.add(head);
+    const lens=new THREE.Mesh(new THREE.CircleGeometry(0.28,12),new THREE.MeshBasicMaterial({color:0xfff6d0})); lens.position.z=0.31; search.add(lens);
+    const cone=new THREE.Mesh(new THREE.CylinderGeometry(0.28,2.4,14.5,16,1,true),new THREE.MeshBasicMaterial({color:0xfff2c8,transparent:true,opacity:0.08,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));
+    cone.rotation.x=-Math.PI/2; cone.position.z=7.55; search.add(cone); search.rotation.order='YXZ'; search.rotation.x=0.6; }
+  { const l=new THREE.PointLight(0xfff2d8,0.9,30,1.4); l.position.set(-29.6,7.6,-29.6); world.add(l); }
+  addBox(6,0.4,1.8,stoneM,-27.7,0.2,-32.8); addBox(6,0.4,1.2,stoneM,-27.7,0.6,-33.1); addBox(6,0.4,0.6,stoneM,-27.7,1.0,-33.4);
+  colliders.push({minX:-30.7,maxX:-24.7,minZ:-33.7,maxZ:-31.9,h:1.2});
+  addBox(1.8,1.1,0.06,white,-29,3.3,-16.36,{cast:false});
+  { const hoop=new THREE.Mesh(new THREE.TorusGeometry(0.24,0.025,6,16),lam(0xc04a20)); hoop.rotation.x=Math.PI/2; hoop.position.set(-29,2.95,-16.66); world.add(hoop); }
+  /* coils of razor wire along the outer wall tops */
+  { const tg=new THREE.TorusGeometry(0.3,0.02,4,10), pts=[];
+    for(let z=-33.8;z<=16;z+=0.55){ pts.push([-34,z,Math.PI/2]); pts.push([34,z,Math.PI/2]); }
+    for(let x=-33.8;x<=34;x+=0.55) if(Math.abs(x)>12.4) pts.push([x,-34,0]);
+    const im=new THREE.InstancedMesh(tg,lam(0x7a7e84),pts.length), m4=new THREE.Matrix4(), q=new THREE.Quaternion(), e=new THREE.Euler();
+    pts.forEach(([x,z,r],i)=>{ e.set(0,r,0); q.setFromEuler(e); m4.compose(new THREE.Vector3(x,HW+0.3,z),q,new THREE.Vector3(1,1,1)); im.setMatrixAt(i,m4); }); world.add(im); }
+
+  /* docks: the dock shed, crates, lamps and the low sea wall */
+  wallLine('x',34,16,32.3,[],1.2,wallD); wallLine('x',-34,16,32.3,[],1.2,wallD); wallLine('z',32,-34.3,34.3,[[-2,2]],1.2,wallD);
+  for(let x=-30;x<=30;x+=8) if(Math.abs(x)>4){ const b=new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.22,0.4,10),iron); b.position.set(x,1.4,32); world.add(b); }
+  addBox(5.7,3.6,4.7,wood,-30.85,1.8,18.65,{collide:true}); addBox(6.2,0.25,5.2,roofM,-30.85,3.72,18.65);
+  addBox(0.06,2.2,1.2,woodD,-27.97,1.1,18.6,{cast:false}); addBox(1.2,0.8,0.06,lam(0x1a2024,{emissive:0x6a5020,emissiveIntensity:0.6}),-29.4,2.2,21.03,{cast:false,solid:false});
+  plaque('DOCK 2',1.8,0.5,-32.6,2.9,21.04,0);
+  for(const [x,z,two] of [[10,22,1],[-12,25,0],[28.5,24.5,1]]){ addBox(1.4,1.4,1.4,crateM,x,0.7,z,{collide:true}); if(two) addBox(1.2,1.2,1.2,crateM,x+0.05,2.0,z,{ry:0.3}); }
+  streetlight(-14,31.3,1); streetlight(14,31.3,-1);
+  for(const x of [-11.9,11.9]){ const l=new THREE.PointLight(0xffc888,0.85,26,1.4); l.position.set(x,7.4,31.3); world.add(l); }
+  /* lit, barred windows high on the prison's south face */
+  { const lit=lam(0x2a2418,{emissive:0xffb860,emissiveIntensity:0.32});
+    for(const x of [-31,-27,-18,-11,-7,7,11,18,27,31]){ const y=x>-14.5&&x<14.5?5.2:3.9; addBox(1.1,1.2,0.04,lit,x,y,16.32,{cast:false,solid:false});
+      for(const k of [-0.3,0,0.3]) addBox(0.05,1.2,0.05,iron,x+k,y,16.36,{cast:false,solid:false}); } }
+
+  /* the pier, Pump-a-Punch at its far end */
+  addBox(8.6,0.5,22.4,woodD,0,-0.25,43.1,{cast:false}); flat(8,22,dockC,3,0,0.01,43);
+  colliders.push({minX:-4.15,maxX:-3.85,minZ:32.3,maxZ:54.15,h:1.1},{minX:3.85,maxX:4.15,minZ:32.3,maxZ:54.15,h:1.1},{minX:-4.15,maxX:4.15,minZ:53.85,maxZ:54.15,h:1.1});
+  for(const sx of [-1,1]){ addBox(0.12,0.1,21.9,wood,sx*4,1.05,43.25,{cast:false}); addBox(0.08,0.08,21.9,wood,sx*4,0.6,43.25,{cast:false});
+    for(let z=32.5;z<54.2;z+=2.15) addBox(0.18,1.15,0.18,woodD,sx*4,0.575,z,{cast:false}); }
+  addBox(8.3,0.1,0.12,wood,0,1.05,54,{cast:false}); addBox(8.3,0.08,0.08,wood,0,0.6,54,{cast:false}); addBox(0.18,1.15,0.18,woodD,0,0.575,54,{cast:false});
+  { const pg=new THREE.CylinderGeometry(0.22,0.26,3.7,8), pil=new THREE.InstancedMesh(pg,woodD,14), m4=new THREE.Matrix4(); let i=0;
+    for(const sx of [-1,1]) for(let k=0;k<7;k++){ m4.makeTranslation(sx*4.45,-1.35,33+k*3.5); pil.setMatrixAt(i++,m4); } world.add(pil); }
+  for(const sx of [-1,1]) addBox(0.8,3.8,0.8,wallD,sx*2.4,1.9,32,{collide:true});
+  addBox(5.6,0.5,0.5,wallD,0,4.75,32); plaque('PIER',1.6,0.42,0,4.75,32.26,0); plaque('PIER',1.6,0.42,0,4.75,31.74,Math.PI);
+  buildPap(0,53.3);
+  { const l=new THREE.PointLight(0xb04aff,1.2,20,1.4); l.position.set(0,5.5,51.6); world.add(l); }
+  streetlight(3.55,43,-1);
+  { const l=new THREE.PointLight(0xffd8a0,0.8,22,1.4); l.position.set(1.45,7.4,43); world.add(l); }
+  /* a patrol boat tied up beside the pier */
+  const boat=new THREE.Group(); boat.position.set(9.5,-0.55,44); world.add(boat);
+  { const hull=lam(0xd8d8d0), blue=lam(0x22405a);
+    gAdd(boat,bgeo(3.2,1.4,8),hull,0,0,0); gAdd(boat,bgeo(3.24,0.3,8.04),blue,0,-0.45,0);
+    const bow=gAdd(boat,new THREE.CylinderGeometry(0.01,2.26,2.6,4,1),hull,0,0,-5.3); bow.rotation.set(-Math.PI/2,Math.PI/4,0); bow.scale.set(1,1,0.44);
+    gAdd(boat,bgeo(2.2,1.6,3),hull,0,1.5,1); gAdd(boat,bgeo(2.3,0.12,3.1),blue,0,2.35,1);
+    gAdd(boat,bgeo(2.0,0.5,0.06),lam(0x1a2a34,{emissive:0x3a5a6a,emissiveIntensity:0.4}),0,1.8,-0.52); }
+  /* channel buoys */
+  const buoys=[[-16,62,0xff3020],[16,62,0x30ff60]].map(([x,z,c])=>{ const b=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.7,1.4,10),lam(c)); b.position.set(x,-0.7,z); world.add(b);
+    const tip=new THREE.Mesh(new THREE.SphereGeometry(0.22,8,6),new THREE.MeshBasicMaterial({color:c,fog:false})); tip.position.set(x,0.25,z); world.add(tip); return tip; });
+
+  /* doors: barred gates you buy to push outward */
+  buildDoor({id:'mess',label:'the Mess Hall',type:'bars',price:750,x:12.25,z:-4,axis:'x',a:'cell',b:'mess'});
+  buildDoor({id:'showers',label:'the Showers',type:'bars',price:1000,x:-12.25,z:-4,axis:'x',a:'cell',b:'showers'});
+  buildDoor({id:'warden',label:"the Warden's Office",type:'bars',price:1250,x:23,z:-16,axis:'z',a:'mess',b:'warden'});
+  buildDoor({id:'yard',label:'the Rec Yard',type:'bars',price:1250,x:-23,z:-16,axis:'z',a:'showers',b:'yard'});
+  buildDoor({id:'docksE',label:'the Docks',type:'bars',price:1250,x:23,z:16,axis:'z',a:'mess',b:'docks'});
+  buildDoor({id:'docksW',label:'the Docks',type:'bars',price:1250,x:-23,z:16,axis:'z',a:'showers',b:'docks'});
+  buildDoor({id:'pier',label:'the Pier',type:'bars',price:1500,x:0,z:32,axis:'z',a:'docks',b:'pier'});
+  P.portals.push({a:'citadel',b:'warden',x:12,z:-25,axis:'x',door:null},{a:'citadel',b:'yard',x:-12,z:-25,axis:'x',door:null});
+
+  /* perks spread through every wing */
+  buildPerk('quick',-6,15.275,Math.PI); buildPerk('second',6,15.275,Math.PI);
+  buildPerk('rapid',33.275,12,-Math.PI/2); buildPerk('road',-33.275,12,Math.PI/2);
+  buildPerk('dead',33.275,-24,-Math.PI/2); buildPerk('wire',0,-33.275,0);
+  buildPerk('fire',-33.275,-25,Math.PI/2); buildPerk('cash',-31,21.425,0);
+
+  /* crate, ammo and armor */
+  buildBox(0,-15.15,0);
+  buildAmmo(9.5,-15.25,0); buildAmmo(33.24,-12,-Math.PI/2); buildAmmo(20,31.24,Math.PI);
+  buildArmor(23,-33.22,0);
+
+  /* where they climb in: pried bars on the buildings, ladders up from the water */
+  { const hole=lam(0x0a0c0e);
+    for(const s of P.spawns){
+      const dx=s.side==='e'?1:(s.side==='w'?-1:0), dz=s.side==='s'?1:(s.side==='n'?-1:0), onX=dx!==0, fx=s.x+dx*1.1, fz=s.z+dz*1.1;
+      if(s.zone==='docks'||s.zone==='pier'){
+        const th=s.zone==='pier'?0.3:0.6, top=s.zone==='pier'?1.1:1.2, t0=-1.3, t1=top+0.35, len=t1-t0;
+        const ox=fx+dx*(th+0.04), oz=fz+dz*(th+0.04), ix=fx-dx*0.04, iz=fz-dz*0.04;
+        for(const k of [-0.28,0.28]){ const kx=onX?0:k, kz=onX?k:0;
+          addBox(0.06,len,0.06,iron,ox+kx,t0+len/2,oz+kz,{cast:false,solid:false});
+          addBox(onX?th+0.1:0.06,0.06,onX?0.06:th+0.1,iron,(ox+ix)/2+kx,t1,(oz+iz)/2+kz,{cast:false,solid:false});
+          addBox(0.06,0.3,0.06,iron,ix+kx,t1-0.15,iz+kz,{cast:false,solid:false}); }
+        for(let y=t0+0.2;y<t1-0.1;y+=0.32) addBox(onX?0.05:0.62,0.05,onX?0.62:0.05,iron,ox,y,oz,{cast:false,solid:false});
+      }else{
+        const wx=fx-dx*0.02, wz=fz-dz*0.02;
+        addBox(onX?0.04:1.5,1.2,onX?1.5:0.04,hole,wx,1.6,wz,{cast:false,solid:false});
+        addBox(onX?0.14:1.8,0.12,onX?1.8:0.14,trim,wx-dx*0.05,0.98,wz-dz*0.05,{cast:false,solid:false});
+        for(let k=0;k<4;k++){ const off=-0.54+k*0.36, b=addBox(0.05,1.2,0.05,iron,wx-dx*0.06+(onX?0:off),1.6,wz-dz*0.06+(onX?off:0),{cast:false,solid:false});
+          if(k===1||k===2){ const bend=(k===1?-1:1)*0.35; if(onX) b.rotation.x=bend; else b.rotation.z=bend; } }
+      }
+    } }
+
+  /* the lighthouse on the east point */
+  const beam=new THREE.Group();
+  { const lx=46, lz=-6;
+    const tw=new THREE.Mesh(new THREE.CylinderGeometry(1.5,2.3,18,16),lam(0xd8d4c8)); tw.position.set(lx,9,lz); tw.castShadow=true; world.add(tw); solids.push(tw);
+    const band=new THREE.Mesh(new THREE.CylinderGeometry(1.78,1.9,1.6,16),lam(0x8a2a22)); band.position.set(lx,12,lz); world.add(band);
+    const gal=new THREE.Mesh(new THREE.CylinderGeometry(2.4,2.4,0.3,16),iron); gal.position.set(lx,18.15,lz); world.add(gal);
+    const lamp=new THREE.Mesh(new THREE.CylinderGeometry(1.2,1.2,2,12),new THREE.MeshBasicMaterial({color:0xfff0b0})); lamp.position.set(lx,19.3,lz); world.add(lamp);
+    const rf=new THREE.Mesh(new THREE.ConeGeometry(1.6,1.6,12),lam(0x2a2a2a)); rf.position.set(lx,21.1,lz); world.add(rf);
+    addBox(4,3,5,lam(0xb8b0a0),lx+3.5,1.5,lz-6,{collide:true}); { const r=addBox(4.6,0.3,5.6,roofM,lx+3.5,3.3,lz-6); r.rotation.z=0.12; }
+    beam.position.set(lx,19.3,lz); world.add(beam);
+    const bm=new THREE.MeshBasicMaterial({color:0xfff2c0,transparent:true,opacity:0.1,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,fog:false});
+    for(const s of [-1,1]){ const c=new THREE.Mesh(new THREE.CylinderGeometry(0.4,5,60,16,1,true),bm); c.rotation.z=s*Math.PI/2; c.position.x=s*30; beam.add(c); } }
+
+  /* rocks and dead trees on the island, rocks along the shore */
+  { const rg=new THREE.DodecahedronGeometry(1,0); let placed=0, tries=0;
+    while(placed<46&&tries<3000){ tries++; const x=rand(-60,60), z=rand(-64,14);
+      if(x>-37&&x<37&&z>-37) continue; if(Math.hypot(x-48,z+9)<8) continue;
+      const s=rand(0.6,2.2), m=new THREE.Mesh(rg,Math.random()<0.5?rock:rockD); m.scale.set(s*rand(0.8,1.4),s*rand(0.5,0.9),s*rand(0.8,1.4)); m.position.set(x,s*0.25,z); m.rotation.set(rand(0,3),rand(0,3),rand(0,3));
+      m.castShadow=m.receiveShadow=true; world.add(m); solids.push(m); placed++; }
+    for(let i=0;i<16;i++){ const sx=i%2?1:-1, x=sx*rand(13,38), z=rand(33,39), s=rand(0.8,2), m=new THREE.Mesh(rg,rockD); m.scale.set(s*1.3,s*0.7,s); m.position.set(x,-1.1,z); m.rotation.set(rand(0,3),rand(0,3),rand(0,3)); world.add(m); }
+    const bark=lam(0x2e2620), tg=new THREE.CylinderGeometry(0.12,0.3,1,6); let trees=0; tries=0;
+    while(trees<10&&tries<500){ tries++; const x=rand(-58,58), z=rand(-62,10); if(x>-40&&x<40&&z>-40) continue; if(Math.hypot(x-48,z+9)<9) continue;
+      const h=rand(4,7), t=new THREE.Mesh(tg,bark); t.scale.set(1,h,1); t.position.set(x,h/2,z); t.rotation.z=rand(-0.15,0.15); t.castShadow=true; world.add(t); solids.push(t);
+      for(let k=0;k<3;k++){ const b=new THREE.Mesh(tg,bark), bl=rand(1.4,2.6); b.scale.set(0.5,bl,0.5); const a=rand(0,6.283), y=h*rand(0.55,0.9);
+        b.position.set(x+Math.cos(a)*bl*0.4,y+bl*0.3,z+Math.sin(a)*bl*0.4); b.rotation.set(Math.sin(a)*0.9,0,-Math.cos(a)*0.9); world.add(b); }
+      trees++; } }
+
+  /* a long red bridge and city lights far across the bay */
+  { const bm=new THREE.MeshBasicMaterial({color:0x2c1612,fog:false}), bz=240, deckY=16, top=60, towers=[-70,60];
+    const add=(w,h,d,x,y,z)=>{ const m=new THREE.Mesh(bgeo(w,h,d),bm); m.position.set(x,y,z); world.add(m); return m; };
+    add(380,1.4,6,-10,deckY,bz);
+    for(const tx of towers){ for(const o of [-2.6,2.6]) add(2.6,top,2.6,tx,top/2-1.2,bz+o); for(const y of [deckY+10,deckY+26,top-4]) add(2.6,2,7.8,tx,y,bz); }
+    const cy=x=>{ if(x<towers[0]){ const t=(x+200)/(towers[0]+200); return deckY+2+(top-deckY-4)*t*t; } if(x>towers[1]){ const t=(170-x)/(170-towers[1]); return deckY+2+(top-deckY-4)*t*t; }
+      const m=(towers[0]+towers[1])/2, u=(x-m)/((towers[1]-towers[0])/2); return deckY+3+(top-deckY-5)*u*u; };
+    const lm=new THREE.LineBasicMaterial({color:0x5a2a20,fog:false}), sus=[];
+    for(const o of [-2.6,2.6]){ const pts=[]; for(let x=-200;x<=170;x+=5) pts.push(new THREE.Vector3(x,cy(x),bz+o)); world.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),lm));
+      for(let x=-195;x<170;x+=7.5){ if(Math.abs(x-towers[0])<2||Math.abs(x-towers[1])<2) continue; sus.push(new THREE.Vector3(x,deckY,bz+o),new THREE.Vector3(x,cy(x),bz+o)); } }
+    world.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(sus),lm));
+    const lp=[]; for(let x=-195;x<=170;x+=9) lp.push(x,deckY+1.2,bz-3.4);
+    const cm=new THREE.MeshBasicMaterial({color:0x101a1e,fog:false});
+    for(let i=0;i<24;i++){ const x=rand(-250,-150), z=rand(110,200), w=rand(6,14), h=rand(10,44); const m=new THREE.Mesh(bgeo(w,h,w),cm); m.position.set(x,h/2-1.2,z); world.add(m);
+      for(let k=0;k<9;k++) lp.push(x+w/2+0.3,rand(1,h-2),z+rand(-w/2,w/2)); }
+    const lg=new THREE.BufferGeometry(); lg.setAttribute('position',new THREE.Float32BufferAttribute(lp,3));
+    world.add(new THREE.Points(lg,new THREE.PointsMaterial({color:0xffc070,size:2.5,sizeAttenuation:false,fog:false})));
+    P.beacons=towers.map(tx=>{ const b=new THREE.Mesh(new THREE.SphereGeometry(0.8,8,6),new THREE.MeshBasicMaterial({color:0xff3020,fog:false})); b.position.set(tx,top,bz); world.add(b); return b; }); }
+
+  /* rain that follows the camera */
+  { const n=isTouch?450:1000, a=new Float32Array(n*6);
+    for(let i=0;i<n;i++){ const x=rand(-30,30), y=rand(0,28), z=rand(-30,30); a.set([x,y,z,x+0.04,y+0.7,z+0.02],i*6); }
+    const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(a,3));
+    P.rain=new THREE.LineSegments(g,new THREE.LineBasicMaterial({color:0xa8c0cc,transparent:true,opacity:0.38,depthWrite:false})); P.rain.frustumCulled=false; world.add(P.rain); }
+
+  P.tick=dt=>{ const t=performance.now()/1000;
+    waterTex.offset.set((t*0.01)%1,(t*0.018)%1);
+    beam.rotation.y+=dt*0.55; search.rotation.y=Math.sin(t*0.35)*0.53+0.78;
+    boat.position.y=-0.55+Math.sin(t*0.9)*0.08; boat.rotation.z=Math.sin(t*0.7)*0.03; boat.rotation.x=Math.sin(t*0.5)*0.015;
+    const blink=(t%2)<0.25; buoys[0].visible=blink; buoys[1].visible=((t+1)%2)<0.25; for(const b of P.beacons) b.visible=(t%1.6)<0.8;
+    citLight.intensity=Math.random()<0.03?0.3:1.2;
+    const ra=P.rain.geometry.attributes.position, a=ra.array;
+    for(let i=1;i<a.length;i+=6){ a[i]-=dt*16; a[i+3]-=dt*16; if(a[i]<0){ a[i]+=28; a[i+3]+=28; } }
+    ra.needsUpdate=true; P.rain.position.set(camera.position.x,0,camera.position.z);
+    const zi=zoneAt(camera.position.x,camera.position.z); P.rain.visible=!(zi>=0&&P.zones[zi].roof);
+    updateDoors(dt); };
+}
+{ const P=MAPS.prison; P.portals.forEach(Q=>{ Q.ai=zoneOf(P,Q.a); Q.bi=zoneOf(P,Q.b); }); P.spawns.forEach(s=>s.zi=zoneOf(P,s.zone)); P.zoneStart=zoneOf(P,'cell'); }
+endMap('prison');
 
 function selectMap(id){
   const m=MAPS[id]||MAPS.station; curMap=m;
@@ -1656,8 +1992,11 @@ function resolveCircle(p,r){
     if(d2>r*r) continue;
     hit=true; lastHit=c;
     if(d2>1e-8){ const d=Math.sqrt(d2), push=r-d; p.x+=dx/d*push; p.z+=dz/d*push; }
-    else{ const l=p.x-c.minX, rr=c.maxX-p.x, t=p.z-c.minZ, b=c.maxZ-p.z, m=Math.min(l,rr,t,b);
-      if(m===l) p.x=c.minX-r; else if(m===rr) p.x=c.maxX+r; else if(m===t) p.z=c.minZ-r; else p.z=c.maxZ+r; }
+    else{ /* centre buried inside the box (crowds can shove a zombie deep into a perk machine): leave by the nearest side that stays in
+         the open map, ideally clear of other boxes too, so it is not pushed out through the wall at its back */
+      const ex=[[p.x-c.minX,c.minX-r,p.z],[c.maxX-p.x,c.maxX+r,p.z],[p.z-c.minZ,p.x,c.minZ-r],[c.maxZ-p.z,p.x,c.maxZ+r]].sort((u,v)=>u[0]-v[0]);
+      const free=([,x,z])=>!colliders.some(o=>o!==c&&x>o.minX&&x<o.maxX&&z>o.minZ&&z<o.maxZ), inMap=([,x,z])=>{ if(!curMap||!curMap.zones) return true; const zi=zoneAt(x,z); return zi>=0&&curMap.zones[zi].open; };
+      const e=ex.find(q=>free(q)&&inMap(q))||ex.find(inMap)||ex.find(free)||ex[0]; p.x=e[1]; p.z=e[2]; }
   }
   return hit;
 }
@@ -2458,7 +2797,7 @@ function usePrompt(u){
   const key=isTouch?`Tap ${useLabel(u)}`:'Press F', poor=n=>`You need $${(n-cash).toLocaleString()} more`;
   const swapNote=()=>inv.indexOf(null)>=0?'Goes in your empty slot':`Replaces your ${W(inv[cur]).name}`;
   const say=(cls,a,b)=>{ el.papPrompt.className=cls; setT('papTxt',a); setT('papSub',b); };
-  if(u.kind==='door'){ const D=u.door; say(cash<D.price?'poor':'',`${key} to ${D.type==='metal'?'open the door':'clear the debris'} for $${D.price.toLocaleString()}`,cash<D.price?poor(D.price):`Opens ${D.label}`); return; }
+  if(u.kind==='door'){ const D=u.door; say(cash<D.price?'poor':'',`${key} to ${D.type==='debris'?'clear the debris':(D.type==='bars'?'open the gate':'open the door')} for $${D.price.toLocaleString()}`,cash<D.price?poor(D.price):`Opens ${D.label}`); return; }
   if(u.kind==='box'){
     if(box.st==='spin') say('','The Mystery Crate is choosing...','');
     else if(box.st==='offer'){ const w=WEAPONS[box.pick]; say('',`${key} to take the ${w.name}`,`${ownsGun(box.pick)>=0?'You have it, so this refills it':swapNote()}. ${Math.max(0,Math.ceil(BOX_OFFER-box.t))}s left`); }
