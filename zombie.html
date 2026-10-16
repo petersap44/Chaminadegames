@@ -192,7 +192,7 @@
   .item .sbtn:hover:not(:disabled){background:#33363a;color:var(--led)}
   .item .sbtn:disabled{border-color:rgba(0,0,0,.2);color:rgba(0,0,0,.5)}
   .item .sbtn:focus-visible{outline-color:var(--canopy)}
-  .shopFoot{position:sticky;bottom:0;display:flex;justify-content:flex-end;padding:18px 0 6px;margin-top:10px;
+  .shopFoot{position:sticky;bottom:0;display:flex;justify-content:flex-end;flex-wrap:wrap;gap:12px;padding:18px 0 6px;margin-top:10px;
     background:linear-gradient(transparent,rgba(10,12,14,.95) 40%)}
   .dlg{position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:8;padding:24px}
   .dlgCard{background:#1b1d20;border:2px solid var(--sodium);border-radius:6px;padding:22px;max-width:440px;width:100%}
@@ -356,7 +356,7 @@
     <div class="slots" id="slots"></div>
     <h3>Behind the counter</h3>
     <div class="board" id="board"></div>
-    <div class="shopFoot"><button class="btn" id="nextWaveBtn">Start next wave</button></div>
+    <div class="shopFoot"><button class="btn alt" id="shopMenuBtn">Main menu</button><button class="btn" id="nextWaveBtn">Start next wave</button></div>
   </div>
   <div id="codeDlg" class="dlg" hidden>
     <div class="dlgCard" role="dialog" aria-modal="true" aria-labelledby="codeLbl">
@@ -377,7 +377,8 @@
   <div class="card">
     <div class="sign small">Paused</div>
     <p class="tag">The zombies are waiting politely.</p>
-    <div class="btnRow"><button class="btn" id="resumeBtn">Resume</button><a class="btn alt" href="index.html" style="text-decoration:none;display:inline-block">&#9664; All Chaminade games</a></div>
+    <div class="btnRow"><button class="btn" id="resumeBtn">Resume</button><button class="btn alt" id="pauseMenuBtn">Main menu</button><a class="btn alt" href="index.html" style="text-decoration:none;display:inline-block">&#9664; All Chaminade games</a></div>
+    <p class="best" id="pauseNote"></p>
   </div>
 </section>
 
@@ -385,7 +386,7 @@
   <div class="card">
     <div class="sign small">Overrun</div>
     <div class="stats" id="overStats"></div>
-    <div class="btnRow"><button class="btn" id="againBtn">Play again</button><a class="btn alt" href="index.html" style="text-decoration:none;display:inline-block">&#9664; All Chaminade games</a></div>
+    <div class="btnRow"><button class="btn" id="againBtn">Play again</button><button class="btn alt" id="overMenuBtn">Main menu</button><a class="btn alt" href="index.html" style="text-decoration:none;display:inline-block">&#9664; All Chaminade games</a></div>
     <p class="best" id="overBest"></p>
   </div>
 </section>
@@ -3178,7 +3179,8 @@ function startGame(){
 }
 function pause(){
   if(state!=='playing') return;
-  state='paused'; mouseDown=false; scopeEl.hidden=true; reticleEl.hidden=true; reticleEl.dataset.k=''; $('pauseScreen').hidden=false; document.body.classList.remove('playing'); $('touchUI').hidden=true;
+  state='paused'; mouseDown=false; scopeEl.hidden=true; reticleEl.hidden=true; reticleEl.dataset.k=''; $('pauseScreen').hidden=false;
+  const sv=loadRun(); $('pauseNote').textContent=sv?`Main menu keeps your run. Continue picks up after wave ${sv.wave}.`:'Your run saves once you clear a wave. Main menu now ends this run.'; document.body.classList.remove('playing'); $('touchUI').hidden=true;
   if(document.pointerLockElement) document.exitPointerLock();
 }
 function resume(){
@@ -3210,6 +3212,19 @@ $('againBtn').addEventListener('click',startGame);
 document.querySelectorAll('.mapBtn').forEach(b=>b.addEventListener('click',()=>{ if(state==='title') selectMap(b.dataset.map); }));
 document.querySelectorAll('.diffBtn').forEach(b=>b.addEventListener('click',()=>{ if(state==='title') selectDiff(b.dataset.diff); }));
 $('resumeBtn').addEventListener('click',resume);
+function toMenu(){
+  if(state==='shop'){ swapDlg.hidden=true; codeDlg.hidden=true; pendingBuy=null; saveRun(); }
+  state='title'; titleT=0; wave=0; mouseDown=false; ads=false; adsT=0; reloading=false; papT=0; papSlot=null; spinT=0; cheat=false;
+  if(document.pointerLockElement) document.exitPointerLock();
+  clearWorld(); scopeEl.hidden=true; reticleEl.hidden=true; reticleEl.dataset.k=''; $('banner').classList.remove('show');
+  for(const id in guns) guns[id].g.visible=false;
+  camera.fov=75; camera.updateProjectionMatrix();
+  $('pauseScreen').hidden=true; $('overScreen').hidden=true; shopEl.hidden=true; setPlayingUI(false);
+  selectMap(curMap.id); titleCrowd(); refreshTitle(); $('titleScreen').hidden=false; $('titleScreen').scrollTop=0;
+  try{ $('startBtn').focus({preventScroll:true}); }catch(e){}
+}
+$('pauseMenuBtn').addEventListener('click',toMenu);
+$('overMenuBtn').addEventListener('click',toMenu);
 document.addEventListener('visibilitychange',()=>{ if(document.hidden) pause(); });
 
 /* shop */
@@ -3294,6 +3309,7 @@ shopEl.addEventListener('click',e=>{
   else if(t.dataset.heal){ if(cash>=HEAL_PRICE&&player.hp<player.maxHp){ cash-=HEAL_PRICE; player.hp=player.maxHp; sfx.buy(); renderShop(); } }
 });
 $('nextWaveBtn').addEventListener('click',closeShop);
+$('shopMenuBtn').addEventListener('click',toMenu);
 addEventListener('keydown',e=>{ if(state==='shop'&&e.code==='Escape'&&!swapDlg.hidden){ pendingBuy=null; swapDlg.hidden=true; } });
 /* tester code */
 const CHEAT_HASH='5781258a', CHEAT_LEN=8, CHEAT_CASH=9999999;
@@ -3397,7 +3413,8 @@ tap('tPap',interact);
 
 /* title ambience */
 { let m0='station'; try{ m0=localStorage.getItem('laststop-map')||'station'; }catch(e){} selectMap(MAPS[m0]?m0:'station'); selectDiff(diffId); }
-for(let i=0;i<8;i++){ const [x,z]=spawnPoint(18,48); makeZombie(i%3===0?'runner':(i%4===1?'brute':'walker'),x,z); }
+function titleCrowd(){ for(let i=0;i<8;i++){ const [x,z]=spawnPoint(18,48); makeZombie(i%3===0?'runner':(i%4===1?'brute':'walker'),x,z); } }
+titleCrowd();
 
 /* loop */
 const clock=new THREE.Clock();
