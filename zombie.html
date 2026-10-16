@@ -199,6 +199,21 @@
   .dlgCard p{font-size:22px;font-weight:600;margin:0 0 16px;line-height:1.3}
   .dlgBtns{display:grid;gap:10px}
   .dlgBtns .sbtn{margin:0;width:100%;align-self:stretch;font-size:19px;padding:10px 14px}
+  #keysDlg{z-index:9}
+  .keysCard{max-width:560px;max-height:calc(100vh - 48px);overflow-y:auto}
+  .dlgCard p.keysHint{font-size:16px;font-weight:400;color:var(--dim);min-height:2.6em;margin-bottom:12px}
+  .keyGrid{display:grid;grid-template-columns:1fr auto auto;gap:6px 10px;align-items:center;font-size:18px}
+  .kbtn{min-width:118px;font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-weight:700;font-size:17px;background:#24272b;color:var(--led);
+    border:2px solid rgba(255,255,255,.22);border-radius:3px;padding:5px 10px;cursor:pointer}
+  .kbtn:hover{border-color:var(--sodium)}
+  .kbtn:focus-visible{outline:3px solid var(--paper);outline-offset:2px}
+  .kbtn.empty{color:var(--dim)}
+  .kbtn.listen{border-color:var(--sodium);color:var(--paper);background:rgba(244,165,43,.18)}
+  .keysFoot{display:flex;justify-content:space-between;gap:10px;margin-top:18px;position:sticky;bottom:-22px;background:#1b1d20;padding:12px 0 22px;margin-bottom:-22px}
+  #keyList{grid-template-columns:fit-content(46%) 1fr}
+  .keysFoot .sbtn{margin:0}
+  #keysBtn{margin-top:12px}
+  @media (max-width:640px){ .kbtn{min-width:92px} }
   @media (max-width:760px){
     .item{grid-template-columns:1fr auto;gap:10px 14px}
     .stats3{grid-column:1 / -1;order:3}
@@ -241,6 +256,14 @@
 <div id="game"></div>
 <div id="scope" hidden></div>
 <div id="reticle" hidden></div>
+<div id="keysDlg" class="dlg" hidden>
+  <div class="dlgCard keysCard" role="dialog" aria-modal="true" aria-labelledby="keysTitle">
+    <p id="keysTitle">Controls</p>
+    <p class="keysHint" id="keysHint" aria-live="polite"></p>
+    <div class="keyGrid" id="keyGrid"></div>
+    <div class="keysFoot"><button class="sbtn ghost" id="keysReset">Reset to defaults</button><button class="sbtn" id="keysDone">Done</button></div>
+  </div>
+</div>
 <div id="vignette"></div>
 
 <div class="hud" id="hud" hidden>
@@ -302,19 +325,8 @@
     <div class="cols">
       <div>
         <h3>Controls</h3>
-        <dl class="keys desk-only">
-          <dt><kbd>WASD</kbd></dt><dd>Move</dd>
-          <dt><kbd>Mouse</kbd></dt><dd>Look</dd>
-          <dt><kbd>Left click</kbd></dt><dd>Shoot</dd>
-          <dt><kbd>Right click</kbd> or <kbd>E</kbd></dt><dd>Aim down sights (hold)</dd>
-          <dt><kbd>R</kbd></dt><dd>Reload</dd>
-          <dt><kbd>1</kbd> <kbd>2</kbd></dt><dd>Switch weapons</dd>
-          <dt><kbd>Shift</kbd></dt><dd>Sprint</dd>
-          <dt><kbd>Space</kbd></dt><dd>Jump</dd>
-          <dt><kbd>G</kbd></dt><dd>Throw grenade</dd>
-          <dt><kbd>F</kbd></dt><dd>Use Pump-a-Punch, perks, ammo crates, armor and the Mystery Crate</dd>
-          <dt><kbd>Esc</kbd></dt><dd>Pause</dd>
-        </dl>
+        <dl class="keys desk-only" id="keyList"></dl>
+        <button class="sbtn desk-only" id="keysBtn">Change controls</button>
         <dl class="keys touch-only">
           <dt><kbd>Left stick</kbd></dt><dd>Move, push fully to sprint</dd>
           <dt><kbd>Drag</kbd></dt><dd>Look around</dd>
@@ -377,7 +389,7 @@
   <div class="card">
     <div class="sign small">Paused</div>
     <p class="tag">The zombies are waiting politely.</p>
-    <div class="btnRow"><button class="btn" id="resumeBtn">Resume</button><button class="btn alt" id="pauseMenuBtn">Main menu</button><a class="btn alt" href="index.html" style="text-decoration:none;display:inline-block">&#9664; All Chaminade games</a></div>
+    <div class="btnRow"><button class="btn" id="resumeBtn">Resume</button><button class="btn alt" id="pauseMenuBtn">Main menu</button><button class="btn alt desk-only" id="pauseKeysBtn">Controls</button><a class="btn alt" href="index.html" style="text-decoration:none;display:inline-block">&#9664; All Chaminade games</a></div>
     <p class="best" id="pauseNote"></p>
   </div>
 </section>
@@ -2731,6 +2743,36 @@ function updateWaves(dt){
 
 /* player */
 const keys={};
+/* key bindings: two slots per action, saved in this browser */
+const KEY_ACTIONS=[
+  ['fwd','Move forward',['KeyW','ArrowUp']],['back','Move back',['KeyS','ArrowDown']],
+  ['left','Move left',['KeyA','ArrowLeft']],['right','Move right',['KeyD','ArrowRight']],
+  ['sprint','Sprint',['ShiftLeft','ShiftRight']],['jump','Jump',['Space','']],
+  ['fire','Shoot',['Mouse0','']],['aim','Aim down sights (hold)',['Mouse2','KeyE']],
+  ['reload','Reload',['KeyR','']],['use','Use / buy',['KeyF','']],['nade','Throw grenade',['KeyG','']],
+  ['swap','Switch weapons',['KeyQ','']],['gun1','Weapon 1',['Digit1','']],['gun2','Weapon 2',['Digit2','']],
+  ['pause','Pause',['KeyP','']]];
+const KEYS_SAVE='laststop-keys';
+let binds={};
+function loadBinds(){
+  let sv=null; try{ sv=JSON.parse(localStorage.getItem(KEYS_SAVE)||'null'); }catch(e){}
+  binds={}; for(const [id,,def] of KEY_ACTIONS){ const b=sv&&Array.isArray(sv[id])?sv[id]:def; binds[id]=[0,1].map(i=>typeof b[i]==='string'?b[i]:''); }
+}
+function saveBinds(){ try{ localStorage.setItem(KEYS_SAVE,JSON.stringify(binds)); }catch(e){} }
+loadBinds();
+function actsFor(code){ const out=[]; if(code) for(const id in binds) if(binds[id].includes(code)) out.push(id); return out; }
+function held(id){ const b=binds[id]; return !!(b&&((b[0]&&keys[b[0]])||(b[1]&&keys[b[1]]))); }
+const KEY_NAMES={Mouse0:'Left click',Mouse1:'Middle click',Mouse2:'Right click',Mouse3:'Mouse 4',Mouse4:'Mouse 5',Space:'Space',ShiftLeft:'Left Shift',ShiftRight:'Right Shift',
+  ControlLeft:'Left Ctrl',ControlRight:'Right Ctrl',AltLeft:'Left Alt',AltRight:'Right Alt',MetaLeft:'Left Cmd',MetaRight:'Right Cmd',ArrowUp:'\u2191',ArrowDown:'\u2193',ArrowLeft:'\u2190',ArrowRight:'\u2192',
+  Enter:'Enter',Tab:'Tab',CapsLock:'Caps Lock',Backquote:'`',Minus:'-',Equal:'=',BracketLeft:'[',BracketRight:']',Backslash:'\\',Semicolon:';',Quote:"'",Comma:',',Period:'.',Slash:'/',ContextMenu:'Menu'};
+function keyName(c){
+  if(!c) return '';
+  if(KEY_NAMES[c]) return KEY_NAMES[c];
+  if(/^Key[A-Z]$/.test(c)) return c.slice(3);
+  if(/^Digit\d$/.test(c)) return c.slice(5);
+  if(/^Numpad/.test(c)) return 'Num '+c.slice(6);
+  return c.replace(/([a-z])([A-Z0-9])/g,'$1 $2');
+}
 const joy={x:0,y:0,active:false,id:null};
 let touchJump=false;
 function hurt(dmg){
@@ -2743,18 +2785,18 @@ function hurt(dmg){
 const lastOk=new THREE.Vector3(0,-1,0);
 function updatePlayer(dt){
   let ix=0, iz=0;
-  if(keys.KeyW||keys.ArrowUp) iz+=1; if(keys.KeyS||keys.ArrowDown) iz-=1;
-  if(keys.KeyA||keys.ArrowLeft) ix-=1; if(keys.KeyD||keys.ArrowRight) ix+=1;
+  if(held('fwd')) iz+=1; if(held('back')) iz-=1;
+  if(held('left')) ix-=1; if(held('right')) ix+=1;
   ix+=joy.x; iz-=joy.y;
   const mag=Math.hypot(ix,iz); if(mag>1){ ix/=mag; iz/=mag; }
-  const sprint=(keys.ShiftLeft||keys.ShiftRight||(joy.active&&Math.hypot(joy.x,joy.y)>0.95))&&iz>0.3&&!ads;
+  const sprint=(held('sprint')||(joy.active&&Math.hypot(joy.x,joy.y)>0.95))&&iz>0.3&&!ads;
   const spd=(sprint?9.2:5.8)*(ads?0.6:1)*(W(inv[cur]).heavy||1)*(hasPerk('road')?1.15:1);
   const fx=-Math.sin(yaw), fz=-Math.cos(yaw), rx=Math.cos(yaw), rz=-Math.sin(yaw);
   const vx=(fx*iz+rx*ix)*spd, vz=(fz*iz+rz*ix)*spd;
   { const stX=(vx+player.kb.x)*dt, stZ=(vz+player.kb.z)*dt, n=Math.max(1,Math.ceil(Math.hypot(stX,stZ)/0.25));
     for(let i=0;i<n;i++){ player.pos.x+=stX/n; player.pos.z+=stZ/n; resolveCircle(player.pos,0.4); } }
   player.kb.multiplyScalar(Math.max(0,1-dt*5));
-  if((keys.Space||touchJump)&&player.onGround){ player.vy=hasPerk('road')?8:6.5; player.onGround=false; }
+  if((held('jump')||touchJump)&&player.onGround){ player.vy=hasPerk('road')?8:6.5; player.onGround=false; }
   touchJump=false;
   player.vy-=18*dt; player.pos.y+=player.vy*dt;
   if(player.vy>0&&curMap.ceils) for(const c of curMap.ceils) if(player.pos.x>c[0]&&player.pos.x<c[1]&&player.pos.z>c[2]&&player.pos.z<c[3]&&player.pos.y>c[4]){ player.pos.y=c[4]; player.vy=0; }
@@ -3213,6 +3255,76 @@ $('againBtn').addEventListener('click',startGame);
 document.querySelectorAll('.mapBtn').forEach(b=>b.addEventListener('click',()=>{ if(state==='title') selectMap(b.dataset.map); }));
 document.querySelectorAll('.diffBtn').forEach(b=>b.addEventListener('click',()=>{ if(state==='title') selectDiff(b.dataset.diff); }));
 $('resumeBtn').addEventListener('click',resume);
+
+/* controls: the title list and the rebinding dialog */
+const keysDlg=$('keysDlg'); let keyListen=null, keysOpener=null, keyBoundAt=0;
+function bindLabel(b){
+  const c=b.filter(Boolean), m=c.length===2&&c[0].replace(/Left|Right/,'')===c[1].replace(/Left|Right/,'')&&c[0]!==c[1]&&/Left|Right/.test(c[0])&&/^(Shift|Control|Alt|Meta)/.test(c[0]);
+  if(m) return `<kbd>${keyName(c[0]).replace(/^(Left|Right) /,'')}</kbd>`;  /* Left + Right Shift reads as Shift */
+  return c.map(x=>`<kbd>${keyName(x)}</kbd>`).join(' or ');
+}
+function renderKeyList(){
+  const pri=id=>keyName(binds[id][0]||binds[id][1])||'?';
+  const mv=['fwd','left','back','right'].map(pri);
+  let h=`<dt><kbd>${mv.every(k=>k.length===1)?mv.join(''):mv.join(' ')}</kbd></dt><dd>Move</dd><dt><kbd>Mouse</kbd></dt><dd>Look</dd>`;
+  const row=(id,txt)=>{ const l=bindLabel(binds[id]); return `<dt>${l||'<kbd>none</kbd>'}</dt><dd>${txt}</dd>`; };
+  h+=row('fire','Shoot')+row('aim','Aim down sights (hold)')+row('reload','Reload');
+  const first=id=>binds[id][0]||binds[id][1], sw=[first('gun1'),first('gun2')].filter(Boolean).map(c=>`<kbd>${keyName(c)}</kbd>`);
+  if(first('swap')) sw.push(`${sw.length?'or ':''}<kbd>${keyName(first('swap'))}</kbd>`);
+  h+=`<dt>${sw.join(' ')||'<kbd>Mouse wheel</kbd>'}</dt><dd>Switch weapons</dd>`;
+  h+=row('sprint','Sprint')+row('jump','Jump')+row('nade','Throw grenade')+row('use','Use Pump-a-Punch, perks, ammo crates, armor and the Mystery Crate');
+  h+=`<dt>${binds.pause.filter(Boolean).map(c=>`<kbd>${keyName(c)}</kbd> or `).join('')}<kbd>Esc</kbd></dt><dd>Pause</dd>`;
+  $('keyList').innerHTML=h;
+}
+const KEYS_HINT='Click a box, then press a key. For a mouse button, click the box with that button. Backspace clears a box.';
+function renderKeyGrid(){
+  let h='';
+  for(const [id,label] of KEY_ACTIONS){
+    h+=`<div>${label}</div>`;
+    for(const i of [0,1]){ const c=binds[id][i], on=keyListen&&keyListen.id===id&&keyListen.slot===i;
+      h+=`<button class="kbtn${on?' listen':c?'':' empty'}" data-act="${id}" data-slot="${i}" aria-label="${label}, ${i?'second':'main'} key: ${on?'press a key':c?keyName(c):'none'}">${on?'Press a key':c?keyName(c):'None'}</button>`; }
+  }
+  $('keyGrid').innerHTML=h;
+}
+function openKeys(from){ keysOpener=from||null; keyListen=null; $('keysHint').textContent=KEYS_HINT; renderKeyGrid(); keysDlg.hidden=false; keysDlg.querySelector('.keysCard').scrollTop=0; try{ $('keysDone').focus({preventScroll:true}); }catch(e){} }
+function closeKeys(){ keyListen=null; keysDlg.hidden=true; renderKeyList(); for(const k in keys) keys[k]=false; if(keysOpener) try{ keysOpener.focus({preventScroll:true}); }catch(e){} }
+function setBind(code){
+  const {id,slot}=keyListen; keyListen=null; let note='';
+  if(code){
+    for(const [o,lab] of KEY_ACTIONS) for(const i of [0,1]) if(binds[o][i]===code&&!(o===id&&i===slot)){ binds[o][i]=''; if(o!==id) note=` It was taken off ${lab}.`; }
+  }
+  binds[id][slot]=code; saveBinds(); renderKeyGrid();
+  const lab=KEY_ACTIONS.find(a=>a[0]===id)[1];
+  $('keysHint').textContent=code?`${lab} is now ${keyName(code)}.${note}`:`Cleared that box for ${lab}.`;
+  const b=$('keyGrid').querySelector(`[data-act="${id}"][data-slot="${slot}"]`); if(b) try{ b.focus({preventScroll:true}); }catch(e){}
+}
+$('keyGrid').addEventListener('click',e=>{
+  const b=e.target.closest('.kbtn'); if(!b||performance.now()-keyBoundAt<400) return;
+  if(keyListen&&keyListen.id===b.dataset.act&&keyListen.slot===+b.dataset.slot&&e.detail>0) return;
+  keyListen={id:b.dataset.act,slot:+b.dataset.slot}; $('keysHint').textContent=KEYS_HINT; renderKeyGrid();
+  const nb=$('keyGrid').querySelector(`[data-act="${keyListen.id}"][data-slot="${keyListen.slot}"]`); if(nb) try{ nb.focus({preventScroll:true}); }catch(e){}
+});
+/* while listening, the next key or a mouse button pressed on that box becomes the binding */
+addEventListener('keydown',e=>{
+  if(keysDlg.hidden) return;
+  if(!keyListen){ if(e.code==='Escape'){ e.preventDefault(); e.stopImmediatePropagation(); closeKeys(); } return; }
+  e.preventDefault(); e.stopImmediatePropagation();
+  if(e.repeat) return;
+  if(e.code==='Escape'){ keyListen=null; $('keysHint').textContent=KEYS_HINT; renderKeyGrid(); return; }
+  setBind(e.code==='Backspace'||e.code==='Delete'?'':e.code);
+},true);
+keysDlg.addEventListener('mousedown',e=>{
+  if(!keyListen) return;
+  const b=e.target.closest('.kbtn');
+  if(b&&b.dataset.act===keyListen.id&&+b.dataset.slot===keyListen.slot){ e.preventDefault(); keyBoundAt=performance.now(); setBind('Mouse'+e.button); }
+  else{ keyListen=null; renderKeyGrid(); }
+});
+keysDlg.addEventListener('auxclick',e=>e.preventDefault());
+$('keysReset').addEventListener('click',()=>{ for(const [id,,def] of KEY_ACTIONS) binds[id]=def.slice(); saveBinds(); keyListen=null; renderKeyGrid(); $('keysHint').textContent='All controls are back to the defaults.'; });
+$('keysDone').addEventListener('click',closeKeys);
+$('keysBtn').addEventListener('click',()=>openKeys($('keysBtn')));
+$('pauseKeysBtn').addEventListener('click',()=>openKeys($('pauseKeysBtn')));
+renderKeyList();
 function toMenu(){
   if(state==='shop'){ swapDlg.hidden=true; codeDlg.hidden=true; pendingBuy=null; saveRun(); }
   else if(state==='paused'&&phase==='shopwait'){ if(papT>0) finishPap(); saveRun(); }  /* wave cleared, counter not open yet */
@@ -3338,29 +3450,41 @@ addEventListener('keydown',e=>{
 });
 
 /* input */
+function pressActs(acts,rep){
+  for(const a of acts){
+    if(state!=='playing') return;
+    if(a==='fire'){ mouseDown=true; if(!rep) fire(); }
+    else if(a==='aim') ads=true;
+    else if(rep) continue;
+    else if(a==='reload') startReload();
+    else if(a==='gun1') swapWeapon(0);
+    else if(a==='gun2') swapWeapon(1);
+    else if(a==='swap') swapWeapon();
+    else if(a==='nade') throwNade();
+    else if(a==='use') interact();
+    else if(a==='pause') pause();
+  }
+}
+function releaseActs(acts){ for(const a of acts){ if(a==='fire') mouseDown=held('fire'); else if(a==='aim') ads=held('aim'); } }
 addEventListener('keydown',e=>{
-  if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)&&state==='playing') e.preventDefault();
+  if(!keysDlg.hidden) return;
+  const acts=actsFor(e.code);
+  if(state==='playing'&&(acts.length||['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))) e.preventDefault();
   keys[e.code]=true;
   if(state==='playing'){
-    if(e.code==='KeyR') startReload();
-    if(e.code==='Digit1') swapWeapon(0);
-    if(e.code==='Digit2') swapWeapon(1);
-    if(e.code==='KeyQ') swapWeapon();
-    if(e.code==='KeyG') throwNade();
-    if(e.code==='KeyF'&&!e.repeat) interact();
-    if(e.code==='KeyE') ads=true;
-    if(e.code==='KeyP'||(e.code==='Escape'&&(freeLook||isTouch))) pause();
+    pressActs(acts,e.repeat);
+    if(e.code==='Escape'&&(freeLook||isTouch)) pause();
   }
 });
-addEventListener('keyup',e=>{ keys[e.code]=false; if(e.code==='KeyE') ads=false; });
-addEventListener('blur',()=>{ for(const k in keys) keys[k]=false; mouseDown=false; });
+addEventListener('keyup',e=>{ keys[e.code]=false; releaseActs(actsFor(e.code)); });
+addEventListener('blur',()=>{ for(const k in keys) keys[k]=false; mouseDown=false; ads=false; });
 document.addEventListener('mousedown',e=>{
   if(state!=='playing'||isTouch) return;
+  if(e.button>2) e.preventDefault();
   if(!locked&&!freeLook){ requestLock(); return; }
-  if(e.button===0){ mouseDown=true; fire(); }
-  if(e.button===2) ads=true;
+  const c='Mouse'+e.button; keys[c]=true; pressActs(actsFor(c),false);
 });
-document.addEventListener('mouseup',e=>{ if(e.button===0) mouseDown=false; if(e.button===2) ads=false; });
+document.addEventListener('mouseup',e=>{ if(e.button>2&&state==='playing') e.preventDefault(); const c='Mouse'+e.button; keys[c]=false; releaseActs(actsFor(c)); });
 document.addEventListener('contextmenu',e=>e.preventDefault());
 document.addEventListener('mousemove',e=>{
   if(state!=='playing'||isTouch||!(locked||freeLook)) return;
