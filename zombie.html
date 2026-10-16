@@ -200,7 +200,7 @@
   .dlgBtns{display:grid;gap:10px}
   .dlgBtns .sbtn{margin:0;width:100%;align-self:stretch;font-size:19px;padding:10px 14px}
   #keysDlg{z-index:9}
-  .keysCard{max-width:560px;max-height:calc(100vh - 48px);overflow-y:auto}
+  .keysCard{max-width:560px;max-height:calc(100vh - 48px);overflow-y:auto;scroll-padding-bottom:84px}
   .dlgCard p.keysHint{font-size:16px;font-weight:400;color:var(--dim);min-height:2.6em;margin-bottom:12px}
   .keyGrid{display:grid;grid-template-columns:1fr auto auto;gap:6px 10px;align-items:center;font-size:18px}
   .kbtn{min-width:118px;font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-weight:700;font-size:17px;background:#24272b;color:var(--led);
@@ -211,6 +211,7 @@
   .kbtn.listen{border-color:var(--sodium);color:var(--paper);background:rgba(244,165,43,.18)}
   .keysFoot{display:flex;justify-content:space-between;gap:10px;margin-top:18px;position:sticky;bottom:-22px;background:#1b1d20;padding:12px 0 22px;margin-bottom:-22px}
   #keyList{grid-template-columns:fit-content(46%) 1fr}
+  @media (max-width:420px){ .keyGrid{grid-template-columns:1fr 1fr} .keyGrid>div{grid-column:1/-1;margin-top:4px} .kbtn{min-width:0} }
   .keysFoot .sbtn{margin:0}
   #keysBtn{margin-top:12px}
   @media (max-width:640px){ .kbtn{min-width:92px} }
@@ -2765,10 +2766,17 @@ function held(id){ const b=binds[id]; return !!(b&&((b[0]&&keys[b[0]])||(b[1]&&k
 const KEY_NAMES={Mouse0:'Left click',Mouse1:'Middle click',Mouse2:'Right click',Mouse3:'Mouse 4',Mouse4:'Mouse 5',Space:'Space',ShiftLeft:'Left Shift',ShiftRight:'Right Shift',
   ControlLeft:'Left Ctrl',ControlRight:'Right Ctrl',AltLeft:'Left Alt',AltRight:'Right Alt',MetaLeft:'Left Cmd',MetaRight:'Right Cmd',ArrowUp:'\u2191',ArrowDown:'\u2193',ArrowLeft:'\u2190',ArrowRight:'\u2192',
   Enter:'Enter',Tab:'Tab',CapsLock:'Caps Lock',Backquote:'`',Minus:'-',Equal:'=',BracketLeft:'[',BracketRight:']',Backslash:'\\',Semicolon:';',Quote:"'",Comma:',',Period:'.',Slash:'/',ContextMenu:'Menu'};
+const NAMES_SAVE='laststop-keynames';
+let keyLabels={}; try{ keyLabels=JSON.parse(localStorage.getItem(NAMES_SAVE)||'{}')||{}; }catch(e){}
+function setLabel(code,ch){
+  const u=(ch||'').toUpperCase();
+  if(!/^Key[A-Z]$/.test(code)||!/^\p{L}$/u.test(u)||keyLabels[code]===u) return false;
+  keyLabels[code]=u; try{ localStorage.setItem(NAMES_SAVE,JSON.stringify(keyLabels)); }catch(e){} return true;
+}
 function keyName(c){
   if(!c) return '';
   if(KEY_NAMES[c]) return KEY_NAMES[c];
-  if(/^Key[A-Z]$/.test(c)) return c.slice(3);
+  if(/^Key[A-Z]$/.test(c)) return keyLabels[c]||c.slice(3);
   if(/^Digit\d$/.test(c)) return c.slice(5);
   if(/^Numpad/.test(c)) return 'Num '+c.slice(6);
   return c.replace(/([a-z])([A-Z0-9])/g,'$1 $2');
@@ -3180,6 +3188,7 @@ function resetGame(){
   banner('Get ready',curMap.ready);
 }
 function continueRun(){
+  if(!$('keysDlg').hidden) return;
   const d=loadRun(); if(!d){ refreshTitle(); return; }
   selectDiff(d.diff); selectMap(MAPS[d.map]?d.map:'station'); initAudio(); resetGame(); $('banner').classList.remove('show');
   wave=d.wave|0; score=d.score|0; kills=d.kills|0; cash=Math.max(0,d.cash|0); bossCount=d.bossCount|0;
@@ -3214,6 +3223,7 @@ function newGameClick(){
   startGame();
 }
 function startGame(){
+  if(!$('keysDlg').hidden) return;
   initAudio(); resetGame(); state='playing';
   $('titleScreen').hidden=true; $('overScreen').hidden=true; $('pauseScreen').hidden=true; $('shopScreen').hidden=true;
   setPlayingUI(true); showGun();
@@ -3227,7 +3237,7 @@ function pause(){
   if(document.pointerLockElement) document.exitPointerLock();
 }
 function resume(){
-  if(state!=='paused') return;
+  if(state!=='paused'||!$('keysDlg').hidden) return;
   initAudio(); state='playing'; $('pauseScreen').hidden=true; setPlayingUI(true);
   if(!isTouch&&!freeLook) requestLock();
   clock.getDelta();
@@ -3257,7 +3267,9 @@ document.querySelectorAll('.diffBtn').forEach(b=>b.addEventListener('click',()=>
 $('resumeBtn').addEventListener('click',resume);
 
 /* controls: the title list and the rebinding dialog */
-const keysDlg=$('keysDlg'); let keyListen=null, keysOpener=null, keyBoundAt=0;
+const keysDlg=$('keysDlg'); let keyListen=null, keysOpener=null, keyBoundAt=0, listenAt=0, modPending=null;
+const KEYS_BEHIND=['titleScreen','pauseScreen','shopScreen','overScreen','hud','touchUI'];  /* inert while the dialog is open */
+try{ navigator.keyboard.getLayoutMap().then(m=>{ let ch=false; m.forEach((v,k)=>{ if(setLabel(k,v)) ch=true; }); if(ch){ renderKeyList(); if(!keysDlg.hidden&&!keyListen) renderKeyGrid(); } }).catch(()=>{}); }catch(e){}
 function bindLabel(b){
   const c=b.filter(Boolean), m=c.length===2&&c[0].replace(/Left|Right/,'')===c[1].replace(/Left|Right/,'')&&c[0]!==c[1]&&/Left|Right/.test(c[0])&&/^(Shift|Control|Alt|Meta)/.test(c[0]);
   if(m) return `<kbd>${keyName(c[0]).replace(/^(Left|Right) /,'')}</kbd>`;  /* Left + Right Shift reads as Shift */
@@ -3286,8 +3298,12 @@ function renderKeyGrid(){
   }
   $('keyGrid').innerHTML=h;
 }
-function openKeys(from){ keysOpener=from||null; keyListen=null; $('keysHint').textContent=KEYS_HINT; renderKeyGrid(); keysDlg.hidden=false; keysDlg.querySelector('.keysCard').scrollTop=0; try{ $('keysDone').focus({preventScroll:true}); }catch(e){} }
-function closeKeys(){ keyListen=null; keysDlg.hidden=true; renderKeyList(); for(const k in keys) keys[k]=false; if(keysOpener) try{ keysOpener.focus({preventScroll:true}); }catch(e){} }
+function setBehind(v){ for(const id of KEYS_BEHIND){ const el=$(id); if(el) el.inert=v; } }
+function openKeys(from){ keysOpener=from||null; keyListen=null; modPending=null; $('keysHint').textContent=KEYS_HINT; renderKeyGrid(); setBehind(true); keysDlg.hidden=false; keysDlg.querySelector('.keysCard').scrollTop=0; try{ $('keysDone').focus({preventScroll:true}); }catch(e){} }
+function closeKeys(){ keyListen=null; modPending=null; keysDlg.hidden=true; setBehind(false); renderKeyList(); for(const k in keys) keys[k]=false; if(keysOpener) try{ keysOpener.focus({preventScroll:true}); }catch(e){} }
+function focusBox(id,slot){ const b=$('keyGrid').querySelector(`[data-act="${id}"][data-slot="${slot}"]`); if(b) try{ b.focus({preventScroll:true}); }catch(e){} }
+function listenTo(id,slot){ keyListen={id,slot}; listenAt=performance.now(); modPending=null; $('keysHint').textContent=KEYS_HINT; renderKeyGrid(); focusBox(id,slot); }
+function cancelListen(refocus){ const l=keyListen; keyListen=null; modPending=null; $('keysHint').textContent=KEYS_HINT; renderKeyGrid(); if(l&&refocus) focusBox(l.id,l.slot); }
 function setBind(code){
   const {id,slot}=keyListen; keyListen=null; let note='';
   if(code){
@@ -3296,36 +3312,60 @@ function setBind(code){
   binds[id][slot]=code; saveBinds(); renderKeyGrid();
   const lab=KEY_ACTIONS.find(a=>a[0]===id)[1];
   $('keysHint').textContent=code?`${lab} is now ${keyName(code)}.${note}`:`Cleared that box for ${lab}.`;
-  const b=$('keyGrid').querySelector(`[data-act="${id}"][data-slot="${slot}"]`); if(b) try{ b.focus({preventScroll:true}); }catch(e){}
+  focusBox(id,slot);
 }
 $('keyGrid').addEventListener('click',e=>{
   const b=e.target.closest('.kbtn'); if(!b||performance.now()-keyBoundAt<400) return;
   if(keyListen&&keyListen.id===b.dataset.act&&keyListen.slot===+b.dataset.slot&&e.detail>0) return;
-  keyListen={id:b.dataset.act,slot:+b.dataset.slot}; $('keysHint').textContent=KEYS_HINT; renderKeyGrid();
-  const nb=$('keyGrid').querySelector(`[data-act="${keyListen.id}"][data-slot="${keyListen.slot}"]`); if(nb) try{ nb.focus({preventScroll:true}); }catch(e){}
+  listenTo(b.dataset.act,+b.dataset.slot);
 });
 /* while listening, the next key or a mouse button pressed on that box becomes the binding */
 addEventListener('keydown',e=>{
+  const ae=document.activeElement;  /* a held Enter would open and close the dialog over and over */
+  if(e.repeat&&!keyListen&&/^(Enter|NumpadEnter|Space)$/.test(e.code)&&(!keysDlg.hidden||ae===$('keysBtn')||ae===$('pauseKeysBtn'))){ e.preventDefault(); return; }
   if(keysDlg.hidden) return;
-  if(!keyListen){ if(e.code==='Escape'){ e.preventDefault(); e.stopImmediatePropagation(); closeKeys(); } return; }
+  if(!keyListen){
+    if(e.code==='Escape'){ e.preventDefault(); e.stopImmediatePropagation(); closeKeys(); }
+    else if(e.code==='Tab'){  /* keep focus inside the dialog */
+      const f=[...keysDlg.querySelectorAll('button')], i=f.indexOf(ae);
+      if(e.shiftKey?i<=0:(i<0||i===f.length-1)){ e.preventDefault(); try{ f[e.shiftKey?f.length-1:0].focus(); }catch(er){} }
+    }
+    return;
+  }
   e.preventDefault(); e.stopImmediatePropagation();
   if(e.repeat) return;
-  if(e.code==='Escape'){ keyListen=null; $('keysHint').textContent=KEYS_HINT; renderKeyGrid(); return; }
+  if(e.code==='Escape'){ cancelListen(true); return; }
+  if(/^(Control|Meta|OS)/.test(e.code)){ modPending=null; $('keysHint').textContent='Ctrl and Cmd clash with browser shortcuts, like closing the tab. Pick another key.'; return; }
+  if(/^(Shift|Alt)/.test(e.code)){ modPending=e.code; return; }  /* bound on release, so Alt+Tab away doesn't bind Alt */
+  modPending=null;
+  if(!e.ctrlKey&&!e.altKey&&!e.metaKey) setLabel(e.code,e.key);
   setBind(e.code==='Backspace'||e.code==='Delete'?'':e.code);
+},true);
+addEventListener('keyup',e=>{
+  if(keysDlg.hidden||!keyListen) return;
+  e.preventDefault();
+  if(modPending&&e.code===modPending){ modPending=null; setBind(e.code); }
 },true);
 keysDlg.addEventListener('mousedown',e=>{
   if(!keyListen) return;
   const b=e.target.closest('.kbtn');
-  if(b&&b.dataset.act===keyListen.id&&+b.dataset.slot===keyListen.slot){ e.preventDefault(); keyBoundAt=performance.now(); setBind('Mouse'+e.button); }
-  else{ keyListen=null; renderKeyGrid(); }
+  if(b&&b.dataset.act===keyListen.id&&+b.dataset.slot===keyListen.slot){
+    e.preventDefault();
+    if(e.detail>1||performance.now()-listenAt<400) return;  /* the second half of a double click is not a binding */
+    keyBoundAt=performance.now(); setBind('Mouse'+e.button);
+  }
+  else if(b){ e.preventDefault(); listenTo(b.dataset.act,+b.dataset.slot); }  /* clicking another box moves to it */
+  else cancelListen(!e.target.closest('button'));
 });
 keysDlg.addEventListener('auxclick',e=>e.preventDefault());
+keysDlg.addEventListener('mouseup',e=>{ if(e.button>2) e.preventDefault(); });  /* Mouse 4/5 would go Back/Forward */
 $('keysReset').addEventListener('click',()=>{ for(const [id,,def] of KEY_ACTIONS) binds[id]=def.slice(); saveBinds(); keyListen=null; renderKeyGrid(); $('keysHint').textContent='All controls are back to the defaults.'; });
 $('keysDone').addEventListener('click',closeKeys);
 $('keysBtn').addEventListener('click',()=>openKeys($('keysBtn')));
 $('pauseKeysBtn').addEventListener('click',()=>openKeys($('pauseKeysBtn')));
 renderKeyList();
 function toMenu(){
+  if(!keysDlg.hidden) closeKeys();
   if(state==='shop'){ swapDlg.hidden=true; codeDlg.hidden=true; pendingBuy=null; saveRun(); }
   else if(state==='paused'&&phase==='shopwait'){ if(papT>0) finishPap(); saveRun(); }  /* wave cleared, counter not open yet */
   state='title'; titleT=0; wave=0; mouseDown=false; ads=false; adsT=0; reloading=false; papT=0; papSlot=null; spinT=0; cheat=false;
@@ -3477,14 +3517,14 @@ addEventListener('keydown',e=>{
   }
 });
 addEventListener('keyup',e=>{ keys[e.code]=false; releaseActs(actsFor(e.code)); });
-addEventListener('blur',()=>{ for(const k in keys) keys[k]=false; mouseDown=false; ads=false; });
+addEventListener('blur',()=>{ for(const k in keys) keys[k]=false; mouseDown=false; ads=false; if(isTouch) $('tAim').classList.remove('on'); if(keyListen) cancelListen(false); });
 document.addEventListener('mousedown',e=>{
-  if(state!=='playing'||isTouch) return;
+  if(state!=='playing'||isTouch||!keysDlg.hidden) return;
   if(e.button>2) e.preventDefault();
   if(!locked&&!freeLook){ requestLock(); return; }
   const c='Mouse'+e.button; keys[c]=true; pressActs(actsFor(c),false);
 });
-document.addEventListener('mouseup',e=>{ if(e.button>2&&state==='playing') e.preventDefault(); const c='Mouse'+e.button; keys[c]=false; releaseActs(actsFor(c)); });
+document.addEventListener('mouseup',e=>{ if(e.button>2&&(state!=='title'||!keysDlg.hidden)) e.preventDefault();  /* Mouse 4/5 would leave the page */ const c='Mouse'+e.button; keys[c]=false; releaseActs(actsFor(c)); });
 document.addEventListener('contextmenu',e=>e.preventDefault());
 document.addEventListener('mousemove',e=>{
   if(state!=='playing'||isTouch||!(locked||freeLook)) return;
